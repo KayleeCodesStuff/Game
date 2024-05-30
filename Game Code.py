@@ -120,7 +120,7 @@ class Player(pygame.sprite.Sprite):
         return fruit.name
 
     def attack(self, enemy):
-        damage_dealt = max(self.damage - self.damage_reduction, 0)
+        damage_dealt = max(self.damage, 0) 
         enemy.health -= damage_dealt
         if enemy.health <= 0:
             enemy.kill()
@@ -132,11 +132,11 @@ class Player(pygame.sprite.Sprite):
                 global malakar_spawn_allowed_time
                 malakar_spawn_allowed_time = pygame.time.get_ticks() + 15000  # 15 seconds delay before Malakar can respawn
 
-    def take_damage(self, amount):
+    def take_damage(self, enemydamage):
         if not self.invulnerable:
             current_time = pygame.time.get_ticks()
             if current_time - self.last_hit > 1000:  # 1 second cooldown
-                self.health -= max(amount - self.damage_reduction, 0)
+                self.health -= max(enemydamage - self.damage_reduction, 0)
                 self.speed = max(self.speed - 1, 1)  # Permanent -1 speed penalty, but not less than 1
                 self.last_hit = current_time
 
@@ -614,7 +614,7 @@ while running:
         pygame.time.wait(3000)
         running = False
 
-    if player.level >= 100: #hi
+    if player.level >= 100:
         draw_text(screen, 'YOU WIN', 50, WIDTH // 2, HEIGHT // 2, GREEN)
         pygame.display.flip()
         pygame.time.wait(3000)
