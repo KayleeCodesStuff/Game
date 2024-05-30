@@ -12,50 +12,49 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Elysian Grove Adventure")
 
 # Load character images with error handling
-def load_image(name, size=None):
+def load_image(name):
     try:
         image = pygame.image.load(name)
-        if size:
-            image = pygame.transform.scale(image, size)
         return image.convert_alpha()  # Ensure transparency is handled correctly
     except pygame.error as message:
         print(f"Cannot load image: {name}")
         raise SystemExit(message)
 
 # Load images
-luminara_img = load_image("luminara.png", (90, 90))
-luminara_invuln_img = load_image("luminarainvuln.png", (90, 90))
-enemy_img = load_image("enemy.png", (67, 67))
-bossenemy_img = load_image("bossenemy.png", (134, 134))
-malakar_img = load_image("malakar.png", (268, 268))
-background_img = load_image("background.png")
-ripple_img = load_image("ripple.png", (45, 45))
-
-# Load fruit images
-fruit_images = {
-    "Gleam Berry": load_image("gleamberry.png", (45, 45)),
-    "Shimmering Apple": load_image("shimmeringapple.png", (45, 45)),
-    "Ethereal Pear": load_image("etherealpear.png", (45, 45)),
-    "Flamefruit": load_image("flamefruit.png", (45, 45)),
-    "Moonbeam Melon": load_image("moonbeammelon.png", (45, 45)),
+images = {
+    "luminara": pygame.transform.scale(load_image("luminara.png"), (90, 90)),
+    "luminarainvuln": pygame.transform.scale(load_image("luminarainvuln.png"), (90, 90)),
+    "enemy": pygame.transform.scale(load_image("enemy.png"), (67, 67)),
+    "bossenemy": pygame.transform.scale(load_image("bossenemy.png"), (134, 134)),
+    "malakar": pygame.transform.scale(load_image("malakar.png"), (268, 268)),
+    "background": load_image("background.png"),
+    "ripple": pygame.transform.scale(load_image("ripple.png"), (45, 45)),
+    "gleamberry": pygame.transform.scale(load_image("gleamberry.png"), (45, 45)),
+    "shimmeringapple": pygame.transform.scale(load_image("shimmeringapple.png"), (45, 45)),
+    "etherealpear": pygame.transform.scale(load_image("etherealpear.png"), (45, 45)),
+    "flamefruit": pygame.transform.scale(load_image("flamefruit.png"), (45, 45)),
+    "moonbeammelon": pygame.transform.scale(load_image("moonbeammelon.png"), (45, 45))
 }
 
 # Colors
-WHITE, GREEN, RED, BLUE, BLACK = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+BLACK = (0, 0, 0)
 
-# Base Sprite class
 class BaseSprite(pygame.sprite.Sprite):
     def __init__(self, x, y, image):
         super().__init__()
         self.image = image
-        self.rect = self.image.get_rect(topleft=(x, y))
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
 
-# Player class
 class Player(BaseSprite):
-    def __init__(self, image):
-        super().__init__(WIDTH // 2, PLAYABLE_HEIGHT // 2, image)
-        self.default_image = image
-        self.invuln_image = luminara_invuln_img
+    def __init__(self):
+        super().__init__(WIDTH // 2, PLAYABLE_HEIGHT // 2, images["luminara"])
+        self.default_image = self.image
+        self.invuln_image = images["luminarainvuln"]
         self.base_speed = 5
         self.permanent_speed_boost = 0
         self.speed = self.base_speed
@@ -66,7 +65,13 @@ class Player(BaseSprite):
         self.level = 1
         self.health = 100
         self.max_health = 100
-        self.inventory = {fruit: 0 for fruit in fruit_images}
+        self.inventory = {
+            "gleamberry": 0,
+            "shimmeringapple": 0,
+            "etherealpear": 0,
+            "flamefruit": 0,
+            "moonbeammelon": 0
+        }
         self.invulnerable = False
         self.last_hit = pygame.time.get_ticks()
         self.invuln_end_time = 0
@@ -83,22 +88,24 @@ class Player(BaseSprite):
         self.damage_reduction_end_times = []
 
     def move(self, dx, dy):
-        self.rect.x = max(0, min(self.rect.x + dx * self.speed, WIDTH - self.rect.width))
-        self.rect.y = max(0, min(self.rect.y + dy * self.speed, PLAYABLE_HEIGHT - self.rect.height))
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
+        self.rect.x = max(0, min(self.rect.x, WIDTH - self.rect.width))
+        self.rect.y = max(0, min(self.rect.y, PLAYABLE_HEIGHT - self.rect.height))
 
     def collect_fruit(self, fruit):
         self.inventory[fruit.name] += 1
-        if fruit.name == "Gleam Berry":
+        if fruit.name == "gleamberry":
             self.health = min(self.health + 10, self.max_health)
             spawn_ripple(fruit.rect.center)
-        elif fruit.name == "Shimmering Apple":
+        elif fruit.name == "shimmeringapple":
             self.speed_boost_end_time = pygame.time.get_ticks() + 12000
             self.speed = (self.base_speed + self.permanent_speed_boost) * 2
-        elif fruit.name == "Ethereal Pear":
+        elif fruit.name == "etherealpear":
             self.experience += 150
             self.health = min(self.health + 20, self.max_health + 20)
             self.max_health += 5
-        elif fruit.name == "Flamefruit":
+        elif fruit.name == "flamefruit":
             self.experience += 100
             self.flamefruit_end_time = pygame.time.get_ticks() + 3000
             self.flamefruit_active = True
@@ -106,7 +113,7 @@ class Player(BaseSprite):
             if self.level > 50:
                 self.damage_reduction += 10
                 self.damage_reduction_end_times.append(pygame.time.get_ticks() + 5000)
-        elif fruit.name == "Moonbeam Melon":
+        elif fruit.name == "moonbeammelon":
             self.experience += 200
             self.damage = (self.base_damage + self.permanent_damage_boost) * 5
             self.melon_end_time = pygame.time.get_ticks() + 9000
@@ -149,10 +156,7 @@ class Player(BaseSprite):
                     distance = math.hypot(self.rect.centerx - sprite.rect.centerx, self.rect.centery - sprite.rect.centery)
                     if distance <= WIDTH // 5:
                         sprite.health -= 500
-                        sprite.speed = 0
-                        sprite.freeze_end_time = pygame.time.get_ticks() + 2000
-                        sprite.original_color = sprite.image.copy()
-                        sprite.image.fill(RED, special_flags=pygame.BLEND_MULT)
+                        sprite.freeze()
                         if sprite.health <= 0:
                             sprite.kill()
                             self.experience += 50
@@ -210,81 +214,82 @@ class Enemy(BaseSprite):
                 self.image = self.original_color
 
         if pygame.sprite.collide_circle_ratio(self.aggro_radius / self.rect.width)(self, player):
-            if self.rect.x < player.rect.x:
-                self.rect.x += self.speed
-            elif self.rect.x > player.rect.x:
-                self.rect.x -= self.speed
-            if self.rect.y < player.rect.y:
-                self.rect.y += self.speed
-            elif self.rect.y > player.rect.y:
-                self.rect.y -= self.speed
+            self.move_towards(player.rect.center)
             if pygame.sprite.collide_rect(self, player):
-                player.take_damage(1 + player.level // 4)
+                player.take_damage(self.calculate_damage())
+
         elif player.flamefruit_active and player.flamefruit_position:
-            if self.rect.x < player.flamefruit_position[0]:
-                self.rect.x += self.speed
-            elif self.rect.x > player.flamefruit_position[0]:
-                self.rect.x -= self.speed
-            if self.rect.y < player.flamefruit_position[1]:
-                self.rect.y += self.speed
-            elif self.rect.y > player.flamefruit_position[1]:
-                self.rect.y -= self.speed
+            self.move_towards(player.flamefruit_position)
+
+    def move_towards(self, target):
+        dx, dy = target[0] - self.rect.centerx, target[1] - self.rect.centery
+        distance = math.hypot(dx, dy)
+        if distance > 0:
+            dx, dy = dx / distance, dy / distance
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
+
+    def calculate_damage(self):
+        raise NotImplementedError("This method should be overridden by subclasses")
+
+    def freeze(self):
+        self.speed = 0
+        self.freeze_end_time = pygame.time.get_ticks() + 2000
+        self.original_color = self.image.copy()
+        self.image.fill(RED, special_flags=pygame.BLEND_MULT)
 
 class NightCrawler(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, enemy_img, 100, (0.5, 1.5), WIDTH // 5)
+        super().__init__(x, y, images["enemy"], 100, (0.5, 1.5), WIDTH // 5)
+
+    def calculate_damage(self):
+        return 1 + player.level // 4
 
 class BossEnemy(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, bossenemy_img, 500, (0.5, 1.5), WIDTH // 5)
+        super().__init__(x, y, images["bossenemy"], 500, (0.5, 1.5), WIDTH // 5)
 
-    def update(self):
-        super().update()
-        if pygame.sprite.collide_circle_ratio(self.aggro_radius / self.rect.width)(self, player):
-            if pygame.sprite.collide_rect(self, player):
-                player.take_damage(10 + player.level // 2)
+    def calculate_damage(self):
+        return 10 + player.level // 2
 
 class Malakar(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y, malakar_img, 5000, (0.5, 1.5), WIDTH // 2)
+        super().__init__(x, y, images["malakar"], 5000, (0.5, 1.5), WIDTH // 2)
 
-    def update(self):
-        super().update()
-        if pygame.sprite.collide_circle_ratio(self.aggro_radius / self.rect.width)(self, player):
-            if pygame.sprite.collide_rect(self, player):
-                player.take_damage(10 + player.level)
+    def calculate_damage(self):
+        return 10 + player.level
 
 class Fruit(BaseSprite):
     def __init__(self, x, y, name):
-        super().__init__(x, y, fruit_images[name])
+        super().__init__(x, y, images[name])
         self.name = name
 
 class Ripple(BaseSprite):
     def __init__(self, x, y):
-        super().__init__(x, y, ripple_img)
+        super().__init__(x, y, images["ripple"])
         self.speed = 1
 
     def update(self):
         nearest_enemy = min(
-            [enemy for group in [enemies, bossenemies, malakar_group] for enemy in group],
+            enemies.sprites() + bossenemies.sprites() + malakar_group.sprites(),
             key=lambda enemy: math.hypot(self.rect.centerx - enemy.rect.centerx, self.rect.centery - enemy.rect.centery),
             default=None
         )
         if nearest_enemy:
-            if self.rect.centerx < nearest_enemy.rect.centerx:
-                self.rect.x += self.speed
-            elif self.rect.centerx > nearest_enemy.rect.centerx:
-                self.rect.x -= self.speed
-            if self.rect.centery < nearest_enemy.rect.centery:
-                self.rect.y += self.speed
-            elif self.rect.centery > nearest_enemy.rect.centery:
-                self.rect.y -= self.speed
-
+            self.move_towards(nearest_enemy.rect.center)
             if pygame.sprite.collide_rect(self, nearest_enemy):
                 nearest_enemy.health -= 10000
                 if nearest_enemy.health <= 0:
                     nearest_enemy.kill()
                 self.kill()
+
+    def move_towards(self, target):
+        dx, dy = target[0] - self.rect.centerx, target[1] - self.rect.centery
+        distance = math.hypot(dx, dy)
+        if distance > 0:
+            dx, dy = dx / distance, dy / distance
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
 
 def spawn_ripple(position):
     ripple = Ripple(*position)
@@ -292,27 +297,21 @@ def spawn_ripple(position):
 
 def draw_inventory(surface, player):
     pygame.draw.rect(surface, BLUE, (0, PLAYABLE_HEIGHT, WIDTH, HEIGHT - PLAYABLE_HEIGHT))
-    x_offset = 10
-    y_offset = PLAYABLE_HEIGHT + 10
+    x_offset, y_offset = 10, PLAYABLE_HEIGHT + 10
     for fruit, image in fruit_images.items():
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(player.inventory[fruit]), 18, x_offset + 30, y_offset, WHITE)
         x_offset += 50
-    if player.invulnerable:
-        draw_text(surface, 'Status: Invulnerable', 18, x_offset + 30, PLAYABLE_HEIGHT + 10, GREEN)
 
 def draw_legend(surface):
     legend_text = ["Arrow Keys: Move", "Spacebar: Attack", "N: Special Attack", "P: Pause"]
-    x = WIDTH - 150
-    y = HEIGHT - 50
+    x, y = WIDTH - 150, HEIGHT - 50
     for line in legend_text:
         draw_text(surface, line, 18, x, y, WHITE)
         y += 20
 
 def draw_health_bar(surface, x, y, health, max_health, width, height, border=2):
-    if health < 0:
-        health = 0
-    fill = (health / max_health) * width
+    fill = max(health, 0) / max_health * width
     outline_rect = pygame.Rect(x, y, width, height)
     fill_rect = pygame.Rect(x, y, fill, height)
     pygame.draw.rect(surface, RED if health > max_health * 0.1 else WHITE, fill_rect)
@@ -321,99 +320,104 @@ def draw_health_bar(surface, x, y, health, max_health, width, height, border=2):
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
     text_surface = font.render(text, True, color)
-    text_rect = text_surface.get_rect()
-    text_rect.midtop = (x, y)
+    text_rect = text_surface.get_rect(midtop=(x, y))
     surface.blit(text_surface, text_rect)
 
-player = Player(luminara_img)
+def increase_max_health():
+    player.max_health += 10
+
+def increase_speed():
+    player.permanent_speed_boost += 1
+
+def increase_level():
+    player.level += 1
+
+def increase_damage_reduction():
+    player.permanent_damage_reduction += 5
+
+def increase_damage():
+    player.permanent_damage_boost += 5
+
+player = Player()
 all_sprites = pygame.sprite.Group()
 fruits = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
 bossenemies = pygame.sprite.Group()
 malakar_group = pygame.sprite.Group()
-
 all_sprites.add(player)
+
+fruit_images = {
+    "gleamberry": images["gleamberry"],
+    "shimmeringapple": images["shimmeringapple"],
+    "etherealpear": images["etherealpear"],
+    "flamefruit": images["flamefruit"],
+    "moonbeammelon": images["moonbeammelon"]
+}
 
 for _ in range(10):
     name = random.choice(list(fruit_images.keys()))
-    fruit = Fruit(random.randint(0, WIDTH-30), random.randint(0, PLAYABLE_HEIGHT-30), name)
+    fruit = Fruit(random.randint(0, WIDTH - 30), random.randint(0, PLAYABLE_HEIGHT - 30), name)
     fruits.add(fruit)
     all_sprites.add(fruit)
 
 for _ in range(10):
-    enemy = NightCrawler(random.randint(0, WIDTH-45), random.randint(0, PLAYABLE_HEIGHT-45))
+    enemy = NightCrawler(random.randint(0, WIDTH - 45), random.randint(0, PLAYABLE_HEIGHT - 45))
     enemies.add(enemy)
     all_sprites.add(enemy)
 
-running = True
-paused = False
-game_won = False
+running, paused, game_won = True, False, False
 clock = pygame.time.Clock()
 
-fruit_spawn_time = pygame.time.get_ticks()
-enemy_spawn_time = pygame.time.get_ticks()
-bossenemy_spawn_time = pygame.time.get_ticks()
-malakar_spawn_allowed_time = pygame.time.get_ticks() + 30000
-
-show_fruit_name = False
-fruit_name = ""
-fruit_name_time = 0
+fruit_spawn_time, enemy_spawn_time = pygame.time.get_ticks(), pygame.time.get_ticks()
+bossenemy_spawn_time, malakar_spawn_allowed_time = pygame.time.get_ticks(), pygame.time.get_ticks() + 30000
+show_fruit_name, fruit_name, fruit_name_time = False, "", 0
 
 def show_menu():
     screen.fill(BLACK)
     draw_text(screen, "Elysian Grove Adventure", 50, WIDTH // 2, HEIGHT // 4, WHITE)
     draw_text(screen, "Press S to Start", 30, WIDTH // 2, HEIGHT // 2, WHITE)
     pygame.display.flip()
-    waiting = True
-    while waiting:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_s:
-                    waiting = False
-
-def show_upgrade_menu():
-    screen.fill(BLACK)
-    draw_text(screen, "Upgrade Menu", 50, WIDTH // 2, HEIGHT // 4, WHITE)
-    draw_text(screen, "Press 1 to Increase Max Health with Gleam Berry", 30, WIDTH // 2, HEIGHT // 2 - 60, WHITE)
-    draw_text(screen, "Press 2 to Increase Speed with Shimmering Apple", 30, WIDTH // 2, HEIGHT // 2 - 30, WHITE)
-    draw_text(screen, "Press 3 to Increase Level with Ethereal Pear", 30, WIDTH // 2, HEIGHT // 2, WHITE)
-    draw_text(screen, "Press 4 to Increase Damage Reduction with Flamefruit", 30, WIDTH // 2, HEIGHT // 2 + 30, WHITE)
-    draw_text(screen, "Press 5 to Increase Damage with Moonbeam Melon", 30, WIDTH // 2, HEIGHT // 2 + 60, WHITE)
-    draw_text(screen, "Press P to Resume Game", 30, WIDTH // 2, HEIGHT // 2 + 90, WHITE)
-    pygame.display.flip()
-
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_1 and player.inventory["Gleam Berry"] > 0:
-                    player.max_health += 10
-                    player.inventory["Gleam Berry"] -= 1
-                if event.key == pygame.K_2 and player.inventory["Shimmering Apple"] > 0:
-                    player.permanent_speed_boost += 1
-                    player.inventory["Shimmering Apple"] -= 1
-                if event.key == pygame.K_3 and player.inventory["Ethereal Pear"] > 0:
-                    player.level += 1
-                    player.inventory["Ethereal Pear"] -= 1
-                if event.key == pygame.K_4 and player.inventory["Flamefruit"] > 0:
-                    player.permanent_damage_reduction += 5
-                    player.inventory["Flamefruit"] -= 1
-                if event.key == pygame.K_5 and player.inventory["Moonbeam Melon"] > 0:
-                    player.permanent_damage_boost += 5
-                    player.inventory["Moonbeam Melon"] -= 1
+                if event.key == pygame.K_s:
+                    return
+
+def show_upgrade_menu():
+    screen.fill(BLACK)
+    options = [
+        ("Increase Max Health with Gleam Berry", "gleamberry", increase_max_health),
+        ("Increase Speed with Shimmering Apple", "shimmeringapple", increase_speed),
+        ("Increase Level with Ethereal Pear", "etherealpear", increase_level),
+        ("Increase Damage Reduction with Flamefruit", "flamefruit", increase_damage_reduction),
+        ("Increase Damage with Moonbeam Melon", "moonbeammelon", increase_damage)
+    ]
+    for i, (text, fruit, action) in enumerate(options):
+        draw_text(screen, f"Press {i + 1} to {text}", 30, WIDTH // 2, HEIGHT // 2 - 60 + i * 30, WHITE)
+    draw_text(screen, "Press P to Resume Game", 30, WIDTH // 2, HEIGHT // 2 + 90, WHITE)
+    pygame.display.flip()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
                     return
+                if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
+                    index = event.key - pygame.K_1
+                    fruit = options[index][1]
+                    if player.inventory[fruit] > 0:
+                        action()
+                        player.inventory[fruit] -= 1
 
 show_menu()
 
 while running:
     current_time = pygame.time.get_ticks()
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -427,14 +431,13 @@ while running:
 
     if not paused and not game_won and player.health > 0:
         keys = pygame.key.get_pressed()
-        dx, dy = (keys[pygame.K_RIGHT] - keys[pygame.K_LEFT]), (keys[pygame.K_DOWN] - keys[pygame.K_UP])
+        dx, dy = keys[pygame.K_RIGHT] - keys[pygame.K_LEFT], keys[pygame.K_DOWN] - keys[pygame.K_UP]
         player.move(dx, dy)
 
         collected_fruits = pygame.sprite.spritecollide(player, fruits, True)
         for fruit in collected_fruits:
             fruit_name = player.collect_fruit(fruit)
-            show_fruit_name = True
-            fruit_name_time = current_time
+            show_fruit_name, fruit_name_time = True, current_time
 
         enemies_hit = pygame.sprite.spritecollide(player, enemies, False)
         bossenemies_hit = pygame.sprite.spritecollide(player, bossenemies, False)
@@ -449,31 +452,31 @@ while running:
 
         if current_time - fruit_spawn_time >= 2000:
             name = random.choice(list(fruit_images.keys()))
-            fruit = Fruit(random.randint(0, WIDTH-30), random.randint(0, PLAYABLE_HEIGHT-30), name)
+            fruit = Fruit(random.randint(0, WIDTH - 30), random.randint(0, PLAYABLE_HEIGHT - 30), name)
             fruits.add(fruit)
             all_sprites.add(fruit)
             fruit_spawn_time = current_time
 
         if current_time - enemy_spawn_time >= 2000:
-            enemy = NightCrawler(random.randint(0, WIDTH-45), random.randint(0, PLAYABLE_HEIGHT-45))
+            enemy = NightCrawler(random.randint(0, WIDTH - 45), random.randint(0, PLAYABLE_HEIGHT - 45))
             enemies.add(enemy)
             all_sprites.add(enemy)
             enemy_spawn_time = current_time
 
         if len(bossenemies) < 3 and current_time - bossenemy_spawn_time >= 5000:
-            bossenemy = BossEnemy(random.randint(0, WIDTH-90), random.randint(0, PLAYABLE_HEIGHT-90))
+            bossenemy = BossEnemy(random.randint(0, WIDTH - 90), random.randint(0, PLAYABLE_HEIGHT - 90))
             bossenemies.add(bossenemy)
             all_sprites.add(bossenemy)
             bossenemy_spawn_time = current_time
 
         if len(bossenemies) == 0 and len(malakar_group) == 0 and current_time > malakar_spawn_allowed_time:
-            malakar = Malakar(random.randint(0, WIDTH-90), random.randint(0, PLAYABLE_HEIGHT-90))
+            malakar = Malakar(random.randint(0, WIDTH - 90), random.randint(0, PLAYABLE_HEIGHT - 90))
             malakar_group.add(malakar)
             all_sprites.add(malakar)
 
         all_sprites.update()
 
-    screen.blit(background_img, (0, 0))
+    screen.blit(images["background"], (0, 0))
     all_sprites.draw(screen)
     draw_inventory(screen, player)
     draw_legend(screen)
@@ -486,11 +489,9 @@ while running:
         draw_health_bar(screen, malakar.rect.x, malakar.rect.y - 10, malakar.health, 5000, 40, 5)
 
     draw_health_bar(screen, player.rect.x - 10, player.rect.y - 15, player.health, player.max_health, 60, 10, 2)
-
     draw_text(screen, f'Speed: {player.speed}', 18, WIDTH - 100, 10, WHITE)
     draw_text(screen, f'Damage: {player.damage}', 18, WIDTH - 100, 30, WHITE)
     draw_text(screen, f'Damage Reduction: {player.damage_reduction}', 18, WIDTH - 100, 50, WHITE)
-
     draw_text(screen, f'Level: {player.level}', 18, 50, 10, WHITE)
     draw_text(screen, f'Experience: {player.experience}', 18, 150, 10, WHITE)
     draw_text(screen, f'Health: {int(player.health)}', 18, 250, 10, WHITE)
