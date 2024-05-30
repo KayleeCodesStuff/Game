@@ -18,7 +18,7 @@ def load_image(name):
     except pygame.error as message:
         print(f"Cannot load image: {name}")
         raise SystemExit(message)
-    #making changes
+    # making changes
 
 # Load images
 luminara_img = load_image("luminara.png")
