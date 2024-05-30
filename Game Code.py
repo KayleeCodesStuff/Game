@@ -614,7 +614,7 @@ while running:
         pygame.time.wait(3000)
         running = False
 
-    if player.level >= 100:
+    if player.level >= 100: #hi
         draw_text(screen, 'YOU WIN', 50, WIDTH // 2, HEIGHT // 2, GREEN)
         pygame.display.flip()
         pygame.time.wait(3000)
