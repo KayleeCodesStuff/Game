@@ -102,7 +102,9 @@ class Player(pygame.sprite.Sprite):
             self.invuln_end_time = pygame.time.get_ticks() + 2000
 
         self.experience += 100
-        self.check_level_up()
+        if self.experience >= 1000:
+            self.level += 1
+            self.experience -= 1000  # Correcting the experience point reset
         return fruit.name
 
     def attack(self, enemy):
@@ -117,18 +119,15 @@ class Player(pygame.sprite.Sprite):
                 self.experience += 1000
                 global malakar_spawn_allowed_time
                 malakar_spawn_allowed_time = pygame.time.get_ticks() + 15000
-        self.check_level_up()
+        if self.experience >= 1000:
+            self.level += 1
+            self.experience -= 1000  # Correcting the experience point reset
 
     def take_damage(self, enemydamage):
         if not self.invulnerable and pygame.time.get_ticks() - self.last_hit > 1000:
             self.health -= max(enemydamage - (self.damage_reduction + self.permanent_damage_reduction), 0)
             self.speed = max(self.speed - 1, 1)
             self.last_hit = pygame.time.get_ticks()
-
-    def check_level_up(self):
-        while self.experience >= 1000:
-            self.level += 1
-            self.experience -= 1000
 
     def update(self):
         current_time = pygame.time.get_ticks()
@@ -197,6 +196,7 @@ class Enemy(pygame.sprite.Sprite):
         self.speed = 1
         self.aggro_radius = config["width"] // 5
         self.freeze_end_time = 0
+        self.target = player  # Default target is the player
 
     def update(self):
         current_time = pygame.time.get_ticks()
@@ -207,7 +207,15 @@ class Enemy(pygame.sprite.Sprite):
             if hasattr(self, 'original_color'):
                 self.image = self.original_color
 
-            dx, dy = player.rect.x - self.rect.x, player.rect.y - self.rect.y
+            if player.flamefruit_active and current_time <= player.flamefruit_end_time:
+                self.target = player.flamefruit_position
+            else:
+                self.target = player
+
+            if isinstance(self.target, tuple):
+                dx, dy = self.target[0] - self.rect.x, self.target[1] - self.rect.y
+            else:
+                dx, dy = self.target.rect.x - self.rect.x, self.target.rect.y - self.rect.y
             distance = math.hypot(dx, dy)
 
             if distance != 0:
@@ -215,20 +223,9 @@ class Enemy(pygame.sprite.Sprite):
 
             if self.rect.colliderect(player.rect):
                 player.take_damage(config["enemy_damages"][self.__class__.__name__.lower()](player.level))
-            elif player.flamefruit_active:
-                dx, dy = player.flamefruit_position[0] - self.rect.x, player.flamefruit_position[1] - self.rect.y
-                distance = math.hypot(dx, dy)
-                if distance != 0:
-                    dx, dy = dx / distance, dy / distance
+            else:
                 self.rect.x += dx * self.speed
                 self.rect.y += dy * self.speed
-            else:
-                if distance > self.aggro_radius:
-                    self.rect.x += dx
-                    self.rect.y += dy
-                else:
-                    self.rect.x += 3 * dx
-                    self.rect.y += 3 * dy
 
 class NightCrawler(Enemy):
     def __init__(self, x, y):
@@ -242,7 +239,6 @@ class Malakar(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, "malakar")
   
-
 # Additional functions
 def spawn_ripple(position):
     ripple = Ripple(*position)
