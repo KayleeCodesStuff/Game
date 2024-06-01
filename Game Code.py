@@ -50,7 +50,19 @@ images = {
 }
 
 # Colors
-WHITE, GREEN, RED, BLUE, BLACK = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0)
+WHITE, GREEN, RED, BLUE, BLACK, NEON_GREEN = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0), (57, 255, 20)
+
+# Floating Damage class
+class FloatingDamage(pygame.sprite.Sprite):
+    def __init__(self, damage, x, y):
+        super().__init__()
+        self.image = pygame.font.SysFont(None, 24).render(str(damage), True, NEON_GREEN)
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.spawn_time = pygame.time.get_ticks()
+
+    def update(self):
+        if pygame.time.get_ticks() - self.spawn_time > 500:
+            self.kill()
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -110,6 +122,8 @@ class Player(pygame.sprite.Sprite):
     def attack(self, enemy):
         damage_dealt = max(self.damage, 0)
         enemy.health -= damage_dealt
+        floating_damage = FloatingDamage(damage_dealt, enemy.rect.x, enemy.rect.y - 20)
+        all_sprites.add(floating_damage)
         if enemy.health <= 0:
             enemy.kill()
             self.experience += 50
@@ -126,6 +140,8 @@ class Player(pygame.sprite.Sprite):
     def take_damage(self, enemydamage):
         if not self.invulnerable and pygame.time.get_ticks() - self.last_hit > 1000:
             self.health -= max(enemydamage - (self.damage_reduction + self.permanent_damage_reduction), 0)
+            floating_damage = FloatingDamage(enemydamage, self.rect.x, self.rect.y - 20)
+            all_sprites.add(floating_damage)
             self.speed = max(self.speed - 1, 1)
             self.last_hit = pygame.time.get_ticks()
 
@@ -180,6 +196,8 @@ class Ripple(pygame.sprite.Sprite):
 
             if self.rect.colliderect(nearest_target.rect):
                 nearest_target.health -= 10000
+                floating_damage = FloatingDamage(10000, nearest_target.rect.x, nearest_target.rect.y - 20)
+                all_sprites.add(floating_damage)
                 if nearest_target.health <= 0:
                     nearest_target.kill()
                 self.kill()
