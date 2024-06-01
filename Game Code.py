@@ -52,19 +52,20 @@ images = {
 # Colors
 WHITE, GREEN, RED, BLUE, BLACK = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0)
 
-# Floating damage class
-class FloatingDamage(pygame.sprite.Sprite):
-    def __init__(self, damage, x, y, color):
+# Floating text class
+class FloatingText(pygame.sprite.Sprite):
+    def __init__(self, text, color, x, y, duration):
         super().__init__()
-        self.image = pygame.font.SysFont(None, 24).render(str(damage), True, color)
-        self.rect = self.image.get_rect(midtop=(x, y))
-        self.spawn_time = pygame.time.get_ticks()
+        self.font = pygame.font.SysFont(None, 24)
+        self.image = self.font.render(text, True, color)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.start_time = pygame.time.get_ticks()
+        self.duration = duration
 
     def update(self):
-        if pygame.time.get_ticks() - self.spawn_time > 500:
+        current_time = pygame.time.get_ticks()
+        if current_time - self.start_time > self.duration:
             self.kill()
-        else:
-            self.rect.y -= 1  # Move up slightly
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -97,11 +98,15 @@ class Player(pygame.sprite.Sprite):
             self.health = min(self.health + 10, self.max_health)
             spawn_ripple(fruit.rect.center)
         elif fruit.name == "shimmeringapple":
-            self.permanent_speed_boost += 1
+            if self.speed < 10:
+                self.permanent_speed_boost += 4
+            else:
+                self.permanent_speed_boost += 1
             self.speed = self.base_speed + self.permanent_speed_boost
         elif fruit.name == "etherealpear":
             self.experience += 150
             self.health = min(self.health + 20, self.max_health)
+            self.max_health += 5
         elif fruit.name == "flamefruit":
             self.experience += 100
             self.flamefruit_end_time = pygame.time.get_ticks() + 3000
@@ -124,8 +129,6 @@ class Player(pygame.sprite.Sprite):
     def attack(self, enemy):
         damage_dealt = max(self.damage, 0)
         enemy.health -= damage_dealt
-        floating_damage = FloatingDamage(damage_dealt, enemy.rect.x, enemy.rect.y - 20, GREEN)
-        all_sprites.add(floating_damage)
         if enemy.health <= 0:
             enemy.kill()
             self.experience += 50
@@ -138,15 +141,16 @@ class Player(pygame.sprite.Sprite):
         if self.experience >= 1000:
             self.level += 1
             self.experience -= 1000  # Correcting the experience point reset
+        floating_text = FloatingText(str(damage_dealt), GREEN, enemy.rect.x, enemy.rect.y - 10, 500)
+        all_sprites.add(floating_text)
 
     def take_damage(self, enemydamage):
         if not self.invulnerable and pygame.time.get_ticks() - self.last_hit > 1000:
-            damage_taken = max(enemydamage - (self.damage_reduction + self.permanent_damage_reduction), 0)
-            self.health -= damage_taken
-            floating_damage = FloatingDamage(damage_taken, self.rect.x, self.rect.y - 20, RED)
-            all_sprites.add(floating_damage)
+            self.health -= max(enemydamage - (self.damage_reduction + self.permanent_damage_reduction), 0)
             self.speed = max(self.speed - 1, 1)
             self.last_hit = pygame.time.get_ticks()
+            floating_text = FloatingText(str(enemydamage), RED, self.rect.x, self.rect.y - 10, 500)
+            all_sprites.add(floating_text)
 
     def update(self):
         current_time = pygame.time.get_ticks()
@@ -164,6 +168,16 @@ class Player(pygame.sprite.Sprite):
         if current_time - self.last_regen_time > 5000 and self.health < self.max_health:
             self.health += 1
             self.last_regen_time = current_time
+
+        if self.flamefruit_active and current_time > self.flamefruit_end_time:
+            self.flamefruit_active = False
+            for enemy in enemies:
+                if math.hypot(enemy.rect.x - self.flamefruit_position[0], enemy.rect.y - self.flamefruit_position[1]) < 100:
+                    enemy.health -= 50
+                    floating_text = FloatingText(str(50), BLUE, enemy.rect.x, enemy.rect.y - 10, 500)
+                    all_sprites.add(floating_text)
+                    if enemy.health <= 0:
+                        enemy.kill()
 
 # Fruit class
 class Fruit(pygame.sprite.Sprite):
@@ -199,10 +213,10 @@ class Ripple(pygame.sprite.Sprite):
 
             if self.rect.colliderect(nearest_target.rect):
                 nearest_target.health -= 10000
-                floating_damage = FloatingDamage(10000, nearest_target.rect.x, nearest_target.rect.y - 20, BLUE)
-                all_sprites.add(floating_damage)
                 if nearest_target.health <= 0:
                     nearest_target.kill()
+                floating_text = FloatingText(str(10000), BLUE, nearest_target.rect.x, nearest_target.rect.y - 10, 500)
+                all_sprites.add(floating_text)
                 self.kill()
 
 class Enemy(pygame.sprite.Sprite):
@@ -241,10 +255,10 @@ class Enemy(pygame.sprite.Sprite):
                 dx, dy = dx / distance, dy / distance
 
             if self.rect.colliderect(player.rect):
-                damage_dealt = config["enemy_damages"][self.__class__.__name__.lower()](player.level)
-                player.take_damage(damage_dealt)
-                floating_damage = FloatingDamage(damage_dealt, self.rect.x, self.rect.y - 20, RED)
-                all_sprites.add(floating_damage)
+                damage = config["enemy_damages"][self.__class__.__name__.lower()](player.level)
+                player.take_damage(damage)
+                floating_text = FloatingText(str(damage), RED, player.rect.x, player.rect.y - 10, 500)
+                all_sprites.add(floating_text)
             else:
                 self.follow_target(dx, dy, distance)
 
