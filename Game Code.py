@@ -183,6 +183,7 @@ class Ripple(pygame.sprite.Sprite):
                 if nearest_target.health <= 0:
                     nearest_target.kill()
                 self.kill()
+
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, image_key):
         super().__init__()
@@ -250,8 +251,6 @@ def draw_inventory(surface, player):
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(player.inventory[fruit]), 18, x_offset + 30, y_offset, WHITE)
         x_offset += 50
-    if player.invulnerable:
-        draw_text(surface, 'Status: Invulnerable', 18, x_offset + 30, config["playable_height"] + 10, GREEN)
 
 def draw_legend(surface):
     legend_text = ["Arrow Keys: Move", "Spacebar: Attack", "P: Pause"]
@@ -409,9 +408,6 @@ while running:
         draw_text(screen, f'Collected: {fruit_name}', 30, config["width"] // 2, config["playable_height"] + 10, GREEN)
     else:
         show_fruit_name = False
-
-    if player.invulnerable:
-        draw_text(screen, 'Status: Invulnerable', 18, config["width"] // 2, config["playable_height"] + 30, GREEN)
 
     if paused:
         draw_text(screen, 'PAUSED', 50, config["width"] // 2, config["height"] // 2, BLUE)
