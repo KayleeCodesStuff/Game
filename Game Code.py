@@ -183,15 +183,13 @@ class Ripple(pygame.sprite.Sprite):
                 if nearest_target.health <= 0:
                     nearest_target.kill()
                 self.kill()
-
-# Enemy classes
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, image_key):
         super().__init__()
         self.image = pygame.transform.scale(load_image(f"{image_key}.png"), config["enemy_sizes"][image_key])
         self.rect = self.image.get_rect(topleft=(x, y))
         self.health = config["enemy_health"][image_key]
-        self.speed = random.uniform(0.5, 1.5)
+        self.speed = 1
         self.aggro_radius = config["width"] // 5
         self.freeze_end_time = 0
 
@@ -201,31 +199,31 @@ class Enemy(pygame.sprite.Sprite):
             self.speed = 0
             self.image.fill(RED, special_flags=pygame.BLEND_MULT)
         else:
-            self.speed = random.uniform(0.5, 1.5)
             if hasattr(self, 'original_color'):
                 self.image = self.original_color
 
-        dx, dy = player.rect.x - self.rect.x, player.rect.y - self.rect.y
-        distance = math.hypot(dx, dy)
-        if distance != 0:
-            dx, dy = dx / distance, dy / distance
-
-        if self.rect.colliderect(player.rect):
-            player.take_damage(config["enemy_damages"][self.__class__.__name__.lower()](player.level))
-        elif player.flamefruit_active and player.flamefruit_position:
-            dx, dy = player.flamefruit_position[0] - self.rect.x, player.flamefruit_position[1] - self.rect.y
+            dx, dy = player.rect.x - self.rect.x, player.rect.y - self.rect.y
             distance = math.hypot(dx, dy)
+
             if distance != 0:
                 dx, dy = dx / distance, dy / distance
-            self.rect.x += dx * self.speed
-            self.rect.y += dy * self.speed
-        else:
-            if distance > self.aggro_radius:
-                self.rect.x += dx / distance
-                self.rect.y += dy / distance
+
+            if self.rect.colliderect(player.rect):
+                player.take_damage(config["enemy_damages"][self.__class__.__name__.lower()](player.level))
+            elif player.flamefruit_active:
+                dx, dy = player.flamefruit_position[0] - self.rect.x, player.flamefruit_position[1] - self.rect.y
+                distance = math.hypot(dx, dy)
+                if distance != 0:
+                    dx, dy = dx / distance, dy / distance
+                self.rect.x += dx * self.speed
+                self.rect.y += dy * self.speed
             else:
-                self.rect.x += self.speed * dx
-                self.rect.y += self.speed * dy
+                if distance > self.aggro_radius:
+                    self.rect.x += dx
+                    self.rect.y += dy
+                else:
+                    self.rect.x += 3 * dx
+                    self.rect.y += 3 * dy
 
 class NightCrawler(Enemy):
     def __init__(self, x, y):
@@ -238,6 +236,7 @@ class BossEnemy(Enemy):
 class Malakar(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, "malakar")
+  
 
 # Additional functions
 def spawn_ripple(position):
