@@ -68,7 +68,6 @@ class Player(pygame.sprite.Sprite):
         self.inventory = {fruit: 0 for fruit in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
         self.invulnerable, self.last_hit = False, pygame.time.get_ticks()
         self.invuln_end_time, self.melon_end_time, self.last_regen_time = 0, 0, pygame.time.get_ticks()
-        self.special_attack_ready, self.special_attack_time = True, 0
         self.flamefruit_end_time, self.flamefruit_active = 0, False
         self.flamefruit_position, self.speed_boost_end_time = None, 0
         self.damage_reduction, self.permanent_damage_reduction = 0, 0
@@ -127,29 +126,6 @@ class Player(pygame.sprite.Sprite):
             self.speed = max(self.speed - 1, 1)
             self.last_hit = pygame.time.get_ticks()
 
-    def special_attack(self):
-        if self.special_attack_ready:
-            for sprite in all_sprites:
-                if isinstance(sprite, (NightCrawler, BossEnemy, Malakar)):
-                    distance = math.hypot(self.rect.centerx - sprite.rect.centerx, self.rect.centery - sprite.rect.centery)
-                    if distance <= config["width"] // 5:
-                        sprite.health -= 500
-                        sprite.speed = 0
-                        sprite.freeze_end_time = pygame.time.get_ticks() + 2000
-                        sprite.original_color = sprite.image.copy()
-                        sprite.image.fill(RED, special_flags=pygame.BLEND_MULT)
-                        if sprite.health <= 0:
-                            sprite.kill()
-                            self.experience += 50
-                            if isinstance(sprite, BossEnemy):
-                                self.experience += 500
-                            if isinstance(sprite, Malakar):
-                                self.experience += 1000
-                                global malakar_spawn_allowed_time
-                                malakar_spawn_allowed_time = pygame.time.get_ticks() + 15000
-            self.special_attack_ready = False
-            self.special_attack_time = pygame.time.get_ticks() + 30000
-
     def update(self):
         current_time = pygame.time.get_ticks()
 
@@ -169,12 +145,6 @@ class Player(pygame.sprite.Sprite):
         if current_time - self.last_regen_time > 5000 and self.health < self.max_health:
             self.health += 1
             self.last_regen_time = current_time
-
-        if not self.special_attack_ready and current_time > self.special_attack_time:
-            self.special_attack_ready = True
-
-        if self.flamefruit_active and current_time > self.flamefruit_end_time:
-            self.flamefruit_active = False
 
 # Fruit class
 class Fruit(pygame.sprite.Sprite):
@@ -247,10 +217,14 @@ class Enemy(pygame.sprite.Sprite):
             distance = math.hypot(dx, dy)
             if distance != 0:
                 dx, dy = dx / distance, dy / distance
+            self.rect.x += dx * self.speed
+            self.rect.y += dy * self.speed
         else:
-            if player.rect.x - self.rect.x:
+            if distance > self.aggro_radius:
+                self.rect.x += dx / distance
+                self.rect.y += dy / distance
+            else:
                 self.rect.x += self.speed * dx
-            if player.rect.y - self.rect.y:
                 self.rect.y += self.speed * dy
 
 class NightCrawler(Enemy):
@@ -281,7 +255,7 @@ def draw_inventory(surface, player):
         draw_text(surface, 'Status: Invulnerable', 18, x_offset + 30, config["playable_height"] + 10, GREEN)
 
 def draw_legend(surface):
-    legend_text = ["Arrow Keys: Move", "Spacebar: Attack", "N: Special Attack", "P: Pause"]
+    legend_text = ["Arrow Keys: Move", "Spacebar: Attack", "P: Pause"]
     x, y = config["width"] - 150, config["height"] - 50
     for line in legend_text:
         draw_text(surface, line, 18, x, y, WHITE)
@@ -339,34 +313,6 @@ def show_menu():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
                 waiting = False
 
-def show_upgrade_menu():
-    screen.fill(BLACK)
-    upgrades = [
-        ("Increase Max Health with Gleam Berry", "gleamberry", lambda: setattr(player, 'max_health', player.max_health + 10)),
-        ("Increase Speed with Shimmering Apple", "shimmeringapple", lambda: setattr(player, 'permanent_speed_boost', player.permanent_speed_boost + 1)),
-        ("Increase Level with Ethereal Pear", "etherealpear", lambda: setattr(player, 'level', player.level + 1)),
-        ("Increase Damage Reduction with Flamefruit", "flamefruit", lambda: setattr(player, 'permanent_damage_reduction', player.permanent_damage_reduction + 5)),
-        ("Increase Damage with Moonbeam Melon", "moonbeammelon", lambda: setattr(player, 'permanent_damage_boost', player.permanent_damage_boost + 5)),
-    ]
-    draw_text(screen, "Upgrade Menu", 50, config["width"] // 2, config["height"] // 4, WHITE)
-    for i, (text, fruit, _) in enumerate(upgrades):
-        draw_text(screen, f'Press {i + 1} to {text}', 30, config["width"] // 2, config["height"] // 2 - 60 + 30 * i, WHITE)
-    draw_text(screen, "Press P to Resume Game", 30, config["width"] // 2, config["height"] // 2 + 90, WHITE)
-    pygame.display.flip()
-
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_p:
-                    return
-                for i, (_, fruit, upgrade) in enumerate(upgrades):
-                    if event.key == pygame.K_1 + i and player.inventory[fruit] > 0:
-                        upgrade()
-                        player.inventory[fruit] -= 1
-
 show_menu()
 
 while running:
@@ -378,10 +324,6 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
                 paused = not paused
-                if paused:
-                    show_upgrade_menu()
-            if event.key == pygame.K_n and not paused:
-                player.special_attack()
 
     if not paused and not game_won and player.health > 0:
         keys = pygame.key.get_pressed()
