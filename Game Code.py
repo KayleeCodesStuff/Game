@@ -47,25 +47,11 @@ images = {
     "etherealpear": pygame.transform.scale(load_image("etherealpear.png"), (45, 45)),
     "flamefruit": pygame.transform.scale(load_image("flamefruit.png"), (45, 45)),
     "moonbeammelon": pygame.transform.scale(load_image("moonbeammelon.png"), (45, 45)),
+    "nyx": pygame.transform.scale(load_image("nyx.png"), (90, 90)),
 }
 
 # Colors
 WHITE, GREEN, RED, BLUE, BLACK = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0)
-
-# Floating text class
-class FloatingText(pygame.sprite.Sprite):
-    def __init__(self, text, color, x, y, duration):
-        super().__init__()
-        self.font = pygame.font.SysFont(None, 24)
-        self.image = self.font.render(text, True, color)
-        self.rect = self.image.get_rect(center=(x, y))
-        self.start_time = pygame.time.get_ticks()
-        self.duration = duration
-
-    def update(self):
-        current_time = pygame.time.get_ticks()
-        if current_time - self.start_time > self.duration:
-            self.kill()
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -100,9 +86,7 @@ class Player(pygame.sprite.Sprite):
         elif fruit.name == "shimmeringapple":
             if self.speed < 10:
                 self.permanent_speed_boost += 4
-            else:
-                self.permanent_speed_boost += 1
-            self.speed = self.base_speed + self.permanent_speed_boost
+            self.speed = self.base_speed + self.permanent_speed_boost + 1
         elif fruit.name == "etherealpear":
             self.experience += 150
             self.health = min(self.health + 20, self.max_health)
@@ -138,19 +122,17 @@ class Player(pygame.sprite.Sprite):
                 self.experience += 1000
                 global malakar_spawn_allowed_time
                 malakar_spawn_allowed_time = pygame.time.get_ticks() + 15000
+                nyx_spawned[0] = True  # Set flag to spawn Nyx
+                print(f"Malakar killed. New spawn allowed time: {malakar_spawn_allowed_time}")
         if self.experience >= 1000:
             self.level += 1
             self.experience -= 1000  # Correcting the experience point reset
-        floating_text = FloatingText(str(damage_dealt), GREEN, enemy.rect.x, enemy.rect.y - 10, 500)
-        all_sprites.add(floating_text)
 
     def take_damage(self, enemydamage):
         if not self.invulnerable and pygame.time.get_ticks() - self.last_hit > 1000:
             self.health -= max(enemydamage - (self.damage_reduction + self.permanent_damage_reduction), 0)
             self.speed = max(self.speed - 1, 1)
             self.last_hit = pygame.time.get_ticks()
-            floating_text = FloatingText(str(enemydamage), RED, self.rect.x, self.rect.y - 10, 500)
-            all_sprites.add(floating_text)
 
     def update(self):
         current_time = pygame.time.get_ticks()
@@ -170,14 +152,13 @@ class Player(pygame.sprite.Sprite):
             self.last_regen_time = current_time
 
         if self.flamefruit_active and current_time > self.flamefruit_end_time:
-            self.flamefruit_active = False
             for enemy in enemies:
-                if math.hypot(enemy.rect.x - self.flamefruit_position[0], enemy.rect.y - self.flamefruit_position[1]) < 100:
+                if math.hypot(self.flamefruit_position[0] - enemy.rect.centerx, self.flamefruit_position[1] - enemy.rect.centery) < 50:
                     enemy.health -= 50
-                    floating_text = FloatingText(str(50), BLUE, enemy.rect.x, enemy.rect.y - 10, 500)
-                    all_sprites.add(floating_text)
+                    display_damage(enemy.rect.x, enemy.rect.y, 50, BLUE)
                     if enemy.health <= 0:
                         enemy.kill()
+            self.flamefruit_active = False
 
 # Fruit class
 class Fruit(pygame.sprite.Sprite):
@@ -213,10 +194,9 @@ class Ripple(pygame.sprite.Sprite):
 
             if self.rect.colliderect(nearest_target.rect):
                 nearest_target.health -= 10000
+                display_damage(nearest_target.rect.x, nearest_target.rect.y, 10000, BLUE)
                 if nearest_target.health <= 0:
                     nearest_target.kill()
-                floating_text = FloatingText(str(10000), BLUE, nearest_target.rect.x, nearest_target.rect.y - 10, 500)
-                all_sprites.add(floating_text)
                 self.kill()
 
 class Enemy(pygame.sprite.Sprite):
@@ -257,8 +237,7 @@ class Enemy(pygame.sprite.Sprite):
             if self.rect.colliderect(player.rect):
                 damage = config["enemy_damages"][self.__class__.__name__.lower()](player.level)
                 player.take_damage(damage)
-                floating_text = FloatingText(str(damage), RED, player.rect.x, player.rect.y - 10, 500)
-                all_sprites.add(floating_text)
+                display_damage(player.rect.x, player.rect.y, damage, RED)
             else:
                 self.follow_target(dx, dy, distance)
 
@@ -281,6 +260,26 @@ class BossEnemy(Enemy):
 class Malakar(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, "malakar")
+
+class Nyx(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = images["nyx"]
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.speed = 5
+
+    def update(self):
+        nearest_fruit = min(fruits, key=lambda fruit: math.hypot(self.rect.centerx - fruit.rect.centerx, self.rect.centery - fruit.rect.centery), default=None)
+        if nearest_fruit:
+            dx, dy = nearest_fruit.rect.centerx - self.rect.centerx, nearest_fruit.rect.centery - self.rect.centery
+            distance = math.hypot(dx, dy)
+            if distance != 0:
+                dx, dy = dx / distance, dy / distance
+                self.rect.x += dx * self.speed
+                self.rect.y += dy * self.speed
+
+            if self.rect.colliderect(nearest_fruit.rect):
+                nearest_fruit.kill()
 
 # Additional functions
 def spawn_ripple(position):
@@ -315,10 +314,33 @@ def draw_text(surface, text, size, x, y, color):
     text_surface, text_rect = font.render(text, True, color), font.render(text, True, color).get_rect(midtop=(x, y))
     surface.blit(text_surface, text_rect)
 
+class DamageText(pygame.sprite.Sprite):
+    def __init__(self, x, y, damage, color):
+        super().__init__()
+        font = pygame.font.SysFont(None, 18)
+        self.image = font.render(str(damage), True, color)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.spawn_time = pygame.time.get_ticks()
+
+    def update(self):
+        if pygame.time.get_ticks() - self.spawn_time > 500:
+            self.kill()
+
+def display_damage(x, y, damage, color):
+    damage_text = DamageText(x, y, damage, color)
+    damage_texts.add(damage_text)
+    all_sprites.add(damage_text)
+
+# Function to spawn Nyx
+def spawn_nyx():
+    nyx = Nyx(random.randint(0, config["width"] - 90), random.randint(0, config["playable_height"] - 90))
+    nyx_group.add(nyx)
+    all_sprites.add(nyx)
+
 # Create player and groups
 player = Player()
 all_sprites = pygame.sprite.Group(player)
-fruits, enemies, bossenemies, malakar_group = pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group()
+fruits, enemies, bossenemies, malakar_group, nyx_group, damage_texts = pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group(), pygame.sprite.Group()
 
 fruit_names_images = [("gleamberry", images["gleamberry"]), ("shimmeringapple", images["shimmeringapple"]), ("etherealpear", images["etherealpear"]), ("flamefruit", images["flamefruit"]), ("moonbeammelon", images["moonbeammelon"])]
 
@@ -339,6 +361,9 @@ running, paused, game_won, clock = True, False, False, pygame.time.Clock()
 fruit_spawn_time, enemy_spawn_time, bossenemy_spawn_time = pygame.time.get_ticks(), pygame.time.get_ticks(), pygame.time.get_ticks()
 malakar_spawn_allowed_time, ripple_spawn_allowed_time = pygame.time.get_ticks() + 30000, 0
 show_fruit_name, fruit_name, fruit_name_time = False, "", 0
+
+# Flag to control Nyx spawn state
+nyx_spawned = [False]
 
 def show_menu():
     screen.fill(BLACK)
@@ -382,10 +407,13 @@ while running:
         if keys[pygame.K_SPACE]:
             for enemy in enemies_hit:
                 player.attack(enemy)
+                display_damage(enemy.rect.x, enemy.rect.y, player.damage, GREEN)
             for bossenemy in bossenemies_hit:
                 player.attack(bossenemy)
+                display_damage(bossenemy.rect.x, bossenemy.rect.y, player.damage, GREEN)
             for malakar in malakar_hit:
                 player.attack(malakar)
+                display_damage(malakar.rect.x, malakar.rect.y, player.damage, GREEN)
 
         if current_time - fruit_spawn_time >= 2000:
             name, image = random.choice(fruit_names_images)
@@ -411,7 +439,19 @@ while running:
             malakar_group.add(malakar)
             all_sprites.add(malakar)
 
+        if current_time > malakar_spawn_allowed_time:
+            for nyx in nyx_group:
+                nyx.kill()
+            nyx_spawned[0] = False
+        else:
+            if nyx_spawned[0] and not nyx_group:
+                spawn_nyx()
+            elif not nyx_spawned[0]:
+                for nyx in nyx_group:
+                    nyx.kill()
+
         all_sprites.update()
+        damage_texts.update()
 
     screen.blit(images["background"], (0, 0))
     all_sprites.draw(screen)
