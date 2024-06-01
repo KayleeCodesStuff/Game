@@ -102,9 +102,7 @@ class Player(pygame.sprite.Sprite):
             self.invuln_end_time = pygame.time.get_ticks() + 2000
 
         self.experience += 100
-        if self.experience >= 1000:
-            self.level += 1
-            self.experience = 0
+        self.check_level_up()
         return fruit.name
 
     def attack(self, enemy):
@@ -119,12 +117,18 @@ class Player(pygame.sprite.Sprite):
                 self.experience += 1000
                 global malakar_spawn_allowed_time
                 malakar_spawn_allowed_time = pygame.time.get_ticks() + 15000
+        self.check_level_up()
 
     def take_damage(self, enemydamage):
         if not self.invulnerable and pygame.time.get_ticks() - self.last_hit > 1000:
             self.health -= max(enemydamage - (self.damage_reduction + self.permanent_damage_reduction), 0)
             self.speed = max(self.speed - 1, 1)
             self.last_hit = pygame.time.get_ticks()
+
+    def check_level_up(self):
+        while self.experience >= 1000:
+            self.level += 1
+            self.experience -= 1000
 
     def update(self):
         current_time = pygame.time.get_ticks()
