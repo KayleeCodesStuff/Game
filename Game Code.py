@@ -69,7 +69,7 @@ class Player(pygame.sprite.Sprite):
         self.invulnerable, self.last_hit = False, pygame.time.get_ticks()
         self.invuln_end_time, self.melon_end_time, self.last_regen_time = 0, 0, pygame.time.get_ticks()
         self.flamefruit_end_time, self.flamefruit_active = 0, False
-        self.flamefruit_position, self.speed_boost_end_time = None, 0
+        self.flamefruit_position = None
         self.damage_reduction, self.permanent_damage_reduction = 0, 0
         self.timed_effects = {"damage_reduction": []}
 
@@ -83,8 +83,8 @@ class Player(pygame.sprite.Sprite):
             self.health = min(self.health + 10, self.max_health)
             spawn_ripple(fruit.rect.center)
         elif fruit.name == "shimmeringapple":
-            self.speed_boost_end_time = pygame.time.get_ticks() + 12000
-            self.speed = self.base_speed + self.permanent_speed_boost + 1
+            self.permanent_speed_boost += 1
+            self.speed = self.base_speed + self.permanent_speed_boost
         elif fruit.name == "etherealpear":
             self.experience += 150
             self.health = min(self.health + 20, self.max_health)
@@ -141,9 +141,6 @@ class Player(pygame.sprite.Sprite):
 
         self.damage_reduction = sum(10 for end_time in self.timed_effects["damage_reduction"] if current_time <= end_time)
         self.timed_effects["damage_reduction"] = [end_time for end_time in self.timed_effects["damage_reduction"] if current_time <= end_time]
-
-        if current_time > self.speed_boost_end_time:
-            self.speed = self.base_speed + self.permanent_speed_boost
 
         if current_time - self.last_regen_time > 5000 and self.health < self.max_health:
             self.health += 1
@@ -216,6 +213,7 @@ class Enemy(pygame.sprite.Sprite):
                 dx, dy = self.target[0] - self.rect.x, self.target[1] - self.rect.y
             else:
                 dx, dy = self.target.rect.x - self.rect.x, self.target.rect.y - self.rect.y
+
             distance = math.hypot(dx, dy)
 
             if distance != 0:
@@ -224,8 +222,15 @@ class Enemy(pygame.sprite.Sprite):
             if self.rect.colliderect(player.rect):
                 player.take_damage(config["enemy_damages"][self.__class__.__name__.lower()](player.level))
             else:
-                self.rect.x += dx * self.speed
-                self.rect.y += dy * self.speed
+                self.follow_target(dx, dy, distance)
+
+    def follow_target(self, dx, dy, distance):
+        if distance > self.aggro_radius:
+            self.rect.x += dx
+            self.rect.y += dy
+        else:
+            self.rect.x += 3 * dx
+            self.rect.y += 3 * dy
 
 class NightCrawler(Enemy):
     def __init__(self, x, y):
@@ -238,7 +243,7 @@ class BossEnemy(Enemy):
 class Malakar(Enemy):
     def __init__(self, x, y):
         super().__init__(x, y, "malakar")
-  
+
 # Additional functions
 def spawn_ripple(position):
     ripple = Ripple(*position)
