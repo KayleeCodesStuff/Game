@@ -42,6 +42,9 @@ score = 0
 # Timer setup
 start_time = time.time()
 
+# Tree destruction tracking
+tree_timers = {}
+
 # Create a random maze using DFS algorithm
 def create_maze(width, height):
     maze = [[1] * width for _ in range(height)]
@@ -84,9 +87,20 @@ ripple_pos = find_valid_position(maze)
 # Add outer walls
 outer_walls = [(x, 0) for x in range(MAZE_WIDTH + 2)] + [(x, MAZE_HEIGHT + 1) for x in range(MAZE_WIDTH + 2)] + [(0, y) for y in range(MAZE_HEIGHT + 2)] + [(MAZE_WIDTH + 1, y) for y in range(MAZE_HEIGHT + 2)]
 
+# Darken image
+def darken_image(image, factor):
+    dark_image = image.copy()
+    dark_image.fill((0, 0, 0, factor), special_flags=pygame.BLEND_RGBA_MULT)
+    return dark_image
+
 # Draw the maze and outer walls
 def draw_maze():
     for (x, y, img) in maze_walls:
+        if (x, y) in tree_timers:
+            timer = tree_timers[(x, y)]
+            dark_factor = int(255 * (timer['start'] - time.time()) / 3)
+            dark_factor = max(0, min(255, dark_factor))
+            img = darken_image(img, dark_factor)
         screen.blit(img, ((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
     for (x, y) in outer_walls:
         screen.blit(outer_wall_img, (x * TILE_SIZE, y * TILE_SIZE))
@@ -160,9 +174,25 @@ while running:
     if nightcrawler_pos and not found_ripple and not lost_game:
         nightcrawler_pos = move_towards_target(nightcrawler_pos, [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE], nightcrawler_speed)
 
-    if nightcrawler_pos and not lost_game:
-        if pygame.Rect(nightcrawler_pos[0], nightcrawler_pos[1], TILE_SIZE, TILE_SIZE).colliderect(pygame.Rect((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)):
-            lost_game = True
+        # Check if nightcrawler collides with a tree tile
+        nightcrawler_rect = pygame.Rect(nightcrawler_pos[0], nightcrawler_pos[1], TILE_SIZE, TILE_SIZE)
+        for (x, y, img) in maze_walls:
+            wall_rect = pygame.Rect((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            if nightcrawler_rect.colliderect(wall_rect):
+                if (x, y) not in tree_timers:
+                    tree_timers[(x, y)] = {'start': time.time() + 3, 'img': img}
+                break
+
+    # Update tree timers and remove trees
+    current_time = time.time()
+    to_remove = []
+    for (x, y) in tree_timers:
+        timer = tree_timers[(x, y)]
+        if current_time >= timer['start']:
+            maze_walls = [(wx, wy, wimg) for (wx, wy, wimg) in maze_walls if not (wx == x and wy == y)]
+            to_remove.append((x, y))
+    for key in to_remove:
+        del tree_timers[key]
 
     screen.blit(background_img, (0, 0))
     draw_maze()
