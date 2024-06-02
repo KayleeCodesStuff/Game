@@ -165,7 +165,10 @@ while running:
     if 0 <= next_pos[0] < SCREEN_WIDTH and 0 <= next_pos[1] < PLAY_AREA_HEIGHT - TILE_SIZE and not is_colliding_with_walls(next_pos):
         player_pos = next_pos
 
-    if player_pos[0] // TILE_SIZE == ripple_pos[0] + 1 and player_pos[1] // TILE_SIZE == ripple_pos[1] + 1:
+    # Check if player reaches Ripple
+    player_rect = pygame.Rect(player_pos[0], player_pos[1], TILE_SIZE, TILE_SIZE)
+    ripple_rect = pygame.Rect((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+    if player_rect.colliderect(ripple_rect):
         found_ripple = True
 
     if not nightcrawler_pos and time.time() >= nightcrawler_spawn_time:
@@ -182,6 +185,10 @@ while running:
                 if (x, y) not in tree_timers:
                     tree_timers[(x, y)] = {'start': time.time() + 3, 'img': img}
                 break
+
+        # Check if nightcrawler reaches ripple
+        if nightcrawler_rect.colliderect(ripple_rect):
+            lost_game = True
 
     # Update tree timers and remove trees
     current_time = time.time()
@@ -207,12 +214,13 @@ while running:
     score_text = font.render(f'Score: {score}', True, (255, 255, 255))
     screen.blit(score_text, (10, 10))
 
+    # Display win or lose messages
     if found_ripple:
-        won_text = large_font.render('You Found Ripple!', True, (0, 255, 0))
+        won_text = large_font.render('Found Ripple', True, (0, 255, 0))
         screen.blit(won_text, (SCREEN_WIDTH // 2 - won_text.get_width() // 2, SCREEN_HEIGHT // 2 - won_text.get_height() // 2))
 
     if lost_game:
-        lost_text = large_font.render('You Were Caught!', True, (255, 0, 0))
+        lost_text = large_font.render('Ripple Taken by Malakar', True, (255, 0, 0))
         screen.blit(lost_text, (SCREEN_WIDTH // 2 - lost_text.get_width() // 2, SCREEN_HEIGHT // 2 - lost_text.get_height() // 2))
 
     pygame.display.flip()
