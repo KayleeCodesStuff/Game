@@ -51,7 +51,7 @@ images = {
 }
 
 # Colors
-WHITE, GREEN, RED, BLUE, BLACK, YELLOW = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0), (255, 255, 0)
+WHITE, GREEN, RED, BLUE, BLACK, YELLOW = (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 0, 0), (255, 2+55, 0)
 
 # Player class
 class Player(pygame.sprite.Sprite):
@@ -73,8 +73,7 @@ class Player(pygame.sprite.Sprite):
         self.flamefruit_position = None
         self.damage_reduction, self.permanent_damage_reduction = 0, 0
         self.timed_effects = {"damage_reduction": []}
-        self.attack_radius = 50  # Initial attack radius
-        self.attack_radius_increased = int(self.attack_radius * 1.2)  # Increase by 20%
+        self.attack_radius = 75  # Default attack radius  [Line 58]
 
     def move(self, dx, dy):
         self.rect.x = max(0, min(self.rect.x + dx * self.speed, config["width"] - self.rect.width))
@@ -134,13 +133,13 @@ class Player(pygame.sprite.Sprite):
 
     def attack(self):
         for enemy in enemies:
-            if self.rect.colliderect(enemy.rect.inflate(self.attack_radius_increased, self.attack_radius_increased)):
+            if self.rect.colliderect(enemy.rect.inflate(self.attack_radius, self.attack_radius)):
                 self.attack_enemy(enemy)
         for bossenemy in bossenemies:
-            if self.rect.colliderect(bossenemy.rect.inflate(self.attack_radius_increased, self.attack_radius_increased)):
+            if self.rect.colliderect(bossenemy.rect.inflate(self.attack_radius, self.attack_radius)):
                 self.attack_enemy(bossenemy)
         for malakar in malakar_group:
-            if self.rect.colliderect(malakar.rect.inflate(self.attack_radius_increased, self.attack_radius_increased)):
+            if self.rect.colliderect(malakar.rect.inflate(self.attack_radius, self.attack_radius)):
                 self.attack_enemy(malakar)
 
     def attack_enemy(self, enemy):
@@ -194,7 +193,8 @@ class Player(pygame.sprite.Sprite):
             self.flamefruit_active = False
 
         # Draw attack radius outline
-        pygame.draw.circle(screen, YELLOW, self.rect.center, self.attack_radius_increased, 1)
+        pygame.draw.circle(screen, (57, 255, 20), self.rect.center, self.attack_radius, 1)  # [Line 97]
+
 
 # Fruit class
 class Fruit(pygame.sprite.Sprite):
