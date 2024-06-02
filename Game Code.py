@@ -73,7 +73,8 @@ class Player(pygame.sprite.Sprite):
         self.flamefruit_position = None
         self.damage_reduction, self.permanent_damage_reduction = 0, 0
         self.timed_effects = {"damage_reduction": []}
-        self.attack_radius = self.rect.width * 0.55 * 1.2  # Increase by 20%
+        self.attack_radius = 50  # Initial attack radius
+        self.attack_radius_increased = int(self.attack_radius * 1.2)  # Increase by 20%
 
     def move(self, dx, dy):
         self.rect.x = max(0, min(self.rect.x + dx * self.speed, config["width"] - self.rect.width))
@@ -107,24 +108,45 @@ class Player(pygame.sprite.Sprite):
 
         self.experience += 100
         if self.experience >= 1000:
-            self.level += 1
-            self.experience -= 1000  # Correcting the experience point reset
+            self.level_up()
         return fruit.name
+
+    def level_up(self):
+        self.level += 1
+        self.experience -= 1000
+        self.health = min(self.health + 5, self.max_health)
+        bonus = random.choice(["max_health", "damage", "speed", "damage10", "damage15"])
+        if bonus == "max_health":
+            self.max_health += 5
+        elif bonus == "damage":
+            self.permanent_damage_boost += 5
+        elif bonus == "speed":
+            self.permanent_speed_boost += 2
+        elif bonus == "damage10":
+            self.permanent_damage_boost += 10
+        elif bonus == "damage15":
+            self.permanent_damage_boost += 15
+        self.update_stats()
+
+    def update_stats(self):
+        self.speed = self.base_speed + self.permanent_speed_boost
+        self.damage = self.base_damage + self.permanent_damage_boost
 
     def attack(self):
         for enemy in enemies:
-            if self.rect.colliderect(enemy.rect.inflate(self.attack_radius, self.attack_radius)):
+            if self.rect.colliderect(enemy.rect.inflate(self.attack_radius_increased, self.attack_radius_increased)):
                 self.attack_enemy(enemy)
         for bossenemy in bossenemies:
-            if self.rect.colliderect(bossenemy.rect.inflate(self.attack_radius, self.attack_radius)):
+            if self.rect.colliderect(bossenemy.rect.inflate(self.attack_radius_increased, self.attack_radius_increased)):
                 self.attack_enemy(bossenemy)
         for malakar in malakar_group:
-            if self.rect.colliderect(malakar.rect.inflate(self.attack_radius, self.attack_radius)):
+            if self.rect.colliderect(malakar.rect.inflate(self.attack_radius_increased, self.attack_radius_increased)):
                 self.attack_enemy(malakar)
 
     def attack_enemy(self, enemy):
         damage_dealt = max(self.damage, 0)
         enemy.health -= damage_dealt
+        display_damage(enemy.rect.x, enemy.rect.y, damage_dealt, GREEN)
         if enemy.health <= 0:
             enemy.kill()
             self.experience += 50
@@ -137,8 +159,7 @@ class Player(pygame.sprite.Sprite):
                 nyx_spawned[0] = True  # Set flag to spawn Nyx
                 print(f"Malakar killed. New spawn allowed time: {malakar_spawn_allowed_time}")
         if self.experience >= 1000:
-            self.level += 1
-            self.experience -= 1000  # Correcting the experience point reset
+            self.level_up()
 
     def take_damage(self, enemydamage):
         if not self.invulnerable and pygame.time.get_ticks() - self.last_hit > 1000:
@@ -172,8 +193,8 @@ class Player(pygame.sprite.Sprite):
                         enemy.kill()
             self.flamefruit_active = False
 
-    def draw_attack_radius(self, surface):
-        pygame.draw.circle(surface, YELLOW, self.rect.center, int(self.attack_radius), 1)
+        # Draw attack radius outline
+        pygame.draw.circle(screen, YELLOW, self.rect.center, self.attack_radius_increased, 1)
 
 # Fruit class
 class Fruit(pygame.sprite.Sprite):
@@ -416,9 +437,6 @@ while running:
             fruit_name = player.collect_fruit(fruit)
             show_fruit_name, fruit_name_time = True, current_time
 
-        enemies_hit = pygame.sprite.spritecollide(player, enemies, False)
-        bossenemies_hit = pygame.sprite.spritecollide(player, bossenemies, False)
-        malakar_hit = pygame.sprite.spritecollide(player, malakar_group, False)
         if keys[pygame.K_SPACE]:
             player.attack()
 
@@ -462,7 +480,6 @@ while running:
 
     screen.blit(images["background"], (0, 0))
     all_sprites.draw(screen)
-    player.draw_attack_radius(screen)
     draw_inventory(screen, player)
     draw_legend(screen)
 
