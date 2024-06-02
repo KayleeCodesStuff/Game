@@ -2,8 +2,10 @@ import pygame
 import random
 import time
 
+# Initialize Pygame
 pygame.init()
 
+# Constants
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 TILE_SIZE = 40
@@ -14,8 +16,10 @@ MAZE_HEIGHT = (PLAY_AREA_HEIGHT // TILE_SIZE) - 2
 FPS = 60
 
 def load_and_scale(image_path):
+    """Load and scale image to the defined TILE_SIZE."""
     return pygame.transform.scale(pygame.image.load(image_path), (TILE_SIZE, TILE_SIZE))
 
+# Load images
 luminara_img = load_and_scale('luminara.png')
 background_img = pygame.image.load('background.png')
 ripple_img = load_and_scale('ripple.png')
@@ -23,20 +27,26 @@ outer_wall_img = load_and_scale('tree5.png')
 nightcrawler_img = load_and_scale('nightcrawler.png')
 tree_images = [load_and_scale(f'tree{i}.png') for i in range(8)]
 
+# Create the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Maze Game')
 
+# Fonts
 font = pygame.font.Font(None, 36)
 large_font = pygame.font.Font(None, 72)
 
+# Player setup
 player_pos = [2 * TILE_SIZE, 2 * TILE_SIZE]
 player_speed = 5
 
+# Timer setup
 start_time = time.time()
 
+# Tree destruction tracking
 tree_timers = {}
 
 def create_maze(width, height):
+    """Create a random maze using DFS algorithm."""
     maze = [[1] * width for _ in range(height)]
 
     def carve_passages(x, y):
@@ -55,6 +65,7 @@ def create_maze(width, height):
     return maze
 
 def generate_maze():
+    """Generate the maze and store wall positions."""
     maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
     walls = [(x, y, random.choice(tree_images)) for y in range(len(maze)) for x in range(len(maze[y])) if maze[y][x] == 1]
     return maze, walls
@@ -63,6 +74,7 @@ maze, maze_walls = generate_maze()
 maze[1][1] = 0
 
 def find_valid_position(maze):
+    """Find a valid position within the maze."""
     while True:
         x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
         if maze[y][x] == 0:
@@ -70,19 +82,23 @@ def find_valid_position(maze):
 
 ripple_pos = find_valid_position(maze)
 
+# Add outer walls
 outer_walls = [(x, 0) for x in range(MAZE_WIDTH + 2)] + [(x, MAZE_HEIGHT + 1) for x in range(MAZE_WIDTH + 2)] + [(0, y) for y in range(MAZE_HEIGHT + 2)] + [(MAZE_WIDTH + 1, y) for y in range(MAZE_HEIGHT + 2)]
 
 def darken_image(image, factor):
+    """Darken the image by a given factor."""
     dark_image = image.copy()
     dark_image.fill((0, 0, 0, factor), special_flags=pygame.BLEND_RGBA_MULT)
     return dark_image
 
 def is_colliding_with_walls(next_pos):
+    """Check if the next position collides with any walls."""
     inner_margin = TILE_SIZE * 0.1
     inner_rect = pygame.Rect(next_pos[0] + inner_margin, next_pos[1] + inner_margin, TILE_SIZE * 0.8, TILE_SIZE * 0.8)
     return any(inner_rect.colliderect(pygame.Rect((x + 1) * TILE_SIZE + inner_margin, (y + 1) * TILE_SIZE + inner_margin, TILE_SIZE * 0.8, TILE_SIZE * 0.8)) for (x, y, _) in maze_walls) or any(inner_rect.colliderect(pygame.Rect(x * TILE_SIZE + inner_margin, y * TILE_SIZE + inner_margin, TILE_SIZE * 0.8, TILE_SIZE * 0.8)) for (x, y) in outer_walls)
 
 def move_towards_target(pos, target, speed):
+    """Move the character towards the target position."""
     dx, dy = target[0] - pos[0], target[1] - pos[1]
     dist = (dx**2 + dy**2) ** 0.5
     if dist != 0:
@@ -93,6 +109,7 @@ def move_towards_target(pos, target, speed):
     return pos
 
 def draw_game():
+    """Draw the game screen."""
     screen.blit(background_img, (0, 0))
     for (x, y, img) in maze_walls:
         if (x, y) in tree_timers:
@@ -119,6 +136,7 @@ def draw_game():
     screen.blit(inventory_text, (10, SCREEN_HEIGHT - INVENTORY_HEIGHT + 10))
     pygame.draw.rect(screen, (50, 50, 50), (0, SCREEN_HEIGHT - INVENTORY_HEIGHT, SCREEN_WIDTH, INVENTORY_HEIGHT))
 
+# Main game loop
 running, found_ripple, lost_game = True, False, False
 nightcrawler_pos = None
 nightcrawler_speed = 3
