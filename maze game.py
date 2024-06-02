@@ -175,6 +175,12 @@ last_fruit_spawn_time = start_time
 fruit_positions = {}
 clock = pygame.time.Clock()
 
+def find_valid_nightcrawler_position():
+    while True:
+        x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
+        if maze[y][x] == 0 and (x, y) not in [(x, y) for x, y, _ in maze_walls]:
+            return [x, y]
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -200,7 +206,7 @@ while running:
         found_ripple = True
 
     if not nightcrawler_pos and time.time() >= nightcrawler_spawn_time:
-        nightcrawler_pos = [coord * TILE_SIZE for coord in find_valid_position(maze)]
+        nightcrawler_pos = [coord * TILE_SIZE for coord in find_valid_nightcrawler_position()]
         nightcrawler_target = [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE]
 
     if nightcrawler_pos and not found_ripple and not lost_game:
