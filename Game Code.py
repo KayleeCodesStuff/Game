@@ -62,7 +62,7 @@ class Player(pygame.sprite.Sprite):
         self.image = self.default_image
         self.rect = self.image.get_rect(center=(config["width"] // 2, config["playable_height"] // 2))
         self.base_speed, self.permanent_speed_boost = 5, 0
-        self.base_damage, self.permanent_damage_boost = 20, 0
+        self.base_damage, self.permanent_damage_boost = 5, 0
         self.speed, self.damage = self.base_speed, self.base_damage
         self.experience, self.level = 0, 1
         self.health, self.max_health = 100, 100
@@ -73,7 +73,7 @@ class Player(pygame.sprite.Sprite):
         self.flamefruit_position = None
         self.damage_reduction, self.permanent_damage_reduction = 0, 0
         self.timed_effects = {"damage_reduction": []}
-        self.attack_radius = 75  # Default attack radius  [Line 58]
+        self.attack_radius = 55  # Default attack radius  [Line 58]
 
     def move(self, dx, dy):
         self.rect.x = max(0, min(self.rect.x + dx * self.speed, config["width"] - self.rect.width))
@@ -113,14 +113,14 @@ class Player(pygame.sprite.Sprite):
     def level_up(self):
         self.level += 1
         self.experience -= 1000
-        self.health = min(self.health + 5, self.max_health)
+        self.health = min(self.health + 10, self.max_health)
         bonus = random.choice(["max_health", "damage", "speed", "damage10", "damage15"])
         if bonus == "max_health":
             self.max_health += 5
         elif bonus == "damage":
             self.permanent_damage_boost += 5
         elif bonus == "speed":
-            self.permanent_speed_boost += 2
+            self.permanent_speed_boost += 1
         elif bonus == "damage10":
             self.permanent_damage_boost += 10
         elif bonus == "damage15":
