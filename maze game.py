@@ -37,7 +37,6 @@ large_font = pygame.font.Font(None, 72)
 # Player setup
 player_pos = [2 * TILE_SIZE, 2 * TILE_SIZE]
 player_speed = 5
-score = 0
 
 # Timer setup
 start_time = time.time()
@@ -65,12 +64,13 @@ def create_maze(width, height):
     return maze
 
 # Generate the maze and store wall positions
-def generate_maze():
-    maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
-    maze_walls = [(x, y, random.choice(tree_images)) for y in range(len(maze)) for x in range(len(maze[y])) if maze[y][x] == 1]
-    return maze, maze_walls
+maze, maze_walls = create_maze(MAZE_WIDTH, MAZE_HEIGHT), []
 
-maze, maze_walls = generate_maze()
+for y in range(len(maze)):
+    for x in range(len(maze[y])):
+        if maze[y][x] == 1:
+            img = random.choice(tree_images)
+            maze_walls.append((x, y, img))
 
 # Ensure start and end points are clear
 maze[1][1] = 0
@@ -93,35 +93,6 @@ def darken_image(image, factor):
     dark_image.fill((0, 0, 0, factor), special_flags=pygame.BLEND_RGBA_MULT)
     return dark_image
 
-# Draw the maze and outer walls
-def draw_maze():
-    for (x, y, img) in maze_walls:
-        if (x, y) in tree_timers:
-            timer = tree_timers[(x, y)]
-            dark_factor = int(255 * (timer['start'] - time.time()) / 3)
-            dark_factor = max(0, min(255, dark_factor))
-            img = darken_image(img, dark_factor)
-        screen.blit(img, ((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
-    for (x, y) in outer_walls:
-        screen.blit(outer_wall_img, (x * TILE_SIZE, y * TILE_SIZE))
-
-# Draw the timer
-def draw_timer():
-    elapsed_time = int(time.time() - start_time)
-    timer_text = font.render(f'Time: {elapsed_time}s', True, (255, 255, 255))
-    screen.blit(timer_text, (SCREEN_WIDTH - 150, 10))
-
-# Draw instructions
-def draw_instructions():
-    instructions = font.render('Use arrow keys to move', True, (255, 255, 255))
-    screen.blit(instructions, (10, SCREEN_HEIGHT - 40))
-
-# Draw the inventory
-def draw_inventory():
-    inventory_text = font.render('Inventory:', True, (255, 255, 255))
-    screen.blit(inventory_text, (10, SCREEN_HEIGHT - INVENTORY_HEIGHT + 10))
-    pygame.draw.rect(screen, (50, 50, 50), (0, SCREEN_HEIGHT - INVENTORY_HEIGHT, SCREEN_WIDTH, INVENTORY_HEIGHT))
-
 # Check for collisions with the inner part of the walls
 def is_colliding_with_walls(next_pos):
     inner_margin = TILE_SIZE * 0.1
@@ -138,6 +109,37 @@ def move_towards_target(pos, target, speed):
     if not is_colliding_with_walls(next_pos):
         pos = next_pos
     return pos
+
+# Draw everything
+def draw_game():
+    screen.blit(background_img, (0, 0))
+    for (x, y, img) in maze_walls:
+        if (x, y) in tree_timers:
+            timer = tree_timers[(x, y)]
+            dark_factor = int(255 * (timer['start'] - time.time()) / 3)
+            dark_factor = max(0, min(255, dark_factor))
+            img = darken_image(img, dark_factor)
+        screen.blit(img, ((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
+    for (x, y) in outer_walls:
+        screen.blit(outer_wall_img, (x * TILE_SIZE, y * TILE_SIZE))
+    screen.blit(ripple_img, ((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE))
+    screen.blit(luminara_img, (player_pos[0], player_pos[1]))
+    if nightcrawler_pos:
+        screen.blit(nightcrawler_img, (nightcrawler_pos[0], nightcrawler_pos[1]))
+
+    # Draw the timer
+    elapsed_time = int(time.time() - start_time)
+    timer_text = font.render(f'Time: {elapsed_time}s', True, (255, 255, 255))
+    screen.blit(timer_text, (SCREEN_WIDTH - 150, 10))
+
+    # Draw instructions
+    instructions = font.render('Use arrow keys to move', True, (255, 255, 255))
+    screen.blit(instructions, (10, SCREEN_HEIGHT - 40))
+
+    # Draw the inventory
+    inventory_text = font.render('Inventory:', True, (255, 255, 255))
+    screen.blit(inventory_text, (10, SCREEN_HEIGHT - INVENTORY_HEIGHT + 10))
+    pygame.draw.rect(screen, (50, 50, 50), (0, SCREEN_HEIGHT - INVENTORY_HEIGHT, SCREEN_WIDTH, INVENTORY_HEIGHT))
 
 # Main game loop
 running, found_ripple, lost_game = True, False, False
@@ -176,9 +178,9 @@ while running:
 
     if nightcrawler_pos and not found_ripple and not lost_game:
         nightcrawler_pos = move_towards_target(nightcrawler_pos, [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE], nightcrawler_speed)
+        nightcrawler_rect = pygame.Rect(nightcrawler_pos[0], nightcrawler_pos[1], TILE_SIZE, TILE_SIZE)
 
         # Check if nightcrawler collides with a tree tile
-        nightcrawler_rect = pygame.Rect(nightcrawler_pos[0], nightcrawler_pos[1], TILE_SIZE, TILE_SIZE)
         for (x, y, img) in maze_walls:
             wall_rect = pygame.Rect((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
             if nightcrawler_rect.colliderect(wall_rect):
@@ -201,18 +203,7 @@ while running:
     for key in to_remove:
         del tree_timers[key]
 
-    screen.blit(background_img, (0, 0))
-    draw_maze()
-    screen.blit(ripple_img, ((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE))
-    screen.blit(luminara_img, (player_pos[0], player_pos[1]))
-    if nightcrawler_pos:
-        screen.blit(nightcrawler_img, (nightcrawler_pos[0], nightcrawler_pos[1]))
-    draw_timer()
-    draw_instructions()
-    draw_inventory()
-
-    score_text = font.render(f'Score: {score}', True, (255, 255, 255))
-    screen.blit(score_text, (10, 10))
+    draw_game()
 
     # Display win or lose messages
     if found_ripple:
