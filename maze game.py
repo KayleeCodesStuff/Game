@@ -15,20 +15,16 @@ MAZE_WIDTH = (SCREEN_WIDTH // TILE_SIZE) - 2  # Adjust for outer walls
 MAZE_HEIGHT = (PLAY_AREA_HEIGHT // TILE_SIZE) - 2  # Adjust for outer walls
 FPS = 60
 
-# Load Images
-luminara_img = pygame.image.load('luminara.png')
+# Load and scale images
+def load_and_scale(image_path):
+    return pygame.transform.scale(pygame.image.load(image_path), (TILE_SIZE, TILE_SIZE))
+
+luminara_img = load_and_scale('luminara.png')
 background_img = pygame.image.load('background.png')
-ripple_img = pygame.image.load('ripple.png')
-outer_wall_img = pygame.image.load('tree5.png')
-
-# Tree images
-tree_images = [pygame.image.load(f'tree{i}.png') for i in range(8)]
-
-# Resize images to TILE_SIZE
-luminara_img = pygame.transform.scale(luminara_img, (TILE_SIZE, TILE_SIZE))
-ripple_img = pygame.transform.scale(ripple_img, (TILE_SIZE, TILE_SIZE))
-outer_wall_img = pygame.transform.scale(outer_wall_img, (TILE_SIZE, TILE_SIZE))
-tree_images = [pygame.transform.scale(img, (TILE_SIZE, TILE_SIZE)) for img in tree_images]
+ripple_img = load_and_scale('ripple.png')
+outer_wall_img = load_and_scale('tree5.png')
+nightcrawler_img = load_and_scale('nightcrawler.png')
+tree_images = [load_and_scale(f'tree{i}.png') for i in range(8)]
 
 # Create the screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -46,14 +42,13 @@ score = 0
 # Timer setup
 start_time = time.time()
 
-# Function to create a random maze using DFS algorithm
+# Create a random maze using DFS algorithm
 def create_maze(width, height):
     maze = [[1] * width for _ in range(height)]
-    
+
     def carve_passages(x, y):
         directions = [(2, 0), (-2, 0), (0, 2), (0, -2)]
         random.shuffle(directions)
-        
         for dx, dy in directions:
             nx, ny = x + dx, y + dy
             if 0 <= nx < width and 0 <= ny < height and maze[ny][nx] == 1:
@@ -61,88 +56,88 @@ def create_maze(width, height):
                 maze[ny - dy // 2][nx - dx // 2] = 0  # Ensure path is two tiles wide
                 maze[y + dy // 2][x + dx // 2] = 0
                 carve_passages(nx, ny)
-    
+
     maze[1][1] = 0
     carve_passages(1, 1)
     return maze
 
-# Create the maze and store wall positions
+# Generate the maze and store wall positions
 def generate_maze():
     maze = create_maze(MAZE_WIDTH, MAZE_HEIGHT)
-    maze_walls = []
-
-    for y in range(len(maze)):
-        for x in range(len(maze[y])):
-            if maze[y][x] == 1:
-                maze[y][x] = random.choice(tree_images)
-                maze_walls.append((x, y, maze[y][x]))
-
+    maze_walls = [(x, y, random.choice(tree_images)) for y in range(len(maze)) for x in range(len(maze[y])) if maze[y][x] == 1]
     return maze, maze_walls
 
 maze, maze_walls = generate_maze()
 
 # Ensure start and end points are clear
 maze[1][1] = 0
-ripple_pos = [MAZE_WIDTH-2, MAZE_HEIGHT-2]
+
+# Find a valid position for ripple or nightcrawler
+def find_valid_position(maze):
+    while True:
+        x, y = random.randint(1, MAZE_WIDTH-2), random.randint(1, MAZE_HEIGHT-2)
+        if maze[y][x] == 0:
+            return [x, y]
+
+ripple_pos = find_valid_position(maze)
 
 # Add outer walls
-outer_walls = []
-for x in range(MAZE_WIDTH + 2):
-    outer_walls.append((x, 0))
-    outer_walls.append((x, MAZE_HEIGHT + 1))
-for y in range(MAZE_HEIGHT + 2):
-    outer_walls.append((0, y))
-    outer_walls.append((MAZE_WIDTH + 1, y))
+outer_walls = [(x, 0) for x in range(MAZE_WIDTH + 2)] + [(x, MAZE_HEIGHT + 1) for x in range(MAZE_WIDTH + 2)] + [(0, y) for y in range(MAZE_HEIGHT + 2)] + [(MAZE_WIDTH + 1, y) for y in range(MAZE_HEIGHT + 2)]
 
-# Function to draw the maze
+# Draw the maze and outer walls
 def draw_maze():
     for (x, y, img) in maze_walls:
         screen.blit(img, ((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
     for (x, y) in outer_walls:
         screen.blit(outer_wall_img, (x * TILE_SIZE, y * TILE_SIZE))
 
-# Function to draw the timer
+# Draw the timer
 def draw_timer():
     elapsed_time = int(time.time() - start_time)
     timer_text = font.render(f'Time: {elapsed_time}s', True, (255, 255, 255))
     screen.blit(timer_text, (SCREEN_WIDTH - 150, 10))
 
-# Function to draw instructions
+# Draw instructions
 def draw_instructions():
     instructions = font.render('Use arrow keys to move', True, (255, 255, 255))
     screen.blit(instructions, (10, SCREEN_HEIGHT - 40))
 
-# Function to draw the inventory
+# Draw the inventory
 def draw_inventory():
     inventory_text = font.render('Inventory:', True, (255, 255, 255))
     screen.blit(inventory_text, (10, SCREEN_HEIGHT - INVENTORY_HEIGHT + 10))
     pygame.draw.rect(screen, (50, 50, 50), (0, SCREEN_HEIGHT - INVENTORY_HEIGHT, SCREEN_WIDTH, INVENTORY_HEIGHT))
 
-# Check for collisions with walls
-def is_colliding_with_walls(next_pos, walls):
-    next_rect = pygame.Rect(next_pos[0], next_pos[1], TILE_SIZE, TILE_SIZE)
-    for (x, y, img) in walls:
-        wall_rect = pygame.Rect((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-        if next_rect.colliderect(wall_rect):
-            return True
-    for (x, y) in outer_walls:
-        wall_rect = pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-        if next_rect.colliderect(wall_rect):
-            return True
-    return False
+# Check for collisions with the inner part of the walls
+def is_colliding_with_walls(next_pos):
+    inner_margin = TILE_SIZE * 0.1
+    inner_rect = pygame.Rect(next_pos[0] + inner_margin, next_pos[1] + inner_margin, TILE_SIZE * 0.8, TILE_SIZE * 0.8)
+    return any(inner_rect.colliderect(pygame.Rect((x + 1) * TILE_SIZE + inner_margin, (y + 1) * TILE_SIZE + inner_margin, TILE_SIZE * 0.8, TILE_SIZE * 0.8)) for (x, y, _) in maze_walls) or any(inner_rect.colliderect(pygame.Rect(x * TILE_SIZE + inner_margin, y * TILE_SIZE + inner_margin, TILE_SIZE * 0.8, TILE_SIZE * 0.8)) for (x, y) in outer_walls)
+
+# Move nightcrawler towards ripple
+def move_towards_target(pos, target, speed):
+    dx, dy = target[0] - pos[0], target[1] - pos[1]
+    dist = (dx**2 + dy**2) ** 0.5
+    if dist != 0:
+        dx, dy = dx / dist, dy / dist
+    next_pos = [pos[0] + dx * speed, pos[1] + dy * speed]
+    if not is_colliding_with_walls(next_pos):
+        pos = next_pos
+    return pos
 
 # Main game loop
-running = True
-found_ripple = False
+running, found_ripple, lost_game = True, False, False
+nightcrawler_pos = None
+nightcrawler_speed = 3
+nightcrawler_spawn_time = start_time + 5
 clock = pygame.time.Clock()
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    
-    # Get pressed keys
+
     keys = pygame.key.get_pressed()
-    
     next_pos = player_pos.copy()
     if keys[pygame.K_LEFT]:
         next_pos[0] -= player_speed
@@ -153,41 +148,44 @@ while running:
     if keys[pygame.K_DOWN]:
         next_pos[1] += player_speed
 
-    # Check for collisions with walls and screen edges
-    if (
-        0 <= next_pos[0] < SCREEN_WIDTH and
-        0 <= next_pos[1] < PLAY_AREA_HEIGHT - TILE_SIZE and
-        not is_colliding_with_walls(next_pos, maze_walls)
-    ):
+    if 0 <= next_pos[0] < SCREEN_WIDTH and 0 <= next_pos[1] < PLAY_AREA_HEIGHT - TILE_SIZE and not is_colliding_with_walls(next_pos):
         player_pos = next_pos
 
-    # Check if player reaches the ripple
     if player_pos[0] // TILE_SIZE == ripple_pos[0] + 1 and player_pos[1] // TILE_SIZE == ripple_pos[1] + 1:
         found_ripple = True
 
-    # Draw everything
+    if not nightcrawler_pos and time.time() >= nightcrawler_spawn_time:
+        nightcrawler_pos = [coord * TILE_SIZE for coord in find_valid_position(maze)]
+
+    if nightcrawler_pos and not found_ripple and not lost_game:
+        nightcrawler_pos = move_towards_target(nightcrawler_pos, [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE], nightcrawler_speed)
+
+    if nightcrawler_pos and not lost_game:
+        if pygame.Rect(nightcrawler_pos[0], nightcrawler_pos[1], TILE_SIZE, TILE_SIZE).colliderect(pygame.Rect((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)):
+            lost_game = True
+
     screen.blit(background_img, (0, 0))
     draw_maze()
     screen.blit(ripple_img, ((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE))
     screen.blit(luminara_img, (player_pos[0], player_pos[1]))
+    if nightcrawler_pos:
+        screen.blit(nightcrawler_img, (nightcrawler_pos[0], nightcrawler_pos[1]))
     draw_timer()
     draw_instructions()
     draw_inventory()
-    
-    # Display score
+
     score_text = font.render(f'Score: {score}', True, (255, 255, 255))
     screen.blit(score_text, (10, 10))
 
-    # Display "Found Ripple" message if ripple is found
     if found_ripple:
-        ripple_text = large_font.render('Found Ripple', True, (0, 255, 0))
-        screen.blit(ripple_text, (SCREEN_WIDTH // 2 - ripple_text.get_width() // 2, SCREEN_HEIGHT // 2 - ripple_text.get_height() // 2))
-    
-    # Update the display
+        won_text = large_font.render('You Found Ripple!', True, (0, 255, 0))
+        screen.blit(won_text, (SCREEN_WIDTH // 2 - won_text.get_width() // 2, SCREEN_HEIGHT // 2 - won_text.get_height() // 2))
+
+    if lost_game:
+        lost_text = large_font.render('You Were Caught!', True, (255, 0, 0))
+        screen.blit(lost_text, (SCREEN_WIDTH // 2 - lost_text.get_width() // 2, SCREEN_HEIGHT // 2 - lost_text.get_height() // 2))
+
     pygame.display.flip()
-    
-    # Cap the frame rate
     clock.tick(FPS)
 
-# Quit Pygame
 pygame.quit()
