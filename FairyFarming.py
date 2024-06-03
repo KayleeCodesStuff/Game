@@ -15,6 +15,7 @@ BLUE, WHITE, GREEN, RED, BLACK = (0, 0, 255), (255, 255, 255), (0, 255, 0), (255
 NYX_SPEED = 5
 NYX_SPAWN_BEFORE_MELON_RIPENS = 5
 NYX_DESPAWN_AFTER_MELON_HARVESTED = 3
+RIPPLE_SPEED = 1
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -52,9 +53,10 @@ def load_images():
     tree_imgs = [load_rounded_image(f"tree{i}.png", INITIAL_TREE_SIZE, CORNER_RADIUS) for i in range(5)]
     fruit_imgs = {name: pygame.transform.scale(pygame.image.load(f"{name}.png"), FRUIT_SIZE) for name in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
     nyx_img = pygame.transform.scale(pygame.image.load("nyx.png"), (60, 60))  # Assuming nyx.png is the image for Nyx
-    return tree_imgs, fruit_imgs, nyx_img
+    ripple_img = pygame.transform.scale(pygame.image.load("ripple2.png"), (40, 40))  # Assuming ripple2.png is the image for Ripple
+    return tree_imgs, fruit_imgs, nyx_img, ripple_img
 
-tree_images, fruit_images, nyx_img = load_images()
+tree_images, fruit_images, nyx_img, ripple_img = load_images()
 tree_fruit_pairs = [(tree_images[i], fruit_images[name]) for i, name in enumerate(["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"])]
 
 # Tree names for easy reference
@@ -71,6 +73,53 @@ tree_attributes = [
 
 plants = []
 nyx = None  # Nyx is initially not present
+ripple = None  # Ripple is initially not present
+
+class Ripple:
+    def __init__(self):
+        self.image = ripple_img
+        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        self.speed = RIPPLE_SPEED
+        self.target = None
+
+    def update(self):
+        closest_fruit = None
+        closest_distance = float('inf')
+        for plant in plants:
+            if plant.fruit_visible:
+                if plant.fruit == fruit_images["gleamberry"]:
+                    closest_fruit = plant
+                    break
+                else:
+                    distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        closest_fruit = plant
+
+        self.target = closest_fruit
+
+        if self.target:
+            target_pos = self.target.pos
+            dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
+            distance = (dx ** 2 + dy ** 2) ** 0.5
+            if distance != 0:
+                dx, dy = dx / distance, dy / distance
+                self.rect.x += dx * self.speed
+                self.rect.y += dy * self.speed
+
+            if self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+                if self.target.fruit_positions:
+                    self.target.fruit_positions.pop(0)
+                    inventory.collect_fruit(tree_names[tree_images.index(self.target.tree)])
+                if not self.target.fruit_positions:
+                    self.target.fruit_visible = False
+                    self.target.harvested = True
+                    self.target.respawn_start_time = time.time()
+                    if self.target.harvest_count >= self.target.max_harvests:
+                        plants.remove(self.target)
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect.topleft)
 
 class Nyx:
     def __init__(self):
@@ -129,6 +178,7 @@ class Nyx:
             screen.blit(self.image, self.rect.topleft)
 
 nyx = Nyx()  # Instantiate Nyx object
+ripple = Ripple()  # Instantiate Ripple object
 
 def check_melon_timers():
     for plant in plants:
@@ -298,6 +348,8 @@ def update_game():
         plant.update()
     if nyx:
         nyx.update()
+    if ripple:
+        ripple.update()
 
 def render_game():
     screen.fill(BLACK)
@@ -306,6 +358,8 @@ def render_game():
         plant.draw(screen)
     if nyx:
         nyx.draw(screen)
+    if ripple:
+        ripple.draw(screen)
     draw_inventory(screen, inventory)
     cursor_surface = create_cursor_surface(next_tree_color)
     screen.blit(cursor_surface, pygame.mouse.get_pos())
