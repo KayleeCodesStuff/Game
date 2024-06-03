@@ -71,9 +71,73 @@ tree_attributes = [
 
 plants = []
 nyx = None  # Nyx is initially not present
-nyx_spawn_time = 0
-predicted_tree_type = None  # Store the predicted tree type
-next_tree_color = TREE_COLORS[0]  # Default color for the initial cursor
+
+class Nyx:
+    def __init__(self):
+        self.image = nyx_img
+        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, 0))  # Spawn at top center
+        self.speed = NYX_SPEED
+        self.target = None
+        self.is_spawned = False
+        self.despawn_timer = None
+
+    def update(self):
+        if self.is_spawned:
+            closest_fruit = None
+            closest_distance = float('inf')
+            for plant in plants:
+                if plant.fruit_visible:
+                    if plant.fruit == fruit_images["moonbeammelon"]:
+                        closest_fruit = plant
+                        break
+                    else:
+                        distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
+                        if distance < closest_distance:
+                            closest_distance = distance
+                            closest_fruit = plant
+
+            self.target = closest_fruit
+
+            if self.target:
+                target_pos = self.target.pos
+                dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
+                distance = (dx ** 2 + dy ** 2) ** 0.5
+                if distance != 0:
+                    dx, dy = dx / distance, dy / distance
+                    self.rect.x += dx * self.speed
+                    self.rect.y += dy * self.speed
+
+                if self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+                    if self.target.fruit_positions:
+                        self.target.fruit_positions.pop(0)
+                    if not self.target.fruit_positions:
+                        self.target.fruit_visible = False
+                        self.target.harvested = True
+                        self.target.respawn_start_time = time.time()
+                        if self.target.harvest_count >= self.target.max_harvests:
+                            plants.remove(self.target)
+                        if self.target.fruit == fruit_images["moonbeammelon"]:
+                            self.despawn_timer = time.time() + NYX_DESPAWN_AFTER_MELON_HARVESTED
+
+            if self.despawn_timer and time.time() >= self.despawn_timer:
+                if not any(plant.fruit == fruit_images["moonbeammelon"] and plant.fruit_visible for plant in plants):
+                    self.is_spawned = False
+                    self.despawn_timer = None
+
+    def draw(self, screen):
+        if self.is_spawned:
+            screen.blit(self.image, self.rect.topleft)
+
+nyx = Nyx()  # Instantiate Nyx object
+
+def check_melon_timers():
+    for plant in plants:
+        if plant.fruit == fruit_images["moonbeammelon"]:
+            time_left = plant.mature_time + plant.respawn_time - (time.time() - plant.planted_time)
+            if time_left <= NYX_SPAWN_BEFORE_MELON_RIPENS and not nyx.is_spawned:
+                nyx.rect.center = (SCREEN_WIDTH // 2, 0)
+                nyx.is_spawned = True
+                nyx.despawn_timer = None
 
 def predict_next_tree(selected_fruit):
     global predicted_tree_type, next_tree_color
@@ -129,8 +193,10 @@ class Plant:
                     self.fruit_positions = [(tree_pos[0] + random.randint(0, self.size[0] - FRUIT_SIZE[0]), tree_pos[1] + random.randint(0, self.size[1] - FRUIT_SIZE[1])) for _ in range(fruits_count)]
                 if self.fruit == fruit_images["moonbeammelon"] and elapsed_time >= self.mature_time + self.respawn_time - NYX_SPAWN_BEFORE_MELON_RIPENS:
                     global nyx
-                    if not nyx:
-                        nyx = Nyx(self)
+                    if not nyx.is_spawned:
+                        nyx.rect.center = (SCREEN_WIDTH // 2, 0)
+                        nyx.is_spawned = True
+                        nyx.despawn_timer = None
 
         if self.harvested and self.respawn_start_time:
             time_since_harvest = time.time() - self.respawn_start_time
@@ -151,59 +217,6 @@ class Plant:
 
     def is_clicked(self, mouse_pos):
         return pygame.Rect(self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2, self.size[0], self.size[1]).collidepoint(mouse_pos)
-
-class Nyx:
-    def __init__(self, initial_target):
-        self.image = nyx_img
-        self.rect = self.image.get_rect(center=(initial_target.pos[0], initial_target.pos[1]))
-        self.speed = NYX_SPEED
-        self.target = initial_target
-        self.despawn_time = None
-
-    def update(self):
-        # Find the closest fruit, prioritize melons
-        closest_fruit = None
-        closest_distance = float('inf')
-        for plant in plants:
-            if plant.fruit_visible:
-                if plant.fruit == fruit_images["moonbeammelon"]:
-                    closest_fruit = plant
-                    break
-                else:
-                    distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                    if distance < closest_distance:
-                        closest_distance = distance
-                        closest_fruit = plant
-
-        self.target = closest_fruit
-
-        if self.target:
-            target_pos = self.target.pos
-            dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
-            distance = (dx ** 2 + dy ** 2) ** 0.5
-            if distance != 0:
-                dx, dy = dx / distance, dy / distance
-                self.rect.x += dx * self.speed
-                self.rect.y += dy * self.speed
-
-            if self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
-                if self.target.fruit_positions:
-                    self.target.fruit_positions.pop(0)
-                if not self.target.fruit_positions:
-                    self.target.fruit_visible = False
-                    self.target.harvested = True
-                    self.target.respawn_start_time = time.time()
-                    if self.target.harvest_count >= self.target.max_harvests:
-                        plants.remove(self.target)
-                    if self.target.fruit == fruit_images["moonbeammelon"]:
-                        self.despawn_time = time.time() + NYX_DESPAWN_AFTER_MELON_HARVESTED
-
-            if not any(plant.fruit_visible for plant in plants if plant.fruit == fruit_images["moonbeammelon"]) and self.despawn_time and time.time() >= self.despawn_time:
-                global nyx
-                nyx = None
-
-    def draw(self, screen):
-        screen.blit(self.image, self.rect.topleft)
 
 def is_position_valid(pos, existing_plants, radius=50):
     return all(((pos[0] - plant.pos[0]) ** 2 + (pos[1] - plant.pos[1]) ** 2) ** 0.5 >= radius for plant in existing_plants)
@@ -301,6 +314,7 @@ def render_game():
 running = True
 while running:
     running = handle_events()
+    check_melon_timers()
     update_game()
     render_game()
 
