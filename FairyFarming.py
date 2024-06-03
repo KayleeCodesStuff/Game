@@ -23,6 +23,8 @@ LURE_COST = 25
 LURE_DURATION = 3
 SPEED_BOOST_DURATION = 5
 MAX_SPEED = 10
+TEMP_RIPPLE_DURATION = 15
+TEMP_RIPPLE_COST = 100
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -94,18 +96,24 @@ temporary_ripples = []  # List to hold temporary Ripple instances
 lures = []  # List to hold lure instances
 
 class Ripple:
-    def __init__(self):
+    def __init__(self, duration=None):
         self.image = ripple_img
         self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.base_speed = RIPPLE_SPEED
         self.speed = self.base_speed
         self.speed_boost_timer = None
+        self.spawn_time = time.time() if duration else None
+        self.duration = duration
         self.target = None
 
     def update(self):
         if self.speed_boost_timer and time.time() >= self.speed_boost_timer:
             self.speed = self.base_speed
             self.speed_boost_timer = None
+
+        if self.duration and time.time() - self.spawn_time >= self.duration:
+            temporary_ripples.remove(self)
+            return
 
         closest_fruit = None
         closest_distance = float('inf')
@@ -427,6 +435,12 @@ def draw_inventory(surface, inventory):
     draw_text(surface, "Place Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
     draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
 
+    # Draw the Ripple Clone button
+    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, ripple_clone_button_rect)
+    draw_text(surface, "Clone Ripple", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 5, BLACK)
+    draw_text(surface, f"{TEMP_RIPPLE_COST} Gleamberries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 25, BLACK)
+
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
     surface.blit(font.render(text, True, color), font.render(text, True, color).get_rect(midtop=(x, y)))
@@ -468,6 +482,12 @@ def handle_events():
                         if inventory.items["flamefruit"] >= LURE_COST:
                             inventory.items["flamefruit"] -= LURE_COST
                             place_lure()
+                    # Check if Ripple Clone button was clicked
+                    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
+                    if ripple_clone_button_rect.collidepoint(mouse_pos):
+                        if inventory.items["gleamberry"] >= TEMP_RIPPLE_COST:
+                            inventory.items["gleamberry"] -= TEMP_RIPPLE_COST
+                            temporary_ripples.append(Ripple(TEMP_RIPPLE_DURATION))
             elif event.button == 3:
                 x_offset, selected = 10, False
                 for fruit in fruit_images.keys():
