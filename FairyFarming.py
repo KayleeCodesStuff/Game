@@ -16,6 +16,7 @@ GROWTH_TIME = 5  # Time in seconds for plants to grow
 HARVEST_TIME = 10  # Time in seconds for plants to be ready for harvest
 RESPAWN_TIME = 5  # Time in seconds for fruit to respawn
 CORNER_RADIUS = 20  # Radius for rounding corners
+MAX_HARVESTS = 5  # Maximum number of harvests before tree disappears
 
 # Set up the game window
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -114,8 +115,6 @@ class Plant:
                 self.fruit_visible = True
                 self.fruit_positions = []
                 self.harvest_count += 1
-                if self.harvest_count >= 5:
-                    plants.remove(self)
 
     def draw(self, screen):
         tree_image = pygame.transform.scale(self.tree, self.size)
@@ -124,7 +123,7 @@ class Plant:
         if self.fruit_visible:
             for fruit_pos in self.fruit_positions:
                 screen.blit(self.fruit, fruit_pos)
-        elif self.harvested and self.harvest_count < 5:
+        elif self.harvested and self.harvest_count < MAX_HARVESTS:
             draw_text(screen, str(self.countdown), 24, self.pos[0], self.pos[1] - 50, (0, 255, 0))
 
     def is_clicked(self, mouse_pos):
@@ -143,9 +142,16 @@ def is_position_valid(pos, existing_plants, radius=50):
 class Player:
     def __init__(self):
         self.inventory = {fruit: 0 for fruit in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
+        self.inventory["gleamberry"] = max(5, self.inventory["gleamberry"])
 
     def collect_fruit(self, fruit):
         self.inventory[fruit] += 1
+
+    def remove_random_fruit(self):
+        fruits_with_nonzero_count = [fruit for fruit, count in self.inventory.items() if count > 0]
+        if fruits_with_nonzero_count:
+            fruit_to_remove = random.choice(fruits_with_nonzero_count)
+            self.inventory[fruit_to_remove] -= 1
 
 player = Player()
 
@@ -174,19 +180,24 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
             if mouse_pos[1] <= PLAYABLE_HEIGHT:
-                for plant in plants:
-                    if plant.is_clicked(mouse_pos) and plant.fruit_visible:
-                        fruit_name = list(fruit_images.keys())[tree_images.index(plant.tree)]
-                        for _ in plant.fruit_positions:
-                            player.collect_fruit(fruit=fruit_name)
-                        plant.fruit_visible = False
-                        plant.harvested = True
-                        plant.respawn_start_time = time.time()
-                        break
-                else:
+                if event.button == 1:  # Left click for planting
                     if is_position_valid(mouse_pos, plants):
-                        tree, fruit = tree_fruit_pairs[len(plants) % len(tree_fruit_pairs)]
-                        plants.append(Plant(tree, fruit, mouse_pos))
+                        if any(count > 0 for count in player.inventory.values()):
+                            tree, fruit = tree_fruit_pairs[len(plants) % len(tree_fruit_pairs)]
+                            plants.append(Plant(tree, fruit, mouse_pos))
+                            player.remove_random_fruit()
+                elif event.button == 3:  # Right click for harvesting
+                    for plant in plants:
+                        if plant.is_clicked(mouse_pos) and plant.fruit_visible:
+                            fruit_name = list(fruit_images.keys())[tree_images.index(plant.tree)]
+                            for _ in plant.fruit_positions:
+                                player.collect_fruit(fruit=fruit_name)
+                            plant.fruit_visible = False
+                            plant.harvested = True
+                            plant.respawn_start_time = time.time()
+                            if plant.harvest_count >= MAX_HARVESTS:
+                                plants.remove(plant)
+                            break
 
     # Update plants
     for plant in plants:
