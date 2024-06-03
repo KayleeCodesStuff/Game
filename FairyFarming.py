@@ -409,28 +409,28 @@ def draw_inventory(surface, inventory):
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50
 
+    # Draw the Lure button
+    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, lure_button_rect)
+    draw_text(surface, "Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
+    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
+
     # Draw the Luminara spawn button
-    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
+    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
     pygame.draw.rect(surface, GREEN, luminara_button_rect)
-    draw_text(surface, "Spawn Luminara", 18, luminara_button_rect.centerx, luminara_button_rect.y + 5, BLACK)
+    draw_text(surface, "Luminara", 18, luminara_button_rect.centerx, luminara_button_rect.y + 5, BLACK)
     draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 25, BLACK)
 
     # Draw the Speed Boost button
-    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
     pygame.draw.rect(surface, GREEN, speed_boost_button_rect)
-    draw_text(surface, "Boost Speed", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 5, BLACK)
+    draw_text(surface, "Speed", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 5, BLACK)
     draw_text(surface, f"{SPEED_BOOST_COST} Apples", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 25, BLACK)
-
-    # Draw the Lure button
-    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
-    pygame.draw.rect(surface, GREEN, lure_button_rect)
-    draw_text(surface, "Place Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
 
     # Draw the Ripple clone button
     ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
     pygame.draw.rect(surface, GREEN, ripple_clone_button_rect)
-    draw_text(surface, "Clone Ripple", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 5, BLACK)
+    draw_text(surface, "Ripple", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 5, BLACK)
     draw_text(surface, f"100 Berries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 25, BLACK)
 
 def draw_text(surface, text, size, x, y, color):
