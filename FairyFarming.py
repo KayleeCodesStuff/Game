@@ -10,19 +10,23 @@ pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 INITIAL_TREE_SIZE, FINAL_TREE_SIZE = (50, 50), (80, 80)
 PLAYABLE_HEIGHT = 540
+UNPLAYABLE_HEIGHT = 40
 CORNER_RADIUS, FRUIT_SIZE = 20, (45, 45)
-BLUE, WHITE, GREEN, RED, BLACK = (0, 0, 255), (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 0)
+BLUE, WHITE, GREEN, RED, BLACK, NEON_GREEN, PURPLE = (0, 0, 255), (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 0), (57, 255, 20), (128, 0, 128)
 NYX_SPEED = 5
 NYX_DESPAWN_AFTER_SPAWN = 8  # Nyx despawn time after spawning
 RIPPLE_SPEED = 1
 LUMINARA_SPEED = 2
-LUMINARA_COST = 50
+LUMINARA_COST = 25  # Updated cost
 LUMINARA_MAX_FRUITS = 100
-SPEED_BOOST_COST = 25
-LURE_COST = 25
-LURE_DURATION = 5  # Changed from 3 to 5
+SPEED_BOOST_COST = 20  # Updated cost
+LURE_COST = 15  # Updated cost
+LURE_DURATION = 3
 SPEED_BOOST_DURATION = 5
+RIPPLE_COST = 75  # Updated cost
 MAX_SPEED = 10
+WIN_CONDITION = 50
+LOSS_CONDITION = 50
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -92,6 +96,9 @@ ripple = None  # Ripple is initially not present
 luminaras = []  # List to hold Luminara instances
 temporary_ripples = []  # List to hold temporary Ripple instances
 lures = []  # List to hold lure instances
+nyx_melon_count = 0  # Nyx's melon count
+luminara_melon_count = 0  # Luminara's melon count
+game_over = False  # Game over state
 
 class Ripple:
     def __init__(self):
@@ -194,6 +201,8 @@ class Nyx:
                 if isinstance(self.target, Plant) and self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
                     if self.target.fruit_positions:
                         self.target.fruit_positions.pop(0)
+                        global nyx_melon_count
+                        nyx_melon_count += 1
                     if not self.target.fruit_positions:
                         self.target.fruit_visible = False
                         self.target.harvested = True
@@ -270,6 +279,9 @@ class Luminara:
                         plant.fruit_positions.pop(0)
                         inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
                         self.collected_fruits += 1
+                        global luminara_melon_count
+                        if plant.fruit == fruit_images["moonbeammelon"]:
+                            luminara_melon_count += 1
                     plant.fruit_visible = False
                     plant.harvested = True
                     plant.respawn_start_time = time.time()
@@ -410,40 +422,42 @@ def draw_inventory(surface, inventory):
         x_offset += 50
 
     # Draw the Luminara spawn button
-    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
-    pygame.draw.rect(surface, GREEN, luminara_button_rect, border_radius=10)
+    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, luminara_button_rect)
     draw_text(surface, "Luminara", 18, luminara_button_rect.centerx, luminara_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 20, BLACK)
+    draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 25, BLACK)
 
     # Draw the Speed Boost button
-    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 230, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
-    pygame.draw.rect(surface, GREEN, speed_boost_button_rect, border_radius=10)
+    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, speed_boost_button_rect)
     draw_text(surface, "Speed", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{SPEED_BOOST_COST} Apples", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 20, BLACK)
+    draw_text(surface, f"{SPEED_BOOST_COST} Apples", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 25, BLACK)
 
     # Draw the Lure button
-    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 340, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
-    pygame.draw.rect(surface, GREEN, lure_button_rect, border_radius=10)
+    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, lure_button_rect)
     draw_text(surface, "Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 20, BLACK)
+    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
 
     # Draw the Ripple clone button
-    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 450, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
-    pygame.draw.rect(surface, GREEN, ripple_clone_button_rect, border_radius=10)
+    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, ripple_clone_button_rect)
     draw_text(surface, "Ripple", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 5, BLACK)
-    draw_text(surface, "100 Berries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 20, BLACK)
+    draw_text(surface, f"75 Berries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 25, BLACK)
 
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
     surface.blit(font.render(text, True, color), font.render(text, True, color).get_rect(midtop=(x, y)))
 
 def handle_events():
-    global predicted_tree_type  # Ensure we use the predicted tree type
+    global predicted_tree_type, game_over  # Ensure we use the predicted tree type
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            if game_over:
+                return True
             mouse_pos = pygame.mouse.get_pos()
             if event.button == 1:
                 if mouse_pos[1] <= PLAYABLE_HEIGHT:
@@ -457,28 +471,28 @@ def handle_events():
                             predict_next_tree(inventory.selected_fruit)  # Predict the next tree after planting
                 else:
                     # Check if Luminara button was clicked
-                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
                     if luminara_button_rect.collidepoint(mouse_pos):
                         if inventory.items["etherealpear"] >= LUMINARA_COST:
                             inventory.items["etherealpear"] -= LUMINARA_COST
                             luminaras.append(Luminara())
                     # Check if Speed Boost button was clicked
-                    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 230, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+                    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
                     if speed_boost_button_rect.collidepoint(mouse_pos):
                         if inventory.items["shimmeringapple"] >= SPEED_BOOST_COST:
                             inventory.items["shimmeringapple"] -= SPEED_BOOST_COST
                             apply_speed_boost()
                     # Check if Lure button was clicked
-                    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 340, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+                    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
                     if lure_button_rect.collidepoint(mouse_pos):
                         if inventory.items["flamefruit"] >= LURE_COST:
                             inventory.items["flamefruit"] -= LURE_COST
                             place_lure()
                     # Check if Ripple clone button was clicked
-                    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 450, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+                    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
                     if ripple_clone_button_rect.collidepoint(mouse_pos):
-                        if inventory.items["gleamberry"] >= 100:
-                            inventory.items["gleamberry"] -= 100
+                        if inventory.items["gleamberry"] >= RIPPLE_COST:
+                            inventory.items["gleamberry"] -= RIPPLE_COST
                             temporary_ripples.append(RippleClone())
             elif event.button == 3:
                 x_offset, selected = 10, False
@@ -525,6 +539,8 @@ def place_lure():
     lures.append(Lure(lure_pos))
 
 def update_game():
+    if game_over:
+        return
     for plant in plants:
         plant.update()
     if nyx:
@@ -538,9 +554,32 @@ def update_game():
     for lure in lures:
         lure.update()
 
+    check_win_loss_condition()
+
+def check_win_loss_condition():
+    global game_over
+    if nyx_melon_count >= LOSS_CONDITION and luminara_melon_count >= WIN_CONDITION:
+        display_message("Nyx and Luminara share a Moonbeam Melon", PURPLE)
+        game_over = True
+    elif nyx_melon_count >= LOSS_CONDITION:
+        display_message("Nyx Stole the Moonbeam Melons", RED)
+        game_over = True
+    elif luminara_melon_count >= WIN_CONDITION:
+        display_message("50 Moonbeam Melons Harvested", NEON_GREEN)
+        game_over = True
+
+def display_message(message, color):
+    font = pygame.font.SysFont(None, 55)
+    text = font.render(message, True, color)
+    text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+    screen.blit(text, text_rect)
+    pygame.display.update()
+
 def render_game():
     screen.fill(BLACK)
-    screen.blit(background, ((SCREEN_WIDTH - background.get_width()) // 2, 0))
+    screen.blit(background, ((SCREEN_WIDTH - background.get_width()) // 2, UNPLAYABLE_HEIGHT))
+    pygame.draw.rect(screen, BLACK, (0, 0, SCREEN_WIDTH, UNPLAYABLE_HEIGHT))
+    draw_statistics(screen)
     for plant in plants:
         plant.draw(screen)
     if nyx:
@@ -557,6 +596,14 @@ def render_game():
     cursor_surface = create_cursor_surface(next_tree_color)
     screen.blit(cursor_surface, pygame.mouse.get_pos())
     pygame.display.flip()
+
+def draw_statistics(screen):
+    font = pygame.font.SysFont(None, 30)
+    nyx_melons_text = font.render(f"Nyx: {nyx_melon_count}/50", True, WHITE)
+    nyx_speed_text = font.render(f"Nyx Speed: {nyx.speed}", True, WHITE)
+    screen.blit(nyx_melons_text, (10, 10))
+    screen.blit(nyx_speed_text, (200, 10))  # Display side by side
+
 
 running = True
 while running:
