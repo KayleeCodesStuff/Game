@@ -13,9 +13,11 @@ PLAYABLE_HEIGHT = 540
 CORNER_RADIUS, FRUIT_SIZE = 20, (45, 45)
 BLUE, WHITE, GREEN, RED, BLACK = (0, 0, 255), (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 0)
 NYX_SPEED = 5
-NYX_SPAWN_BEFORE_MELON_RIPENS = 5
-NYX_DESPAWN_AFTER_MELON_HARVESTED = 8  # Updated despawn timer for Nyx
+NYX_DESPAWN_AFTER_SPAWN = 8  # Nyx despawn time after spawning
 RIPPLE_SPEED = 1
+LUMINARA_SPEED = 2
+LUMINARA_COST = 50
+LUMINARA_MAX_FRUITS = 100
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -48,7 +50,10 @@ def load_images():
     def load_rounded_image(image_path, size, radius):
         image = pygame.image.load(image_path)
         aspect_ratio = image.get_width() / image.get_height()
-        size = (int(size[1] * aspect_ratio), size[1]) if aspect_ratio > 1 else (size[0], int(size[0] / aspect_ratio))
+        if aspect_ratio > 1:
+            size = (size[0], int(size[0] / aspect_ratio))
+        else:
+            size = (int(size[1] * aspect_ratio), size[1])
         image = pygame.transform.scale(image, size)
         mask = create_rounded_mask(size, radius)
         return apply_rounded_mask(image, mask)
@@ -57,9 +62,10 @@ def load_images():
     fruit_imgs = {name: pygame.transform.scale(pygame.image.load(f"{name}.png"), FRUIT_SIZE) for name in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
     nyx_img = pygame.transform.scale(pygame.image.load("nyx.png"), (60, 60))  # Assuming nyx.png is the image for Nyx
     ripple_img = pygame.transform.scale(pygame.image.load("ripple2.png"), (40, 40))  # Assuming ripple2.png is the image for Ripple
-    return tree_imgs, fruit_imgs, nyx_img, ripple_img
+    luminara_img = pygame.transform.scale(pygame.image.load("luminara.png"), (60, 60))  # Assuming luminara.png is the image for Luminara
+    return tree_imgs, fruit_imgs, nyx_img, ripple_img, luminara_img
 
-tree_images, fruit_images, nyx_img, ripple_img = load_images()
+tree_images, fruit_images, nyx_img, ripple_img, luminara_img = load_images()
 tree_fruit_pairs = [(tree_images[i], fruit_images[name]) for i, name in enumerate(["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"])]
 
 # Tree names for easy reference
@@ -77,6 +83,7 @@ tree_attributes = [
 plants = []
 nyx = None  # Nyx is initially not present
 ripple = None  # Ripple is initially not present
+luminaras = []  # List to hold Luminara instances
 
 class Ripple:
     def __init__(self):
@@ -136,7 +143,6 @@ class Nyx:
         self.target = None
         self.is_spawned = False
         self.despawn_timer = None
-        self.should_despawn = False
 
     def update(self):
         if self.is_spawned:
@@ -173,14 +179,10 @@ class Nyx:
                         self.target.respawn_start_time = time.time()
                         if self.target.harvest_count >= self.target.max_harvests:
                             plants.remove(self.target)
-                        if self.target.fruit == fruit_images["moonbeammelon"]:
-                            self.despawn_timer = time.time() + NYX_DESPAWN_AFTER_MELON_HARVESTED
-                            self.should_despawn = True
 
-            if self.should_despawn and self.despawn_timer and time.time() >= self.despawn_timer:
+            if self.despawn_timer and time.time() >= self.despawn_timer:
                 self.is_spawned = False
                 self.despawn_timer = None
-                self.should_despawn = False
 
     def draw(self, screen):
         if self.is_spawned:
@@ -189,15 +191,78 @@ class Nyx:
 nyx = Nyx()  # Instantiate Nyx object
 ripple = Ripple()  # Instantiate Ripple object
 
+class Luminara:
+    def __init__(self):
+        self.image = luminara_img
+        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
+        self.speed = LUMINARA_SPEED
+        self.target = None
+        self.collected_fruits = 0
+
+    def update(self):
+        closest_fruit = None
+        closest_distance = float('inf')
+        for plant in plants:
+            if plant.fruit_visible:
+                if plant.fruit == fruit_images["moonbeammelon"]:
+                    closest_fruit = plant
+                    break
+                else:
+                    distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        closest_fruit = plant
+        if not closest_fruit:
+            for plant in plants:
+                if plant.fruit_visible:
+                    fruit_rarity = ["moonbeammelon", "etherealpear", "shimmeringapple", "flamefruit", "gleamberry"]
+                    current_fruit_index = fruit_rarity.index(tree_names[tree_images.index(plant.tree)])
+                    target_fruit_index = fruit_rarity.index(tree_names[tree_images.index(closest_fruit.tree)]) if closest_fruit else float('inf')
+                    if current_fruit_index < target_fruit_index:
+                        closest_fruit = plant
+                    elif current_fruit_index == target_fruit_index:
+                        distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
+                        if distance < closest_distance:
+                            closest_distance = distance
+                            closest_fruit = plant
+
+        self.target = closest_fruit
+
+        if self.target:
+            target_pos = self.target.pos
+            dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
+            distance = (dx ** 2 + dy ** 2) ** 0.5
+            if distance != 0:
+                dx, dy = dx / distance, dy / distance
+                self.rect.x += dx * self.speed
+                self.rect.y += dy * self.speed
+
+            for plant in plants:
+                if plant.fruit_visible and plant.fruit_positions and self.rect.colliderect(pygame.Rect(plant.fruit_positions[0][0], plant.fruit_positions[0][1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+                    while plant.fruit_positions:
+                        plant.fruit_positions.pop(0)
+                        inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
+                        self.collected_fruits += 1
+                    plant.fruit_visible = False
+                    plant.harvested = True
+                    plant.respawn_start_time = time.time()
+                    if plant.harvest_count >= plant.max_harvests:
+                        plants.remove(plant)
+
+        if self.collected_fruits >= LUMINARA_MAX_FRUITS:
+            luminaras.remove(self)
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect.topleft)
+
 def check_melon_timers():
     for plant in plants:
         if plant.fruit == fruit_images["moonbeammelon"]:
             time_left = plant.mature_time + plant.respawn_time - (time.time() - plant.planted_time)
-            if time_left <= NYX_SPAWN_BEFORE_MELON_RIPENS and not nyx.is_spawned:
+            if time_left <= NYX_DESPAWN_AFTER_SPAWN and not nyx.is_spawned:
                 nyx.rect.center = (SCREEN_WIDTH // 2, 0)
                 nyx.is_spawned = True
-                nyx.despawn_timer = None
-                nyx.should_despawn = False
+                nyx.despawn_timer = time.time() + NYX_DESPAWN_AFTER_SPAWN
 
 def predict_next_tree(selected_fruit):
     global predicted_tree_type, next_tree_color
@@ -249,13 +314,6 @@ class Plant:
                     tree_pos = (self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2)
                     fruits_count = self.fruits_per_spawn[min(self.harvest_count, len(self.fruits_per_spawn) - 1)]
                     self.fruit_positions = [(tree_pos[0] + random.randint(0, self.size[0] - FRUIT_SIZE[0]), tree_pos[1] + random.randint(0, self.size[1] - FRUIT_SIZE[1])) for _ in range(fruits_count)]
-                if self.fruit == fruit_images["moonbeammelon"] and elapsed_time >= self.mature_time + self.respawn_time - NYX_SPAWN_BEFORE_MELON_RIPENS:
-                    global nyx
-                    if not nyx.is_spawned:
-                        nyx.rect.center = (SCREEN_WIDTH // 2, 0)
-                        nyx.is_spawned = True
-                        nyx.despawn_timer = None
-                        nyx.should_despawn = False
 
         if self.harvested and self.respawn_start_time:
             time_since_harvest = time.time() - self.respawn_start_time
@@ -311,6 +369,12 @@ def draw_inventory(surface, inventory):
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50
 
+    # Draw the Luminara spawn button
+    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, luminara_button_rect)
+    draw_text(surface, "Spawn Luminara", 18, luminara_button_rect.centerx, luminara_button_rect.y + 5, BLACK)
+    draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 25, BLACK)
+
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
     surface.blit(font.render(text, True, color), font.render(text, True, color).get_rect(midtop=(x, y)))
@@ -323,15 +387,23 @@ def handle_events():
             return False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
-            if event.button == 1 and mouse_pos[1] <= PLAYABLE_HEIGHT:
-                if is_position_valid(mouse_pos, plants):
-                    if inventory.items[inventory.selected_fruit] > 0:
-                        tree_type = predicted_tree_type
-                        tree, fruit = tree_fruit_pairs[tree_names.index(tree_type)]
-                        attributes = tree_attributes[tree_fruit_pairs.index((tree, fruit))]
-                        plants.append(Plant(tree, fruit, mouse_pos, attributes))
-                        inventory.remove_selected_fruit()
-                        predict_next_tree(inventory.selected_fruit)  # Predict the next tree after planting
+            if event.button == 1:
+                if mouse_pos[1] <= PLAYABLE_HEIGHT:
+                    if is_position_valid(mouse_pos, plants):
+                        if inventory.items[inventory.selected_fruit] > 0:
+                            tree_type = predicted_tree_type
+                            tree, fruit = tree_fruit_pairs[tree_names.index(tree_type)]
+                            attributes = tree_attributes[tree_fruit_pairs.index((tree, fruit))]
+                            plants.append(Plant(tree, fruit, mouse_pos, attributes))
+                            inventory.remove_selected_fruit()
+                            predict_next_tree(inventory.selected_fruit)  # Predict the next tree after planting
+                else:
+                    # Check if Luminara button was clicked
+                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
+                    if luminara_button_rect.collidepoint(mouse_pos):
+                        if inventory.items["etherealpear"] >= LUMINARA_COST:
+                            inventory.items["etherealpear"] -= LUMINARA_COST
+                            luminaras.append(Luminara())
             elif event.button == 3:
                 x_offset, selected = 10, False
                 for fruit in fruit_images.keys():
@@ -360,6 +432,8 @@ def update_game():
         nyx.update()
     if ripple:
         ripple.update()
+    for luminara in luminaras:
+        luminara.update()
 
 def render_game():
     screen.fill(BLACK)
@@ -370,6 +444,8 @@ def render_game():
         nyx.draw(screen)
     if ripple:
         ripple.draw(screen)
+    for luminara in luminaras:
+        luminara.draw(screen)
     draw_inventory(screen, inventory)
     cursor_surface = create_cursor_surface(next_tree_color)
     screen.blit(cursor_surface, pygame.mouse.get_pos())
