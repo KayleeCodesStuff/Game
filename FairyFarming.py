@@ -97,7 +97,6 @@ luminaras = []  # List to hold Luminara instances
 temporary_ripples = []  # List to hold temporary Ripple instances
 lures = []  # List to hold lure instances
 nyx_melon_count = 0  # Nyx's melon count
-luminara_melon_count = 0  # Luminara's melon count
 game_over = False  # Game over state
 
 class Ripple:
@@ -200,9 +199,11 @@ class Nyx:
 
                 if isinstance(self.target, Plant) and self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
                     if self.target.fruit_positions:
-                        self.target.fruit_positions.pop(0)
-                        global nyx_melon_count
-                        nyx_melon_count += 1
+                       self.target.fruit_positions.pop(0)
+                       if self.target.fruit == fruit_images["moonbeammelon"]:
+                            global nyx_melon_count
+                            nyx_melon_count += 1
+
                     if not self.target.fruit_positions:
                         self.target.fruit_visible = False
                         self.target.harvested = True
@@ -279,9 +280,6 @@ class Luminara:
                         plant.fruit_positions.pop(0)
                         inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
                         self.collected_fruits += 1
-                        global luminara_melon_count
-                        if plant.fruit == fruit_images["moonbeammelon"]:
-                            luminara_melon_count += 1
                     plant.fruit_visible = False
                     plant.harvested = True
                     plant.respawn_start_time = time.time()
@@ -293,6 +291,7 @@ class Luminara:
 
     def draw(self, screen):
         screen.blit(self.image, self.rect.topleft)
+
 
 class Lure:
     def __init__(self, pos):
@@ -558,13 +557,15 @@ def update_game():
 
 def check_win_loss_condition():
     global game_over
-    if nyx_melon_count >= LOSS_CONDITION and luminara_melon_count >= WIN_CONDITION:
+    player_moonbeam_count = inventory.items["moonbeammelon"]
+
+    if nyx_melon_count >= LOSS_CONDITION and player_moonbeam_count >= WIN_CONDITION:
         display_message("Nyx and Luminara share a Moonbeam Melon", PURPLE)
         game_over = True
     elif nyx_melon_count >= LOSS_CONDITION:
         display_message("Nyx Stole the Moonbeam Melons", RED)
         game_over = True
-    elif luminara_melon_count >= WIN_CONDITION:
+    elif player_moonbeam_count >= WIN_CONDITION:
         display_message("50 Moonbeam Melons Harvested", NEON_GREEN)
         game_over = True
 
@@ -574,6 +575,7 @@ def display_message(message, color):
     text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
     screen.blit(text, text_rect)
     pygame.display.update()
+    pygame.time.wait(3000)
 
 def render_game():
     screen.fill(BLACK)
@@ -595,6 +597,15 @@ def render_game():
     draw_inventory(screen, inventory)
     cursor_surface = create_cursor_surface(next_tree_color)
     screen.blit(cursor_surface, pygame.mouse.get_pos())
+
+    if game_over:
+        if nyx_melon_count >= LOSS_CONDITION and luminara_melon_count >= WIN_CONDITION:
+            display_message("Nyx and Luminara share a Moonbeam Melon", PURPLE)
+        elif nyx_melon_count >= LOSS_CONDITION:
+            display_message("Nyx Stole the Moonbeam Melons", RED)
+        elif luminara_melon_count >= WIN_CONDITION:
+            display_message("50 Moonbeam Melons Harvested", NEON_GREEN)
+
     pygame.display.flip()
 
 def draw_statistics(screen):
