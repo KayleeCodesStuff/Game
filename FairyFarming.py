@@ -18,8 +18,11 @@ RIPPLE_SPEED = 1
 LUMINARA_SPEED = 2
 LUMINARA_COST = 50
 LUMINARA_MAX_FRUITS = 100
-RIPPLE_COST = 100
-RIPPLE_DURATION = 15  # Duration for temporary Ripple
+SPEED_BOOST_COST = 25
+LURE_COST = 25
+LURE_DURATION = 3
+SPEED_BOOST_DURATION = 5
+MAX_SPEED = 10
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -65,9 +68,10 @@ def load_images():
     nyx_img = pygame.transform.scale(pygame.image.load("nyx.png"), (60, 60))  # Assuming nyx.png is the image for Nyx
     ripple_img = pygame.transform.scale(pygame.image.load("ripple2.png"), (40, 40))  # Assuming ripple2.png is the image for Ripple
     luminara_img = pygame.transform.scale(pygame.image.load("luminara.png"), (60, 60))  # Assuming luminara.png is the image for Luminara
-    return tree_imgs, fruit_imgs, nyx_img, ripple_img, luminara_img
+    lure_img = pygame.transform.scale(pygame.image.load("flamefruit.png"), (FRUIT_SIZE[0] * 4, FRUIT_SIZE[1] * 4))  # Enlarged flamefruit image for lure
+    return tree_imgs, fruit_imgs, nyx_img, ripple_img, luminara_img, lure_img
 
-tree_images, fruit_images, nyx_img, ripple_img, luminara_img = load_images()
+tree_images, fruit_images, nyx_img, ripple_img, luminara_img, lure_img = load_images()
 tree_fruit_pairs = [(tree_images[i], fruit_images[name]) for i, name in enumerate(["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"])]
 
 # Tree names for easy reference
@@ -87,15 +91,22 @@ nyx = None  # Nyx is initially not present
 ripple = None  # Ripple is initially not present
 luminaras = []  # List to hold Luminara instances
 temporary_ripples = []  # List to hold temporary Ripple instances
+lures = []  # List to hold lure instances
 
 class Ripple:
     def __init__(self):
         self.image = ripple_img
         self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-        self.speed = RIPPLE_SPEED
+        self.base_speed = RIPPLE_SPEED
+        self.speed = self.base_speed
+        self.speed_boost_timer = None
         self.target = None
 
     def update(self):
+        if self.speed_boost_timer and time.time() >= self.speed_boost_timer:
+            self.speed = self.base_speed
+            self.speed_boost_timer = None
+
         closest_fruit = None
         closest_distance = float('inf')
         for plant in plants:
@@ -162,10 +173,17 @@ class Nyx:
                             closest_distance = distance
                             closest_fruit = plant
 
+            # Check for lures
+            for lure in lures:
+                distance = ((self.rect.centerx - lure.rect.centerx) ** 2 + (self.rect.centery - lure.rect.centery) ** 0.5)
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_fruit = lure
+
             self.target = closest_fruit
 
             if self.target:
-                target_pos = self.target.pos
+                target_pos = self.target.pos if isinstance(self.target, Plant) else self.target.rect.center
                 dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
                 distance = (dx ** 2 + dy ** 2) ** 0.5
                 if distance != 0:
@@ -173,7 +191,7 @@ class Nyx:
                     self.rect.x += dx * self.speed
                     self.rect.y += dy * self.speed
 
-                if self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+                if isinstance(self.target, Plant) and self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
                     if self.target.fruit_positions:
                         self.target.fruit_positions.pop(0)
                     if not self.target.fruit_positions:
@@ -198,11 +216,17 @@ class Luminara:
     def __init__(self):
         self.image = luminara_img
         self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-        self.speed = LUMINARA_SPEED
+        self.base_speed = LUMINARA_SPEED
+        self.speed = self.base_speed
+        self.speed_boost_timer = None
         self.target = None
         self.collected_fruits = 0
 
     def update(self):
+        if self.speed_boost_timer and time.time() >= self.speed_boost_timer:
+            self.speed = self.base_speed
+            self.speed_boost_timer = None
+
         closest_fruit = None
         closest_distance = float('inf')
         for plant in plants:
@@ -258,15 +282,18 @@ class Luminara:
     def draw(self, screen):
         screen.blit(self.image, self.rect.topleft)
 
-class TemporaryRipple(Ripple):
-    def __init__(self):
-        super().__init__()
+class Lure:
+    def __init__(self, pos):
+        self.image = lure_img
+        self.rect = self.image.get_rect(center=pos)
         self.spawn_time = time.time()
 
     def update(self):
-        super().update()
-        if time.time() - self.spawn_time > RIPPLE_DURATION:
-            temporary_ripples.remove(self)
+        if time.time() - self.spawn_time >= LURE_DURATION:
+            lures.remove(self)
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect.topleft)
 
 def check_melon_timers():
     for plant in plants:
@@ -383,16 +410,22 @@ def draw_inventory(surface, inventory):
         x_offset += 50
 
     # Draw the Luminara spawn button
-    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
     pygame.draw.rect(surface, GREEN, luminara_button_rect)
     draw_text(surface, "Spawn Luminara", 18, luminara_button_rect.centerx, luminara_button_rect.y + 5, BLACK)
     draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 25, BLACK)
 
-    # Draw the Ripple clone spawn button
-    ripple_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
-    pygame.draw.rect(surface, GREEN, ripple_button_rect)
-    draw_text(surface, "Spawn Ripple", 18, ripple_button_rect.centerx, ripple_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{RIPPLE_COST} Berries", 18, ripple_button_rect.centerx, ripple_button_rect.y + 25, BLACK)
+    # Draw the Speed Boost button
+    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, speed_boost_button_rect)
+    draw_text(surface, "Boost Speed", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 5, BLACK)
+    draw_text(surface, f"{SPEED_BOOST_COST} Apples", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 25, BLACK)
+
+    # Draw the Lure button
+    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
+    pygame.draw.rect(surface, GREEN, lure_button_rect)
+    draw_text(surface, "Place Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
+    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
 
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
@@ -418,17 +451,23 @@ def handle_events():
                             predict_next_tree(inventory.selected_fruit)  # Predict the next tree after planting
                 else:
                     # Check if Luminara button was clicked
-                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
                     if luminara_button_rect.collidepoint(mouse_pos):
                         if inventory.items["etherealpear"] >= LUMINARA_COST:
                             inventory.items["etherealpear"] -= LUMINARA_COST
                             luminaras.append(Luminara())
-                    # Check if Ripple clone button was clicked
-                    ripple_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
-                    if ripple_button_rect.collidepoint(mouse_pos):
-                        if inventory.items["gleamberry"] >= RIPPLE_COST:
-                            inventory.items["gleamberry"] -= RIPPLE_COST
-                            temporary_ripples.append(TemporaryRipple())
+                    # Check if Speed Boost button was clicked
+                    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+                    if speed_boost_button_rect.collidepoint(mouse_pos):
+                        if inventory.items["shimmeringapple"] >= SPEED_BOOST_COST:
+                            inventory.items["shimmeringapple"] -= SPEED_BOOST_COST
+                            apply_speed_boost()
+                    # Check if Lure button was clicked
+                    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
+                    if lure_button_rect.collidepoint(mouse_pos):
+                        if inventory.items["flamefruit"] >= LURE_COST:
+                            inventory.items["flamefruit"] -= LURE_COST
+                            place_lure()
             elif event.button == 3:
                 x_offset, selected = 10, False
                 for fruit in fruit_images.keys():
@@ -450,6 +489,19 @@ def handle_events():
                             break
     return True
 
+def apply_speed_boost():
+    current_time = time.time()
+    for obj in [ripple] + luminaras + temporary_ripples:
+        if obj.speed < MAX_SPEED:
+            obj.speed += 1
+            obj.speed_boost_timer = current_time + SPEED_BOOST_DURATION
+        else:
+            obj.speed_boost_timer += SPEED_BOOST_DURATION
+
+def place_lure():
+    lure_pos = (random.randint(50, SCREEN_WIDTH - 50), random.randint(50, PLAYABLE_HEIGHT - 50))
+    lures.append(Lure(lure_pos))
+
 def update_game():
     for plant in plants:
         plant.update()
@@ -461,6 +513,8 @@ def update_game():
         luminara.update()
     for temp_ripple in temporary_ripples:
         temp_ripple.update()
+    for lure in lures:
+        lure.update()
 
 def render_game():
     screen.fill(BLACK)
@@ -475,6 +529,8 @@ def render_game():
         luminara.draw(screen)
     for temp_ripple in temporary_ripples:
         temp_ripple.draw(screen)
+    for lure in lures:
+        lure.draw(screen)
     draw_inventory(screen, inventory)
     cursor_surface = create_cursor_surface(next_tree_color)
     screen.blit(cursor_surface, pygame.mouse.get_pos())
