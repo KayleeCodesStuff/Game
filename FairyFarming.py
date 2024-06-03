@@ -74,6 +74,15 @@ tree_fruit_pairs = [
     (tree_images[4], fruit_images["moonbeammelon"]),
 ]
 
+# Weighted list for selecting trees
+weighted_trees = (
+    [0] * 12 +   # Gleamberry: 50% chance
+    [1] * 2 +    # Shimmeringapple: 8% chance
+    [2] * 2 +    # Etherealpear: 8% chance
+    [3] * 5 +    # Flamefruit: 20% chance
+    [4] * 1      # Moonbeammelon: 4% chance
+)
+
 # Game data
 plants = []
 
@@ -183,7 +192,8 @@ while running:
                 if event.button == 1:  # Left click for planting
                     if is_position_valid(mouse_pos, plants):
                         if any(count > 0 for count in player.inventory.values()):
-                            tree, fruit = tree_fruit_pairs[len(plants) % len(tree_fruit_pairs)]
+                            selected_tree = random.choice(weighted_trees)
+                            tree, fruit = tree_fruit_pairs[selected_tree]
                             plants.append(Plant(tree, fruit, mouse_pos))
                             player.remove_random_fruit()
                 elif event.button == 3:  # Right click for harvesting
