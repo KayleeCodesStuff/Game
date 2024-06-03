@@ -13,6 +13,7 @@ PLAYABLE_HEIGHT = 540
 GROWTH_TIME, HARVEST_TIME, RESPAWN_TIME = 5, 10, 5
 CORNER_RADIUS, MAX_HARVESTS = 20, 5
 BLUE, WHITE, GREEN, RED, BLACK = (0, 0, 255), (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 0)
+FRUIT_SIZE = (45, 45)
 
 # Setup
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -36,11 +37,11 @@ def load_images():
         return apply_rounded_mask(image, mask)
 
     tree_imgs = [load_rounded_image(f"tree{i}.png", INITIAL_TREE_SIZE, CORNER_RADIUS) for i in range(5)]
-    fruit_imgs = {name: pygame.transform.scale(pygame.image.load(f"{name}.png"), (45, 45)) for name in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
+    fruit_imgs = {name: pygame.transform.scale(pygame.image.load(f"{name}.png"), FRUIT_SIZE) for name in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
     return tree_imgs, fruit_imgs
 
 tree_images, fruit_images = load_images()
-tree_fruit_pairs = [(tree_images[0], fruit_images["gleamberry"]), (tree_images[1], fruit_images["shimmeringapple"]), (tree_images[2], fruit_images["etherealpear"]), (tree_images[3], fruit_images["flamefruit"]), (tree_images[4], fruit_images["moonbeammelon"])]
+tree_fruit_pairs = [(tree_images[i], fruit_images[name]) for i, name in enumerate(["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"])]
 weighted_trees = [0] * 12 + [1] * 2 + [2] * 2 + [3] * 5 + [4]
 plants = []
 
@@ -53,15 +54,13 @@ class Plant:
 
     def update(self):
         elapsed_time = time.time() - self.planted_time
-        if GROWTH_TIME <= elapsed_time < HARVEST_TIME:
+        if elapsed_time >= GROWTH_TIME:
             self.size = FINAL_TREE_SIZE
-        elif elapsed_time >= HARVEST_TIME:
-            self.size = FINAL_TREE_SIZE
-            if not self.harvested:
+            if elapsed_time >= HARVEST_TIME and not self.harvested:
                 self.fruit_visible = True
                 if not self.fruit_positions:
                     tree_pos = (self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2)
-                    self.fruit_positions = [(tree_pos[0] + random.randint(0, self.size[0] - 45), tree_pos[1] + random.randint(0, self.size[1] - 45)) for _ in range(self.harvest_count + 1)]
+                    self.fruit_positions = [(tree_pos[0] + random.randint(0, self.size[0] - FRUIT_SIZE[0]), tree_pos[1] + random.randint(0, self.size[1] - FRUIT_SIZE[1])) for _ in range(self.harvest_count + 1)]
 
         if self.harvested and self.respawn_start_time:
             time_since_harvest = time.time() - self.respawn_start_time
@@ -88,7 +87,7 @@ def is_position_valid(pos, existing_plants, radius=50):
 
 class Player:
     def __init__(self):
-        self.inventory = {fruit: 0 for fruit in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
+        self.inventory = {fruit: 0 for fruit in fruit_images}
         self.inventory["gleamberry"] = max(5, self.inventory["gleamberry"])
         self.selected_fruit = "gleamberry"
 
@@ -134,7 +133,7 @@ def handle_events():
             elif event.button == 3:
                 x_offset, selected = 10, False
                 for fruit in fruit_images.keys():
-                    if x_offset <= mouse_pos[0] <= x_offset + 45 and PLAYABLE_HEIGHT + 10 <= mouse_pos[1] <= PLAYABLE_HEIGHT + 55:
+                    if x_offset <= mouse_pos[0] <= x_offset + FRUIT_SIZE[0] and PLAYABLE_HEIGHT + 10 <= mouse_pos[1] <= PLAYABLE_HEIGHT + FRUIT_SIZE[1] + 10:
                         player.set_selected_fruit(fruit)
                         selected = True
                         break
@@ -163,7 +162,6 @@ def render_game():
     draw_inventory(screen, player)
     pygame.display.flip()
 
-# Game loop
 running = True
 while running:
     running = handle_events()
