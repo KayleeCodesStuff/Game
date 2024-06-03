@@ -23,8 +23,6 @@ LURE_COST = 25
 LURE_DURATION = 3
 SPEED_BOOST_DURATION = 5
 MAX_SPEED = 10
-TEMP_RIPPLE_DURATION = 15
-TEMP_RIPPLE_COST = 100
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -82,10 +80,10 @@ tree_names = ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "mo
 # Tree attributes
 tree_attributes = [
     {"type": "Gleaming Berry", "mature_time": 5, "respawn_time": 5, "fruits_per_spawn": [1, 2, 3, 4, 5], "max_harvests": 5},
-    {"type": "Shimmering Apple", "mature_time": 6, "respawn_time": 6, "fruits_per_spawn": [1, 1, 2, 2, 3], "max_harvests": 4},
-    {"type": "Ethereal Pear", "mature_time": 7, "respawn_time": 7, "fruits_per_spawn": [1, 1, 1, 2, 2], "max_harvests": 3},
-    {"type": "Flamefruit", "mature_time": 8, "respawn_time": 8, "fruits_per_spawn": [1, 1, 1, 1, 2], "max_harvests": 3},
-    {"type": "Moonbeam Melon", "mature_time": 10, "respawn_time": 10, "fruits_per_spawn": [1, 1, 1, 1, 1], "max_harvests": 2},
+    {"type": "Shimmering Apple", "mature_time": 6, "respawn_time": 6, "fruits_per_spawn": [1, 2, 3, 3, 4], "max_harvests": 4},
+    {"type": "Ethereal Pear", "mature_time": 7, "respawn_time": 7, "fruits_per_spawn": [1, 2, 2, 3, 3], "max_harvests": 3},
+    {"type": "Flamefruit", "mature_time": 8, "respawn_time": 8, "fruits_per_spawn": [1, 2, 2, 2, 3], "max_harvests": 3},
+    {"type": "Moonbeam Melon", "mature_time": 10, "respawn_time": 10, "fruits_per_spawn": [1, 2, 2, 2, 2], "max_harvests": 2},
 ]
 
 plants = []
@@ -96,24 +94,18 @@ temporary_ripples = []  # List to hold temporary Ripple instances
 lures = []  # List to hold lure instances
 
 class Ripple:
-    def __init__(self, duration=None):
+    def __init__(self):
         self.image = ripple_img
         self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.base_speed = RIPPLE_SPEED
         self.speed = self.base_speed
         self.speed_boost_timer = None
-        self.spawn_time = time.time() if duration else None
-        self.duration = duration
         self.target = None
 
     def update(self):
         if self.speed_boost_timer and time.time() >= self.speed_boost_timer:
             self.speed = self.base_speed
             self.speed_boost_timer = None
-
-        if self.duration and time.time() - self.spawn_time >= self.duration:
-            temporary_ripples.remove(self)
-            return
 
         closest_fruit = None
         closest_distance = float('inf')
@@ -183,7 +175,7 @@ class Nyx:
 
             # Check for lures
             for lure in lures:
-                distance = ((self.rect.centerx - lure.rect.centerx) ** 2 + (self.rect.centery - lure.rect.centery) ** 0.5)
+                distance = ((self.rect.centerx - lure.rect.centerx) ** 2 + (self.rect.centery - lure.rect.centery) ** 2) ** 0.5
                 if distance < closest_distance:
                     closest_distance = distance
                     closest_fruit = lure
@@ -435,11 +427,11 @@ def draw_inventory(surface, inventory):
     draw_text(surface, "Place Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
     draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
 
-    # Draw the Ripple Clone button
+    # Draw the Ripple clone button
     ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
     pygame.draw.rect(surface, GREEN, ripple_clone_button_rect)
     draw_text(surface, "Clone Ripple", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{TEMP_RIPPLE_COST} Gleamberries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 25, BLACK)
+    draw_text(surface, f"100 Berries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 25, BLACK)
 
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
@@ -482,12 +474,12 @@ def handle_events():
                         if inventory.items["flamefruit"] >= LURE_COST:
                             inventory.items["flamefruit"] -= LURE_COST
                             place_lure()
-                    # Check if Ripple Clone button was clicked
+                    # Check if Ripple clone button was clicked
                     ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
                     if ripple_clone_button_rect.collidepoint(mouse_pos):
-                        if inventory.items["gleamberry"] >= TEMP_RIPPLE_COST:
-                            inventory.items["gleamberry"] -= TEMP_RIPPLE_COST
-                            temporary_ripples.append(Ripple(TEMP_RIPPLE_DURATION))
+                        if inventory.items["gleamberry"] >= 100:
+                            inventory.items["gleamberry"] -= 100
+                            temporary_ripples.append(RippleClone())
             elif event.button == 3:
                 x_offset, selected = 10, False
                 for fruit in fruit_images.keys():
@@ -508,6 +500,16 @@ def handle_events():
                                 plants.remove(plant)
                             break
     return True
+
+class RippleClone(Ripple):
+    def __init__(self):
+        super().__init__()
+        self.spawn_time = time.time()
+
+    def update(self):
+        super().update()
+        if time.time() - self.spawn_time >= 15:
+            temporary_ripples.remove(self)
 
 def apply_speed_boost():
     current_time = time.time()
