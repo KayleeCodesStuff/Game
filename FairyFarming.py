@@ -16,6 +16,18 @@ NYX_SPEED = 5
 NYX_SPAWN_BEFORE_MELON_RIPENS = 5
 NYX_DESPAWN_AFTER_MELON_HARVESTED = 3
 
+# Colors for the trees
+TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
+
+# Probabilities for each fruit
+probabilities = {
+    "gleamberry": [("gleamberry", 50), ("shimmeringapple", 12.5), ("etherealpear", 12.5), ("flamefruit", 20), ("moonbeammelon", 4)],
+    "shimmeringapple": [("gleamberry", 12.5), ("shimmeringapple", 50), ("etherealpear", 12.5), ("flamefruit", 20), ("moonbeammelon", 4)],
+    "etherealpear": [("gleamberry", 12.5), ("shimmeringapple", 12.5), ("etherealpear", 50), ("flamefruit", 20), ("moonbeammelon", 4)],
+    "flamefruit": [("gleamberry", 20), ("shimmeringapple", 12.5), ("etherealpear", 12.5), ("flamefruit", 50), ("moonbeammelon", 4)],
+    "moonbeammelon": [("gleamberry", 4), ("shimmeringapple", 12.5), ("etherealpear", 12.5), ("flamefruit", 20), ("moonbeammelon", 50)]
+}
+
 # Setup
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Fairy Farm")
@@ -45,6 +57,9 @@ def load_images():
 tree_images, fruit_images, nyx_img = load_images()
 tree_fruit_pairs = [(tree_images[i], fruit_images[name]) for i, name in enumerate(["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"])]
 
+# Tree names for easy reference
+tree_names = ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]
+
 # Tree attributes
 tree_attributes = [
     {"type": "Gleaming Berry", "mature_time": 5, "respawn_time": 5, "fruits_per_spawn": [1, 2, 3, 4, 5], "max_harvests": 5},
@@ -54,10 +69,37 @@ tree_attributes = [
     {"type": "Moonbeam Melon", "mature_time": 10, "respawn_time": 10, "fruits_per_spawn": [1, 1, 1, 1, 1], "max_harvests": 2},
 ]
 
-weighted_trees = [0] * 12 + [1] * 2 + [2] * 2 + [3] * 5 + [4]
 plants = []
 nyx = None  # Nyx is initially not present
 nyx_spawn_time = 0
+predicted_tree_type = None  # Store the predicted tree type
+next_tree_color = TREE_COLORS[0]  # Default color for the initial cursor
+
+def predict_next_tree(selected_fruit):
+    global predicted_tree_type, next_tree_color
+    predicted_tree_type = select_tree_based_on_probability(selected_fruit)
+    print(f"Predicted tree type: {predicted_tree_type}")  # Debug print
+    next_tree_color = TREE_COLORS[tree_names.index(predicted_tree_type)]
+    cursor_surface = create_cursor_surface(next_tree_color)
+    pygame.mouse.set_visible(False)
+
+def select_tree_based_on_probability(selected_fruit):
+    tree_choices = probabilities[selected_fruit]
+    total_weight = sum(weight for tree, weight in tree_choices)
+    rand_val = random.uniform(0, total_weight)
+    cumulative_weight = 0
+    
+    for tree, weight in tree_choices:
+        cumulative_weight += weight
+        if rand_val < cumulative_weight:
+            print(f"Selected tree: {tree}, Random value: {rand_val}, Cumulative weight: {cumulative_weight}")  # Debug print
+            return tree
+    return tree_choices[-1][0]  # Default to the last tree type in case of rounding errors
+
+def create_cursor_surface(color):
+    cursor_surface = pygame.Surface((32, 32), pygame.SRCALPHA)
+    pygame.draw.circle(cursor_surface, color, (16, 16), 16)
+    return cursor_surface
 
 class Plant:
     def __init__(self, tree, fruit, pos, attributes):
@@ -139,7 +181,7 @@ class Nyx:
             target_pos = self.target.pos
             dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
             distance = (dx ** 2 + dy ** 2) ** 0.5
-            if distance > 0:
+            if distance != 0:
                 dx, dy = dx / distance, dy / distance
                 self.rect.x += dx * self.speed
                 self.rect.y += dy * self.speed
@@ -166,32 +208,34 @@ class Nyx:
 def is_position_valid(pos, existing_plants, radius=50):
     return all(((pos[0] - plant.pos[0]) ** 2 + (pos[1] - plant.pos[1]) ** 2) ** 0.5 >= radius for plant in existing_plants)
 
-class Player:
+class Inventory:
     def __init__(self):
-        self.inventory = {fruit: 0 for fruit in fruit_images}
-        self.inventory["gleamberry"] = max(5, self.inventory["gleamberry"])
+        self.items = {fruit: 0 for fruit in fruit_images}
+        self.items["gleamberry"] = 5
         self.selected_fruit = "gleamberry"
+        predict_next_tree(self.selected_fruit)  # Initialize the prediction
 
     def collect_fruit(self, fruit):
-        self.inventory[fruit] += 1
+        self.items[fruit] += 1
 
     def remove_selected_fruit(self):
-        if self.inventory[self.selected_fruit] > 0:
-            self.inventory[self.selected_fruit] -= 1
+        if self.items[self.selected_fruit] > 0:
+            self.items[self.selected_fruit] -= 1
 
     def set_selected_fruit(self, fruit):
-        if fruit in self.inventory:
+        if fruit in self.items:
             self.selected_fruit = fruit
+            predict_next_tree(fruit)
 
-player = Player()
+inventory = Inventory()  # Ensure this is instantiated before the main loop
 
-def draw_inventory(surface, player):
+def draw_inventory(surface, inventory):
     pygame.draw.rect(surface, BLUE, (0, PLAYABLE_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - PLAYABLE_HEIGHT))
     x_offset, y_offset = 10, PLAYABLE_HEIGHT + 10
     for fruit, image in fruit_images.items():
         surface.blit(image, (x_offset, y_offset))
-        draw_text(surface, str(player.inventory[fruit]), 18, x_offset + 30, y_offset, WHITE)
-        if fruit == player.selected_fruit:
+        draw_text(surface, str(inventory.items[fruit]), 18, x_offset + 30, y_offset, WHITE)
+        if fruit == inventory.selected_fruit:
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50
 
@@ -200,6 +244,8 @@ def draw_text(surface, text, size, x, y, color):
     surface.blit(font.render(text, True, color), font.render(text, True, color).get_rect(midtop=(x, y)))
 
 def handle_events():
+    global predicted_tree_type  # Ensure we use the predicted tree type
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False
@@ -207,16 +253,18 @@ def handle_events():
             mouse_pos = pygame.mouse.get_pos()
             if event.button == 1 and mouse_pos[1] <= PLAYABLE_HEIGHT:
                 if is_position_valid(mouse_pos, plants):
-                    if player.inventory[player.selected_fruit] > 0:
-                        tree, fruit = tree_fruit_pairs[random.choice(weighted_trees)]
+                    if inventory.items[inventory.selected_fruit] > 0:
+                        tree_type = predicted_tree_type
+                        tree, fruit = tree_fruit_pairs[tree_names.index(tree_type)]
                         attributes = tree_attributes[tree_fruit_pairs.index((tree, fruit))]
                         plants.append(Plant(tree, fruit, mouse_pos, attributes))
-                        player.remove_selected_fruit()
+                        inventory.remove_selected_fruit()
+                        predict_next_tree(inventory.selected_fruit)  # Predict the next tree after planting
             elif event.button == 3:
                 x_offset, selected = 10, False
                 for fruit in fruit_images.keys():
                     if x_offset <= mouse_pos[0] <= x_offset + FRUIT_SIZE[0] and PLAYABLE_HEIGHT + 10 <= mouse_pos[1] <= PLAYABLE_HEIGHT + FRUIT_SIZE[1] + 10:
-                        player.set_selected_fruit(fruit)
+                        inventory.set_selected_fruit(fruit)
                         selected = True
                         break
                     x_offset += 50
@@ -224,7 +272,7 @@ def handle_events():
                     for plant in plants:
                         if plant.is_clicked(mouse_pos) and plant.fruit_visible:
                             for _ in plant.fruit_positions:
-                                player.collect_fruit(list(fruit_images.keys())[tree_images.index(plant.tree)])
+                                inventory.collect_fruit(list(fruit_images.keys())[tree_images.index(plant.tree)])
                             plant.fruit_visible, plant.harvested = False, True
                             plant.respawn_start_time = time.time()
                             if plant.harvest_count >= plant.max_harvests:
@@ -245,7 +293,9 @@ def render_game():
         plant.draw(screen)
     if nyx:
         nyx.draw(screen)
-    draw_inventory(screen, player)
+    draw_inventory(screen, inventory)
+    cursor_surface = create_cursor_surface(next_tree_color)
+    screen.blit(cursor_surface, pygame.mouse.get_pos())
     pygame.display.flip()
 
 running = True
