@@ -18,15 +18,15 @@ NYX_DESPAWN_AFTER_SPAWN = 8  # Nyx despawn time after spawning
 RIPPLE_SPEED = 1
 LUMINARA_SPEED = 2
 LUMINARA_COST = 25  # Updated cost
-LUMINARA_MAX_FRUITS = 100
+LUMINARA_MAX_FRUITS = 200
 SPEED_BOOST_COST = 20  # Updated cost
 LURE_COST = 15  # Updated cost
 LURE_DURATION = 3
-SPEED_BOOST_DURATION = 5
+SPEED_BOOST_DURATION = 10
 RIPPLE_COST = 75  # Updated cost
 MAX_SPEED = 10
-WIN_CONDITION = 50
-LOSS_CONDITION = 50
+WIN_CONDITION = 30
+LOSS_CONDITION = 30
 
 # Colors for the trees
 TREE_COLORS = [(128, 0, 128), (255, 192, 203), (0, 128, 128), (255, 165, 0), (0, 0, 255)]  # Purple, Pink, Teal, Orange, Blue
@@ -159,34 +159,37 @@ class Nyx:
     def __init__(self):
         self.image = nyx_img
         self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, 0))  # Spawn at top center
-        self.speed = NYX_SPEED
+        self.base_speed = NYX_SPEED
+        self.speed = self.base_speed
         self.target = None
         self.is_spawned = False
         self.despawn_timer = None
 
     def update(self):
         if self.is_spawned:
-            closest_fruit = None
-            closest_distance = float('inf')
-            for plant in plants:
-                if plant.fruit_visible:
-                    if plant.fruit == fruit_images["moonbeammelon"]:
-                        closest_fruit = plant
-                        break
-                    else:
-                        distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                        if distance < closest_distance:
-                            closest_distance = distance
+            if lures:  # Check if there are active lures
+                closest_lure = None
+                closest_distance = float('inf')
+                for lure in lures:
+                    distance = ((self.rect.centerx - lure.rect.centerx) ** 2 + (self.rect.centery - lure.rect.centery) ** 2) ** 0.5
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        closest_lure = lure
+                self.target = closest_lure
+            else:
+                closest_fruit = None
+                closest_distance = float('inf')
+                for plant in plants:
+                    if plant.fruit_visible:
+                        if plant.fruit == fruit_images["moonbeammelon"]:
                             closest_fruit = plant
-
-            # Check for lures
-            for lure in lures:
-                distance = ((self.rect.centerx - lure.rect.centerx) ** 2 + (self.rect.centery - lure.rect.centery) ** 2) ** 0.5
-                if distance < closest_distance:
-                    closest_distance = distance
-                    closest_fruit = lure
-
-            self.target = closest_fruit
+                            break
+                        else:
+                            distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
+                            if distance < closest_distance:
+                                closest_distance = distance
+                                closest_fruit = plant
+                self.target = closest_fruit
 
             if self.target:
                 target_pos = self.target.pos if isinstance(self.target, Plant) else self.target.rect.center
@@ -199,10 +202,12 @@ class Nyx:
 
                 if isinstance(self.target, Plant) and self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
                     if self.target.fruit_positions:
-                       self.target.fruit_positions.pop(0)
-                       if self.target.fruit == fruit_images["moonbeammelon"]:
+                        self.target.fruit_positions.pop(0)
+                        if self.target.fruit == fruit_images["moonbeammelon"]:
                             global nyx_melon_count
                             nyx_melon_count += 1
+                            if self.speed < 10:  # Increase speed when collecting a Moonbeam Melon
+                                self.speed = min(10, self.speed + 0.5)
 
                     if not self.target.fruit_positions:
                         self.target.fruit_visible = False
@@ -522,7 +527,7 @@ class RippleClone(Ripple):
 
     def update(self):
         super().update()
-        if time.time() - self.spawn_time >= 15:
+        if time.time() - self.spawn_time >= 30:
             temporary_ripples.remove(self)
 
 def apply_speed_boost():
@@ -535,8 +540,10 @@ def apply_speed_boost():
             obj.speed_boost_timer += SPEED_BOOST_DURATION
 
 def place_lure():
+    global nyx  # Ensure we're modifying the global Nyx instance
     lure_pos = (random.randint(50, SCREEN_WIDTH - 50), random.randint(50, PLAYABLE_HEIGHT - 50))
     lures.append(Lure(lure_pos))
+    nyx.speed = max(1, nyx.speed - 1)  # Reduce Nyx's speed by 1, ensure it doesn't go below 1
 
 def update_game():
     if game_over:
@@ -558,16 +565,16 @@ def update_game():
 
 def check_win_loss_condition():
     global game_over
-    player_moonbeam_count = inventory.items["moonbeammelon"]
-
-    if nyx_melon_count >= LOSS_CONDITION and player_moonbeam_count >= WIN_CONDITION:
+    player_melon_count = inventory.items["moonbeammelon"]  # Get the player's moonbeam melon count
+    
+    if nyx_melon_count >= LOSS_CONDITION and player_melon_count >= WIN_CONDITION:
         display_message("Nyx and Luminara share a Moonbeam Melon", PURPLE)
         game_over = True
     elif nyx_melon_count >= LOSS_CONDITION:
         display_message("Nyx Stole the Moonbeam Melons", RED)
         game_over = True
-    elif player_moonbeam_count >= WIN_CONDITION:
-        display_message("50 Moonbeam Melons Harvested", NEON_GREEN)
+    elif player_melon_count >= WIN_CONDITION:
+        display_message("30 Moonbeam Melons Harvested", NEON_GREEN)
         game_over = True
 
 def display_message(message, color):
@@ -600,18 +607,19 @@ def render_game():
     screen.blit(cursor_surface, pygame.mouse.get_pos())
 
     if game_over:
-        if nyx_melon_count >= LOSS_CONDITION and luminara_melon_count >= WIN_CONDITION:
+        player_melon_count = inventory.items["moonbeammelon"]
+        if nyx_melon_count >= LOSS_CONDITION and player_melon_count >= WIN_CONDITION:
             display_message("Nyx and Luminara share a Moonbeam Melon", PURPLE)
         elif nyx_melon_count >= LOSS_CONDITION:
             display_message("Nyx Stole the Moonbeam Melons", RED)
-        elif luminara_melon_count >= WIN_CONDITION:
-            display_message("50 Moonbeam Melons Harvested", NEON_GREEN)
+        elif player_melon_count >= WIN_CONDITION:
+            display_message("30 Moonbeam Melons Harvested", NEON_GREEN)
 
     pygame.display.flip()
 
 def draw_statistics(screen):
     font = pygame.font.SysFont(None, 30)
-    nyx_melons_text = font.render(f"Nyx: {nyx_melon_count}/50", True, WHITE)
+    nyx_melons_text = font.render(f"Nyx: {nyx_melon_count}/30", True, WHITE)
     nyx_speed_text = font.render(f"Nyx Speed: {nyx.speed}", True, WHITE)
     screen.blit(nyx_melons_text, (10, 10))
     screen.blit(nyx_speed_text, (200, 10))  # Display side by side
