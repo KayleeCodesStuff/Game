@@ -20,7 +20,7 @@ LUMINARA_COST = 50
 LUMINARA_MAX_FRUITS = 100
 SPEED_BOOST_COST = 25
 LURE_COST = 25
-LURE_DURATION = 3
+LURE_DURATION = 5  # Changed from 3 to 5
 SPEED_BOOST_DURATION = 5
 MAX_SPEED = 10
 
@@ -409,29 +409,29 @@ def draw_inventory(surface, inventory):
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50
 
-    # Draw the Lure button
-    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
-    pygame.draw.rect(surface, GREEN, lure_button_rect)
-    draw_text(surface, "Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 25, BLACK)
-
     # Draw the Luminara spawn button
-    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
-    pygame.draw.rect(surface, GREEN, luminara_button_rect)
+    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+    pygame.draw.rect(surface, GREEN, luminara_button_rect, border_radius=10)
     draw_text(surface, "Luminara", 18, luminara_button_rect.centerx, luminara_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 25, BLACK)
+    draw_text(surface, f"{LUMINARA_COST} Pears", 18, luminara_button_rect.centerx, luminara_button_rect.y + 20, BLACK)
 
     # Draw the Speed Boost button
-    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
-    pygame.draw.rect(surface, GREEN, speed_boost_button_rect)
+    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 230, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+    pygame.draw.rect(surface, GREEN, speed_boost_button_rect, border_radius=10)
     draw_text(surface, "Speed", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 5, BLACK)
-    draw_text(surface, f"{SPEED_BOOST_COST} Apples", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 25, BLACK)
+    draw_text(surface, f"{SPEED_BOOST_COST} Apples", 18, speed_boost_button_rect.centerx, speed_boost_button_rect.y + 20, BLACK)
+
+    # Draw the Lure button
+    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 340, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+    pygame.draw.rect(surface, GREEN, lure_button_rect, border_radius=10)
+    draw_text(surface, "Lure", 18, lure_button_rect.centerx, lure_button_rect.y + 5, BLACK)
+    draw_text(surface, f"{LURE_COST} Flamefruit", 18, lure_button_rect.centerx, lure_button_rect.y + 20, BLACK)
 
     # Draw the Ripple clone button
-    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
-    pygame.draw.rect(surface, GREEN, ripple_clone_button_rect)
+    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 450, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
+    pygame.draw.rect(surface, GREEN, ripple_clone_button_rect, border_radius=10)
     draw_text(surface, "Ripple", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 5, BLACK)
-    draw_text(surface, f"100 Berries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 25, BLACK)
+    draw_text(surface, "100 Berries", 18, ripple_clone_button_rect.centerx, ripple_clone_button_rect.y + 20, BLACK)
 
 def draw_text(surface, text, size, x, y, color):
     font = pygame.font.SysFont(None, size)
@@ -457,25 +457,25 @@ def handle_events():
                             predict_next_tree(inventory.selected_fruit)  # Predict the next tree after planting
                 else:
                     # Check if Luminara button was clicked
-                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 110, 50)
+                    luminara_button_rect = pygame.Rect(SCREEN_WIDTH - 120, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
                     if luminara_button_rect.collidepoint(mouse_pos):
                         if inventory.items["etherealpear"] >= LUMINARA_COST:
                             inventory.items["etherealpear"] -= LUMINARA_COST
                             luminaras.append(Luminara())
                     # Check if Speed Boost button was clicked
-                    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 240, PLAYABLE_HEIGHT + 10, 110, 50)
+                    speed_boost_button_rect = pygame.Rect(SCREEN_WIDTH - 230, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
                     if speed_boost_button_rect.collidepoint(mouse_pos):
                         if inventory.items["shimmeringapple"] >= SPEED_BOOST_COST:
                             inventory.items["shimmeringapple"] -= SPEED_BOOST_COST
                             apply_speed_boost()
                     # Check if Lure button was clicked
-                    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 360, PLAYABLE_HEIGHT + 10, 110, 50)
+                    lure_button_rect = pygame.Rect(SCREEN_WIDTH - 340, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
                     if lure_button_rect.collidepoint(mouse_pos):
                         if inventory.items["flamefruit"] >= LURE_COST:
                             inventory.items["flamefruit"] -= LURE_COST
                             place_lure()
                     # Check if Ripple clone button was clicked
-                    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 480, PLAYABLE_HEIGHT + 10, 110, 50)
+                    ripple_clone_button_rect = pygame.Rect(SCREEN_WIDTH - 450, PLAYABLE_HEIGHT + 10, 90, 40)  # Reduced size
                     if ripple_clone_button_rect.collidepoint(mouse_pos):
                         if inventory.items["gleamberry"] >= 100:
                             inventory.items["gleamberry"] -= 100
