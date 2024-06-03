@@ -459,7 +459,7 @@ def handle_events():
                 return True
             mouse_pos = pygame.mouse.get_pos()
             if event.button == 1:
-                if mouse_pos[1] <= PLAYABLE_HEIGHT:
+                if UNPLAYABLE_HEIGHT <= mouse_pos[1] <= PLAYABLE_HEIGHT:  # Prevent planting in the black zone
                     if is_position_valid(mouse_pos, plants):
                         if inventory.items[inventory.selected_fruit] > 0:
                             tree_type = predicted_tree_type
@@ -513,6 +513,7 @@ def handle_events():
                                 plants.remove(plant)
                             break
     return True
+
 
 class RippleClone(Ripple):
     def __init__(self):
