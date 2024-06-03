@@ -47,7 +47,7 @@ images = {
     "etherealpear": pygame.transform.scale(load_image("etherealpear.png"), (45, 45)),
     "flamefruit": pygame.transform.scale(load_image("flamefruit.png"), (45, 45)),
     "moonbeammelon": pygame.transform.scale(load_image("moonbeammelon.png"), (45, 45)),
-    "nyx": pygame.transform.scale(load_image("nyx.png"), (90, 90)),
+    "nyx": pygame.transform.scale(load_image("nyx.png"), (120, 90)),
 }
 
 # Colors
