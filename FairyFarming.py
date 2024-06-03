@@ -152,15 +152,18 @@ class Player:
     def __init__(self):
         self.inventory = {fruit: 0 for fruit in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
         self.inventory["gleamberry"] = max(5, self.inventory["gleamberry"])
+        self.selected_fruit = "gleamberry"  # Default selected fruit for planting
 
     def collect_fruit(self, fruit):
         self.inventory[fruit] += 1
 
-    def remove_random_fruit(self):
-        fruits_with_nonzero_count = [fruit for fruit, count in self.inventory.items() if count > 0]
-        if fruits_with_nonzero_count:
-            fruit_to_remove = random.choice(fruits_with_nonzero_count)
-            self.inventory[fruit_to_remove] -= 1
+    def remove_selected_fruit(self):
+        if self.inventory[self.selected_fruit] > 0:
+            self.inventory[self.selected_fruit] -= 1
+
+    def set_selected_fruit(self, fruit):
+        if fruit in self.inventory:
+            self.selected_fruit = fruit
 
 player = Player()
 
@@ -171,6 +174,8 @@ def draw_inventory(surface, player):
     for fruit, image in fruit_images.items():
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(player.inventory[fruit]), 18, x_offset + 30, y_offset, (255, 255, 255))
+        if fruit == player.selected_fruit:
+            pygame.draw.rect(surface, (255, 0, 0), (x_offset - 5, y_offset - 5, 50, 50), 2)  # Highlight selected fruit
         x_offset += 50
 
 # Function to draw text on the screen
@@ -191,12 +196,21 @@ while running:
             if mouse_pos[1] <= PLAYABLE_HEIGHT:
                 if event.button == 1:  # Left click for planting
                     if is_position_valid(mouse_pos, plants):
-                        if any(count > 0 for count in player.inventory.values()):
+                        if player.inventory[player.selected_fruit] > 0:
                             selected_tree = random.choice(weighted_trees)
                             tree, fruit = tree_fruit_pairs[selected_tree]
                             plants.append(Plant(tree, fruit, mouse_pos))
-                            player.remove_random_fruit()
-                elif event.button == 3:  # Right click for harvesting
+                            player.remove_selected_fruit()
+            if event.button == 3:
+                x_offset = 10
+                selected = False
+                for fruit in fruit_images.keys():
+                    if x_offset <= mouse_pos[0] <= x_offset + 45 and PLAYABLE_HEIGHT + 10 <= mouse_pos[1] <= PLAYABLE_HEIGHT + 55:
+                        player.set_selected_fruit(fruit)
+                        selected = True
+                        break
+                    x_offset += 50
+                if not selected:
                     for plant in plants:
                         if plant.is_clicked(mouse_pos) and plant.fruit_visible:
                             fruit_name = list(fruit_images.keys())[tree_images.index(plant.tree)]
