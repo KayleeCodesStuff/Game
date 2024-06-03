@@ -10,10 +10,8 @@ pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 INITIAL_TREE_SIZE, FINAL_TREE_SIZE = (50, 50), (80, 80)
 PLAYABLE_HEIGHT = 540
-GROWTH_TIME, HARVEST_TIME, RESPAWN_TIME = 5, 10, 5
-CORNER_RADIUS, MAX_HARVESTS = 20, 5
+CORNER_RADIUS, FRUIT_SIZE = 20, (45, 45)
 BLUE, WHITE, GREEN, RED, BLACK = (0, 0, 255), (255, 255, 255), (0, 255, 0), (255, 0, 0), (0, 0, 0)
-FRUIT_SIZE = (45, 45)
 
 # Setup
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -42,30 +40,50 @@ def load_images():
 
 tree_images, fruit_images = load_images()
 tree_fruit_pairs = [(tree_images[i], fruit_images[name]) for i, name in enumerate(["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"])]
+
+# Tree attributes
+tree_attributes = [
+    {"type": "Gleaming Berry", "mature_time": 5, "respawn_time": 5, "fruits_per_spawn": [1, 2, 3, 4, 5], "max_harvests": 5},
+    {"type": "Shimmering Apple", "mature_time": 6, "respawn_time": 6, "fruits_per_spawn": [1, 1, 2, 2, 3], "max_harvests": 4},
+    {"type": "Ethereal Pear", "mature_time": 7, "respawn_time": 7, "fruits_per_spawn": [1, 1, 1, 2, 2], "max_harvests": 3},
+    {"type": "Flamefruit", "mature_time": 8, "respawn_time": 8, "fruits_per_spawn": [1, 1, 1, 1, 2], "max_harvests": 3},
+    {"type": "Moonbeam Melon", "mature_time": 10, "respawn_time": 10, "fruits_per_spawn": [1, 1, 1, 1, 1], "max_harvests": 2},
+]
+
 weighted_trees = [0] * 12 + [1] * 2 + [2] * 2 + [3] * 5 + [4]
 plants = []
 
 class Plant:
-    def __init__(self, tree, fruit, pos):
+    def __init__(self, tree, fruit, pos, attributes):
         self.tree, self.fruit, self.pos = tree, fruit, pos
-        self.planted_time, self.size = time.time(), INITIAL_TREE_SIZE
-        self.harvested, self.harvest_count, self.respawn_start_time = False, 0, None
-        self.countdown, self.fruit_visible, self.fruit_positions = RESPAWN_TIME, False, []
+        self.mature_time = attributes["mature_time"]
+        self.respawn_time = attributes["respawn_time"]
+        self.fruits_per_spawn = attributes["fruits_per_spawn"]
+        self.max_harvests = attributes["max_harvests"]
+        self.planted_time = time.time()
+        self.size = INITIAL_TREE_SIZE
+        self.harvested = False
+        self.harvest_count = 0
+        self.respawn_start_time = None
+        self.countdown = self.respawn_time
+        self.fruit_visible = False
+        self.fruit_positions = []
 
     def update(self):
         elapsed_time = time.time() - self.planted_time
-        if elapsed_time >= GROWTH_TIME:
+        if elapsed_time >= self.mature_time:
             self.size = FINAL_TREE_SIZE
-            if elapsed_time >= HARVEST_TIME and not self.harvested:
+            if elapsed_time >= self.mature_time + self.respawn_time and not self.harvested:
                 self.fruit_visible = True
                 if not self.fruit_positions:
                     tree_pos = (self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2)
-                    self.fruit_positions = [(tree_pos[0] + random.randint(0, self.size[0] - FRUIT_SIZE[0]), tree_pos[1] + random.randint(0, self.size[1] - FRUIT_SIZE[1])) for _ in range(self.harvest_count + 1)]
+                    fruits_count = self.fruits_per_spawn[min(self.harvest_count, len(self.fruits_per_spawn) - 1)]
+                    self.fruit_positions = [(tree_pos[0] + random.randint(0, self.size[0] - FRUIT_SIZE[0]), tree_pos[1] + random.randint(0, self.size[1] - FRUIT_SIZE[1])) for _ in range(fruits_count)]
 
         if self.harvested and self.respawn_start_time:
             time_since_harvest = time.time() - self.respawn_start_time
-            self.countdown = max(0, RESPAWN_TIME - int(time_since_harvest))
-            if time_since_harvest >= RESPAWN_TIME:
+            self.countdown = max(0, self.respawn_time - int(time_since_harvest))
+            if time_since_harvest >= self.respawn_time:
                 self.harvested, self.fruit_visible, self.fruit_positions = False, True, []
                 self.harvest_count += 1
 
@@ -76,7 +94,7 @@ class Plant:
         if self.fruit_visible:
             for fruit_pos in self.fruit_positions:
                 screen.blit(self.fruit, fruit_pos)
-        elif self.harvested and self.harvest_count < MAX_HARVESTS:
+        elif self.harvested and self.harvest_count < self.max_harvests:
             draw_text(screen, str(self.countdown), 24, self.pos[0], self.pos[1] - 50, GREEN)
 
     def is_clicked(self, mouse_pos):
@@ -128,7 +146,8 @@ def handle_events():
                 if is_position_valid(mouse_pos, plants):
                     if player.inventory[player.selected_fruit] > 0:
                         tree, fruit = tree_fruit_pairs[random.choice(weighted_trees)]
-                        plants.append(Plant(tree, fruit, mouse_pos))
+                        attributes = tree_attributes[tree_fruit_pairs.index((tree, fruit))]
+                        plants.append(Plant(tree, fruit, mouse_pos, attributes))
                         player.remove_selected_fruit()
             elif event.button == 3:
                 x_offset, selected = 10, False
@@ -145,7 +164,7 @@ def handle_events():
                                 player.collect_fruit(list(fruit_images.keys())[tree_images.index(plant.tree)])
                             plant.fruit_visible, plant.harvested = False, True
                             plant.respawn_start_time = time.time()
-                            if plant.harvest_count >= MAX_HARVESTS:
+                            if plant.harvest_count >= plant.max_harvests:
                                 plants.remove(plant)
                             break
     return True
