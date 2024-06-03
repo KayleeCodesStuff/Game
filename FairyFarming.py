@@ -85,33 +85,27 @@ nyx = None  # Nyx is initially not present
 ripple = None  # Ripple is initially not present
 luminaras = []  # List to hold Luminara instances
 
-class Ripple:
-    def __init__(self):
-        self.image = ripple_img
-        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-        self.speed = RIPPLE_SPEED
+class Character:
+    def __init__(self, image, position, speed):
+        self.image = image
+        self.rect = self.image.get_rect(center=position)
+        self.speed = speed
         self.target = None
 
-    def update(self):
+    def find_closest_fruit(self, priority_fruit=None):
         closest_fruit = None
         closest_distance = float('inf')
         for plant in plants:
             if plant.fruit_visible:
-                if plant.fruit == fruit_images["gleamberry"]:
-                    distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                    if distance < closest_distance:
-                        closest_distance = distance
-                        closest_fruit = plant
-        if not closest_fruit:
-            for plant in plants:
-                if plant.fruit_visible:
-                    distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                    if distance < closest_distance:
-                        closest_distance = distance
-                        closest_fruit = plant
+                if priority_fruit and plant.fruit == fruit_images[priority_fruit]:
+                    return plant
+                distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_fruit = plant
+        return closest_fruit
 
-        self.target = closest_fruit
-
+    def move_towards_target(self):
         if self.target:
             target_pos = self.target.pos
             dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
@@ -121,139 +115,83 @@ class Ripple:
                 self.rect.x += dx * self.speed
                 self.rect.y += dy * self.speed
 
-            for plant in plants:
-                if plant.fruit_visible and plant.fruit_positions and self.rect.colliderect(pygame.Rect(plant.fruit_positions[0][0], plant.fruit_positions[0][1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
-                    while plant.fruit_positions:
-                        plant.fruit_positions.pop(0)
-                        inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
-                    plant.fruit_visible = False
-                    plant.harvested = True
-                    plant.respawn_start_time = time.time()
-                    if plant.harvest_count >= plant.max_harvests:
-                        plants.remove(plant)
-
     def draw(self, screen):
         screen.blit(self.image, self.rect.topleft)
 
-class Nyx:
+class Ripple(Character):
     def __init__(self):
-        self.image = nyx_img
-        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, 0))  # Spawn at top center
-        self.speed = NYX_SPEED
-        self.target = None
+        super().__init__(ripple_img, (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2), RIPPLE_SPEED)
+
+    def update(self):
+        self.target = self.find_closest_fruit("gleamberry") or self.find_closest_fruit()
+        self.move_towards_target()
+        self.collect_fruits()
+
+    def collect_fruits(self):
+        for plant in plants:
+            if plant.fruit_visible and plant.fruit_positions and self.rect.colliderect(pygame.Rect(plant.fruit_positions[0][0], plant.fruit_positions[0][1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+                while plant.fruit_positions:
+                    plant.fruit_positions.pop(0)
+                    inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
+                plant.fruit_visible = False
+                plant.harvested = True
+                plant.respawn_start_time = time.time()
+                if plant.harvest_count >= plant.max_harvests:
+                    plants.remove(plant)
+
+class Nyx(Character):
+    def __init__(self):
+        super().__init__(nyx_img, (SCREEN_WIDTH // 2, 0), NYX_SPEED)
         self.is_spawned = False
         self.despawn_timer = None
 
     def update(self):
         if self.is_spawned:
-            closest_fruit = None
-            closest_distance = float('inf')
-            for plant in plants:
-                if plant.fruit_visible:
-                    if plant.fruit == fruit_images["moonbeammelon"]:
-                        closest_fruit = plant
-                        break
-                    else:
-                        distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                        if distance < closest_distance:
-                            closest_distance = distance
-                            closest_fruit = plant
-
-            self.target = closest_fruit
-
-            if self.target:
-                target_pos = self.target.pos
-                dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
-                distance = (dx ** 2 + dy ** 2) ** 0.5
-                if distance != 0:
-                    dx, dy = dx / distance, dy / distance
-                    self.rect.x += dx * self.speed
-                    self.rect.y += dy * self.speed
-
-                if self.rect.colliderect(pygame.Rect(target_pos[0], target_pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
-                    if self.target.fruit_positions:
-                        self.target.fruit_positions.pop(0)
-                    if not self.target.fruit_positions:
-                        self.target.fruit_visible = False
-                        self.target.harvested = True
-                        self.target.respawn_start_time = time.time()
-                        if self.target.harvest_count >= self.target.max_harvests:
-                            plants.remove(self.target)
-
+            self.target = self.find_closest_fruit("moonbeammelon") or self.find_closest_fruit()
+            self.move_towards_target()
+            self.collect_fruits()
             if self.despawn_timer and time.time() >= self.despawn_timer:
                 self.is_spawned = False
                 self.despawn_timer = None
 
-    def draw(self, screen):
-        if self.is_spawned:
-            screen.blit(self.image, self.rect.topleft)
+    def collect_fruits(self):
+        if self.target and self.rect.colliderect(pygame.Rect(self.target.pos[0], self.target.pos[1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+            if self.target.fruit_positions:
+                self.target.fruit_positions.pop(0)
+            if not self.target.fruit_positions:
+                self.target.fruit_visible = False
+                self.target.harvested = True
+                self.target.respawn_start_time = time.time()
+                if self.target.harvest_count >= self.target.max_harvests:
+                    plants.remove(self.target)
 
-nyx = Nyx()  # Instantiate Nyx object
-ripple = Ripple()  # Instantiate Ripple object
-
-class Luminara:
+class Luminara(Character):
     def __init__(self):
-        self.image = luminara_img
-        self.rect = self.image.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-        self.speed = LUMINARA_SPEED
-        self.target = None
+        super().__init__(luminara_img, (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2), LUMINARA_SPEED)
         self.collected_fruits = 0
 
     def update(self):
-        closest_fruit = None
-        closest_distance = float('inf')
-        for plant in plants:
-            if plant.fruit_visible:
-                if plant.fruit == fruit_images["moonbeammelon"]:
-                    closest_fruit = plant
-                    break
-                else:
-                    distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                    if distance < closest_distance:
-                        closest_distance = distance
-                        closest_fruit = plant
-        if not closest_fruit:
-            for plant in plants:
-                if plant.fruit_visible:
-                    fruit_rarity = ["moonbeammelon", "etherealpear", "shimmeringapple", "flamefruit", "gleamberry"]
-                    current_fruit_index = fruit_rarity.index(tree_names[tree_images.index(plant.tree)])
-                    target_fruit_index = fruit_rarity.index(tree_names[tree_images.index(closest_fruit.tree)]) if closest_fruit else float('inf')
-                    if current_fruit_index < target_fruit_index:
-                        closest_fruit = plant
-                    elif current_fruit_index == target_fruit_index:
-                        distance = ((self.rect.centerx - plant.pos[0]) ** 2 + (self.rect.centery - plant.pos[1]) ** 2) ** 0.5
-                        if distance < closest_distance:
-                            closest_distance = distance
-                            closest_fruit = plant
-
-        self.target = closest_fruit
-
-        if self.target:
-            target_pos = self.target.pos
-            dx, dy = target_pos[0] - self.rect.centerx, target_pos[1] - self.rect.centery
-            distance = (dx ** 2 + dy ** 2) ** 0.5
-            if distance != 0:
-                dx, dy = dx / distance, dy / distance
-                self.rect.x += dx * self.speed
-                self.rect.y += dy * self.speed
-
-            for plant in plants:
-                if plant.fruit_visible and plant.fruit_positions and self.rect.colliderect(pygame.Rect(plant.fruit_positions[0][0], plant.fruit_positions[0][1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
-                    while plant.fruit_positions:
-                        plant.fruit_positions.pop(0)
-                        inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
-                        self.collected_fruits += 1
-                    plant.fruit_visible = False
-                    plant.harvested = True
-                    plant.respawn_start_time = time.time()
-                    if plant.harvest_count >= plant.max_harvests:
-                        plants.remove(plant)
-
+        self.target = self.find_closest_fruit("moonbeammelon") or self.find_closest_fruit()
+        self.move_towards_target()
+        self.collect_fruits()
         if self.collected_fruits >= LUMINARA_MAX_FRUITS:
             luminaras.remove(self)
 
-    def draw(self, screen):
-        screen.blit(self.image, self.rect.topleft)
+    def collect_fruits(self):
+        for plant in plants:
+            if plant.fruit_visible and plant.fruit_positions and self.rect.colliderect(pygame.Rect(plant.fruit_positions[0][0], plant.fruit_positions[0][1], FRUIT_SIZE[0], FRUIT_SIZE[1])):
+                while plant.fruit_positions:
+                    plant.fruit_positions.pop(0)
+                    inventory.collect_fruit(tree_names[tree_images.index(plant.tree)])
+                    self.collected_fruits += 1
+                plant.fruit_visible = False
+                plant.harvested = True
+                plant.respawn_start_time = time.time()
+                if plant.harvest_count >= plant.max_harvests:
+                    plants.remove(plant)
+
+nyx = Nyx()
+ripple = Ripple()
 
 def check_melon_timers():
     for plant in plants:
@@ -428,10 +366,9 @@ def handle_events():
 def update_game():
     for plant in plants:
         plant.update()
-    if nyx:
+    if nyx.is_spawned:
         nyx.update()
-    if ripple:
-        ripple.update()
+    ripple.update()
     for luminara in luminaras:
         luminara.update()
 
@@ -440,10 +377,9 @@ def render_game():
     screen.blit(background, ((SCREEN_WIDTH - background.get_width()) // 2, 0))
     for plant in plants:
         plant.draw(screen)
-    if nyx:
+    if nyx.is_spawned:
         nyx.draw(screen)
-    if ripple:
-        ripple.draw(screen)
+    ripple.draw(screen)
     for luminara in luminaras:
         luminara.draw(screen)
     draw_inventory(screen, inventory)
