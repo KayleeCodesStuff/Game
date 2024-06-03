@@ -1,6 +1,7 @@
 import pygame
 import sys
 import time
+import random
 
 # Initialize Pygame
 pygame.init()
@@ -9,21 +10,52 @@ pygame.init()
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 INITIAL_TREE_SIZE = (50, 50)  # Initial size for trees
-FINAL_TREE_SIZE = (100, 100)  # Final size for trees
+FINAL_TREE_SIZE = (80, 80)  # Final size for mature trees
 PLAYABLE_HEIGHT = 540  # Leave space for inventory at the bottom
 GROWTH_TIME = 5  # Time in seconds for plants to grow
 HARVEST_TIME = 10  # Time in seconds for plants to be ready for harvest
 RESPAWN_TIME = 5  # Time in seconds for fruit to respawn
+CORNER_RADIUS = 20  # Radius for rounding corners
 
 # Set up the game window
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Fairy Farm")
 
-# Load images
+# Load and adjust background image
 background = pygame.image.load("fairyfarm1.png")
-background = pygame.transform.scale(background, (SCREEN_WIDTH, SCREEN_HEIGHT))
+background_width, background_height = background.get_size()
+aspect_ratio = background_width / background_height
+new_height = PLAYABLE_HEIGHT
+new_width = int(aspect_ratio * new_height)
+background = pygame.transform.scale(background, (new_width, new_height))
 
-tree_images = [pygame.transform.scale(pygame.image.load(f"tree{i}.png"), INITIAL_TREE_SIZE) for i in range(5)]
+# Function to create a mask for rounded corners
+def create_rounded_mask(size, radius):
+    mask = pygame.Surface(size, pygame.SRCALPHA)
+    pygame.draw.rect(mask, (0, 0, 0, 0), (0, 0, *size))
+    pygame.draw.circle(mask, (255, 255, 255, 255), (radius, radius), radius)
+    pygame.draw.circle(mask, (255, 255, 255, 255), (size[0] - radius, radius), radius)
+    pygame.draw.circle(mask, (255, 255, 255, 255), (radius, size[1] - radius), radius)
+    pygame.draw.circle(mask, (255, 255, 255, 255), (size[0] - radius, size[1] - radius), radius)
+    pygame.draw.rect(mask, (255, 255, 255, 255), (radius, 0, size[0] - 2 * radius, size[1]))
+    pygame.draw.rect(mask, (255, 255, 255, 255), (0, radius, size[0], size[1] - 2 * radius))
+    return mask
+
+# Function to apply the rounded mask to an image
+def apply_rounded_mask(image, mask):
+    image_with_mask = image.copy()
+    image_with_mask.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    return image_with_mask
+
+# Load and round the corners of tree images
+def load_rounded_image(image_path, size, radius):
+    image = pygame.image.load(image_path)
+    image = pygame.transform.scale(image, size)
+    mask = create_rounded_mask(size, radius)
+    rounded_image = apply_rounded_mask(image, mask)
+    return rounded_image
+
+tree_images = [load_rounded_image(f"tree{i}.png", INITIAL_TREE_SIZE, CORNER_RADIUS) for i in range(5)]
 fruit_images = {
     "gleamberry": pygame.transform.scale(pygame.image.load("gleamberry.png"), (45, 45)),
     "shimmeringapple": pygame.transform.scale(pygame.image.load("shimmeringapple.png"), (45, 45)),
@@ -57,6 +89,7 @@ class Plant:
         self.respawn_start_time = None
         self.countdown = RESPAWN_TIME
         self.fruit_visible = False
+        self.fruit_positions = []
 
     def update(self):
         elapsed_time = time.time() - self.planted_time
@@ -66,6 +99,12 @@ class Plant:
             self.size = FINAL_TREE_SIZE
             if not self.harvested:
                 self.fruit_visible = True
+                if not self.fruit_positions:
+                    tree_pos = (self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2)
+                    self.fruit_positions = [
+                        (tree_pos[0] + random.randint(0, self.size[0] - 45), tree_pos[1] + random.randint(0, self.size[1] - 45))
+                        for _ in range(self.harvest_count + 1)
+                    ]
 
         if self.harvested and self.respawn_start_time:
             time_since_harvest = time.time() - self.respawn_start_time
@@ -73,6 +112,7 @@ class Plant:
             if time_since_harvest >= RESPAWN_TIME:
                 self.harvested = False
                 self.fruit_visible = True
+                self.fruit_positions = []
                 self.harvest_count += 1
                 if self.harvest_count >= 5:
                     plants.remove(self)
@@ -82,14 +122,22 @@ class Plant:
         tree_pos = (self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2)
         screen.blit(tree_image, tree_pos)
         if self.fruit_visible:
-            fruit_pos = (tree_pos[0] + self.size[0] // 2 - 22, tree_pos[1] - 20)
-            screen.blit(self.fruit, fruit_pos)
+            for fruit_pos in self.fruit_positions:
+                screen.blit(self.fruit, fruit_pos)
         elif self.harvested and self.harvest_count < 5:
             draw_text(screen, str(self.countdown), 24, self.pos[0], self.pos[1] - 50, (0, 255, 0))
 
     def is_clicked(self, mouse_pos):
         tree_rect = pygame.Rect(self.pos[0] - self.size[0] // 2, self.pos[1] - self.size[1] // 2, self.size[0], self.size[1])
         return tree_rect.collidepoint(mouse_pos)
+
+def is_position_valid(pos, existing_plants, radius=50):
+    for plant in existing_plants:
+        plant_pos = plant.pos
+        distance = ((pos[0] - plant_pos[0]) ** 2 + (pos[1] - plant_pos[1]) ** 2) ** 0.5
+        if distance < radius:
+            return False
+    return True
 
 # Player class
 class Player:
@@ -128,21 +176,26 @@ while running:
             if mouse_pos[1] <= PLAYABLE_HEIGHT:
                 for plant in plants:
                     if plant.is_clicked(mouse_pos) and plant.fruit_visible:
-                        player.collect_fruit(fruit=list(fruit_images.keys())[tree_images.index(plant.tree)])
+                        fruit_name = list(fruit_images.keys())[tree_images.index(plant.tree)]
+                        for _ in plant.fruit_positions:
+                            player.collect_fruit(fruit=fruit_name)
                         plant.fruit_visible = False
                         plant.harvested = True
                         plant.respawn_start_time = time.time()
                         break
                 else:
-                    tree, fruit = tree_fruit_pairs[len(plants) % len(tree_fruit_pairs)]
-                    plants.append(Plant(tree, fruit, mouse_pos))
+                    if is_position_valid(mouse_pos, plants):
+                        tree, fruit = tree_fruit_pairs[len(plants) % len(tree_fruit_pairs)]
+                        plants.append(Plant(tree, fruit, mouse_pos))
 
     # Update plants
     for plant in plants:
         plant.update()
 
     # Draw the background
-    screen.blit(background, (0, 0))
+    screen.fill((0, 0, 0))  # Clear the screen with black color
+    background_x = (SCREEN_WIDTH - new_width) // 2  # Center the background horizontally
+    screen.blit(background, (background_x, 0))
 
     # Draw the plants
     for plant in plants:
