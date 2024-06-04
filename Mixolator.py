@@ -26,10 +26,20 @@ flame_fruit = pygame.image.load("flamefruit.png")
 gleam_berry = pygame.image.load("gleamberry.png")
 moonbeam_melon = pygame.image.load("moonbeammelon.png")
 shimmering_apple = pygame.image.load("shimmeringapple.png")
+pb15 = pygame.image.load("pb15.png")  # Load the overlay image
 
 # Resize fruit images
 fruit_images = [gleam_berry, flame_fruit, shimmering_apple, ethereal_pear, moonbeam_melon]
 fruit_images = [pygame.transform.scale(fruit, (50, 50)) for fruit in fruit_images]
+
+# Scale the pb15 image to fit within a 100x100 box without distorting its aspect ratio
+pb15_rect = pb15.get_rect()
+if pb15_rect.width > pb15_rect.height:
+    scale_factor = 100 / pb15_rect.width
+else:
+    scale_factor = 100 / pb15_rect.height
+new_size = (int(pb15_rect.width * scale_factor), int(pb15_rect.height * scale_factor))
+pb15 = pygame.transform.scale(pb15, new_size)
 
 # RGB ranges for each fruit
 fruit_rgb_ranges = {
@@ -137,9 +147,11 @@ def draw_screen():
     text = font.render("Mixalate", True, BLACK)
     screen.blit(text, (mixalate_button.x + 10, mixalate_button.y + 10))
 
-    # Draw elixir result if created
     if elixir_color and elixir_personality and elixir_color_name and elixir_title:
         pygame.draw.rect(screen, elixir_color, pygame.Rect(800, 500, 100, 100))
+        pb15_x = 800 + (100 - new_size[0]) // 2  # Center the pb15 image within the 100x100 box
+        pb15_y = 500 + (100 - new_size[1]) // 2
+        screen.blit(pb15, (pb15_x, pb15_y))  # Overlay the pb15 image
         for i, word in enumerate(elixir_personality):
             text = small_font.render(word, True, BLACK)
             screen.blit(text, (910, 500 + i * 30))
