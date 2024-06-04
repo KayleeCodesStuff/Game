@@ -19,7 +19,7 @@ HOVER_COLOR = (170, 170, 170)
 SELECTED_COLOR = (100, 100, 255)
 
 # Load images
-background = pygame.image.load("potionbackground.png")
+background = pygame.image.load("potionbackground.png").convert_alpha()  # Load with alpha for transparency
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))  # Scale the background to fit the screen
 ethereal_pear = pygame.image.load("etherealpear.png")
 flame_fruit = pygame.image.load("flamefruit.png")
@@ -111,6 +111,11 @@ def get_color_name(requested_color):
     return closest_name
 
 def draw_screen():
+    # Draw the color swatch in the center of the screen behind the background
+    if elixir_color:
+         pygame.draw.rect(screen, elixir_color, pygame.Rect(WIDTH//2 - 150, HEIGHT//2 - 50, 400, 400))
+
+    # Draw the background on top
     screen.blit(background, (0, 0))
 
     # Draw fruit options at the top
