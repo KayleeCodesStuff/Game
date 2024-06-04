@@ -68,6 +68,9 @@ small_font = pygame.font.Font(None, 28)
 selection_boxes = [pygame.Rect(150, 100, 100, 100), pygame.Rect(300, 100, 100, 100),
                    pygame.Rect(450, 100, 100, 100), pygame.Rect(600, 100, 100, 100)]
 
+# Move the personality word selection box to the first position
+selection_boxes.insert(0, selection_boxes.pop())
+
 # Create mixalate button
 mixalate_button = pygame.Rect(400, 250, 200, 50)
 
@@ -78,6 +81,7 @@ selections = [None, None, None, None]
 elixir_color = None
 elixir_personality = None
 elixir_color_name = None
+elixir_title = None
 
 def closest_color(requested_color):
     min_colors = {}
@@ -112,20 +116,21 @@ def draw_screen():
             text = font.render("?", True, BLACK)
             screen.blit(text, (box.x + 35, box.y + 35))
         else:
-            if i < 3:  # Fruit selections
-                screen.blit(fruit_images[selections[i]], (box.x + 25, box.y + 25))
-                fruit_name = ["Gleam Berry", "Flame Fruit", "Shimmering Apple", "Ethereal Pear", "Moonbeam Melon"][selections[i]]
-                text = small_font.render(fruit_name, True, BLACK)
-                screen.blit(text, (box.x, box.y + 75))
-            else:  # Personality word selection
+            if i == 0:  # Personality word selection
                 text = font.render(personality_keywords[selections[i]], True, BLACK)
                 screen.blit(text, (box.x + 5, box.y + 35))
+            else:  # Fruit selections
+                screen.blit(fruit_images[selections[i]], (box.x + 25, box.y + 15))
+                fruit_name_lines = ["Gleam Berry", "Flame Fruit", "Shimmering Apple", "Ethereal Pear", "Moonbeam Melon"][selections[i]].split()
+                for line_index, line in enumerate(fruit_name_lines):
+                    text = small_font.render(line, True, BLACK)
+                    screen.blit(text, (box.x + 5, box.y + 75 + 20 * line_index))
 
-    # Draw personality word options on the right
+    # Draw personality word options on the left
     for i, keyword in enumerate(personality_keywords):
-        color = HOVER_COLOR if pygame.Rect(WIDTH - 250, 100 + 30 * i, 200, 30).collidepoint(pygame.mouse.get_pos()) else BLACK
+        color = HOVER_COLOR if pygame.Rect(10, 100 + 30 * i, 200, 30).collidepoint(pygame.mouse.get_pos()) else BLACK
         text = small_font.render(keyword, True, color)
-        screen.blit(text, (WIDTH - 250, 100 + 30 * i))
+        screen.blit(text, (10, 100 + 30 * i))
 
     # Draw mixalate button
     pygame.draw.rect(screen, GREY if None in selections else WHITE, mixalate_button)
@@ -133,18 +138,20 @@ def draw_screen():
     screen.blit(text, (mixalate_button.x + 10, mixalate_button.y + 10))
 
     # Draw elixir result if created
-    if elixir_color and elixir_personality:
-        pygame.draw.rect(screen, elixir_color, pygame.Rect(50, 500, 100, 100))
+    if elixir_color and elixir_personality and elixir_color_name and elixir_title:
+        pygame.draw.rect(screen, elixir_color, pygame.Rect(800, 500, 100, 100))
         for i, word in enumerate(elixir_personality):
             text = small_font.render(word, True, BLACK)
-            screen.blit(text, (160, 500 + i * 30))
+            screen.blit(text, (910, 500 + i * 30))
         color_name_text = small_font.render(elixir_color_name, True, BLACK)
-        screen.blit(color_name_text, (50, 610))
+        screen.blit(color_name_text, (800, 610))
+        title_text = small_font.render(elixir_title, True, BLACK)
+        screen.blit(title_text, (800, 640))
 
     pygame.display.flip()
 
 def main():
-    global elixir_color, elixir_personality, elixir_color_name
+    global elixir_color, elixir_personality, elixir_color_name, elixir_title
     running = True
     selected_box = None
 
@@ -152,4 +159,40 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = event.pos
+                for i, box in enumerate(selection_boxes):
+                    if box.collidepoint(x, y):
+                        selected_box = i
+                for i, pos in enumerate(fruit_positions):
+                    if pygame.Rect(pos[0], pos[1], 50, 50).collidepoint(x, y):
+                        if selected_box is not None and selected_box > 0:
+                            selections[selected_box] = i
+                            selected_box = None
+                for i in range(len(personality_keywords)):
+                    if pygame.Rect(10, 100 + 30 * i, 200, 30).collidepoint(x, y):
+                        if selected_box == 0:
+                            selections[selected_box] = i
+                            selected_box = None
+                if mixalate_button.collidepoint(x, y) and None not in selections:
+                    # Create dragon elixir
+                    r = random.choice(fruit_rgb_ranges[selections[1]])
+                    g = random.choice(fruit_rgb_ranges[selections[2]])
+                    b = random.choice(fruit_rgb_ranges[selections[3]])
+                    elixir_color = (r, g, b)
+                    elixir_color_name = get_color_name(elixir_color)
+                    elixir_personality = [
+                        random.choice(fruit_personality_keywords[selections[i]]) for i in range(1, 4)
+                    ]
+                    elixir_personality.insert(0, personality_keywords[selections[0]])
+                    elixir_title = f"{personality_keywords[selections[0]]} {elixir_color_name} Elixir of Dragon Breeding"
+                    print(f"Dragon Elixir Created! Color: {elixir_color_name}, Personality: {elixir_personality}")
+
+        draw_screen()
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
+
