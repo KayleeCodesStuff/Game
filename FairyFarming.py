@@ -543,7 +543,7 @@ def place_lure():
     global nyx  # Ensure we're modifying the global Nyx instance
     lure_pos = (random.randint(50, SCREEN_WIDTH - 50), random.randint(50, PLAYABLE_HEIGHT - 50))
     lures.append(Lure(lure_pos))
-    nyx.speed = max(1, nyx.speed - 1)  # Reduce Nyx's speed by 1, ensure it doesn't go below 1
+    nyx.speed = max(0.5, nyx.speed - 1)  # Reduce Nyx's speed by 1, ensure it doesn't go below 0.5
 
 def update_game():
     if game_over:
