@@ -152,18 +152,15 @@ def draw_screen():
     text = font.render("Mixalate", True, BLACK)
     screen.blit(text, (mixalate_button.x + 10, mixalate_button.y + 10))
 
+       # Draw elixir result if created
     if elixir_color and elixir_personality and elixir_color_name and elixir_title:
-        pygame.draw.rect(screen, elixir_color, pygame.Rect(800, 500, 100, 100))
-        pb15_x = 800 + (100 - new_size[0]) // 2  # Center the pb15 image within the 100x100 box
-        pb15_y = 500 + (100 - new_size[1]) // 2
-        screen.blit(pb15, (pb15_x, pb15_y))  # Overlay the pb15 image
         for i, word in enumerate(elixir_personality):
             text = small_font.render(word, True, BLACK)
-            screen.blit(text, (910, 500 + i * 30))
+            screen.blit(text, (int(WIDTH * 0.65), 500 + i * 30))  # Adjust x-coordinate to 65% of the screen width
         color_name_text = small_font.render(elixir_color_name, True, BLACK)
-        screen.blit(color_name_text, (800, 610))
+        screen.blit(color_name_text, (int(WIDTH * 0.65), 610))  # Adjust x-coordinate to 65% of the screen width
         title_text = small_font.render(elixir_title, True, BLACK)
-        screen.blit(title_text, (800, 640))
+        screen.blit(title_text, (int(WIDTH * 0.65), 640))  # Adjust x-coordinate to 65% of the screen width
 
     pygame.display.flip()
 
