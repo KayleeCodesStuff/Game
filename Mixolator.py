@@ -71,6 +71,8 @@ image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.p
 # Define inventory slots
 inventory_slots = [None] * 10  # None means empty, else it will store the color and image
 
+# Create inventory slots
+inventory_boxes = [pygame.Rect(20 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
 
 # Create font
 font = pygame.font.Font(None, 36)
@@ -144,7 +146,10 @@ def draw_gradient_rect(screen, rect, color1, color2):
 
 def draw_inventory(surface, inventory):
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
-    x_offset, y_offset = 10, HEIGHT - 90
+
+    # Draw potion inventory slots
+    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
+    y_offset = HEIGHT - 90
     for i, slot in enumerate(inventory_slots):
         if slot is None:
             # Draw empty slot with ?
@@ -153,14 +158,19 @@ def draw_inventory(surface, inventory):
             color, image_filename = slot
             pygame.draw.rect(surface, color, pygame.Rect(x_offset, y_offset, 50, 50))
             image = pygame.image.load(image_filename)
+            image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
             surface.blit(image, (x_offset, y_offset))
-        x_offset += 60  # Adjust the offset for next slot
+        x_offset += 60  # Move left for the next slot
+
+    # Draw the fruits in the remaining space
+    x_offset = 10  # Reset x_offset for fruit images
     for fruit, image in fruit_images_dict.items():
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(inventory[fruit]), small_font, WHITE, pygame.Rect(x_offset + 20, y_offset + 45, 30, 30))
         if selections[1:] and list(fruit_images_dict.keys()).index(fruit) in selections[1:]:
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
-        x_offset += 50
+        x_offset += 50  # Move right for the next fruit
+
 
 def draw_screen(selected_box):
     # Clear screen
@@ -292,6 +302,7 @@ def main():
 
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()
