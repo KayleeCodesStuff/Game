@@ -65,15 +65,15 @@ personality_keywords = [
 # Create font
 font = pygame.font.Font(None, 36)
 small_font = pygame.font.Font(None, 28)
-fancy_font = pygame.font.Font(pygame.font.match_font('georgia', bold=True), 36)
+fancy_font = pygame.font.Font(pygame.font.match_font('georgia', bold=True), 32)
 fancy_small_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 28)
 
 # Create boxes for selections, adjusted lower and wider for the first box
-selection_boxes = [pygame.Rect(150, 10, 200, 60), pygame.Rect(400, 10, 80, 60),
-                   pygame.Rect(550, 10, 80, 60), pygame.Rect(700, 10, 80, 60)]
+selection_boxes = [pygame.Rect(150, 10, 200, 65), pygame.Rect(400, 10, 80, 65),
+                   pygame.Rect(550, 10, 80, 65), pygame.Rect(700, 10, 80, 65)]
 
-# Create mixalate button, reduced size and moved up to touch the rim of the cauldron
-mixalate_button = pygame.Rect(425, 370, 150, 40)
+# Create mixalate button
+mixalate_button = pygame.Rect(430, 370, 120, 40)
 
 # Store selections
 selections = [None, None, None, None]
@@ -146,7 +146,9 @@ def draw_screen():
     # Clear screen
     screen.fill(BLACK)
     
-    # Draw the background image, moved up to align with the inventory
+    if elixir_color:
+        pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))# Draw the background image, moved up to align with the inventory
+    
     screen.blit(background, (0, -100))  # Adjust the y-coordinate to move the background up
 
     # Draw the selection boxes
@@ -172,8 +174,11 @@ def draw_screen():
 
     # Draw elixir result if created
     if elixir_color and elixir_personality and elixir_color_name and elixir_title:
+        # Draw the elixir result title with an x offset
+        x_offset = 50  # Adjust the offset as needed
         title_text = fancy_font.render(elixir_title, True, BLACK)
-        draw_text(screen, elixir_title, fancy_font, BLACK, pygame.Rect(WIDTH//2 - title_text.get_width()//2, 250, title_text.get_width(), title_text.get_height()), TEXT_HIGHLIGHT)  # Adjusted position
+        text_rect = pygame.Rect((WIDTH//2 - title_text.get_width()//2) + x_offset, 150, title_text.get_width(), title_text.get_height())
+        draw_text(screen, elixir_title, fancy_font, BLACK, text_rect, TEXT_HIGHLIGHT)
 
         # Draw the trait words in two columns of two under the Mixalate button
         for i, word in enumerate(elixir_personality):
@@ -181,7 +186,7 @@ def draw_screen():
             col = i % 2  # Column 0 or 1
             row = i // 2  # Row 0 or 1
             x_pos = 330 + col * 180  # Base x-coordinate for columns
-            screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 470 + row * 40))  # Adjusted position
+            screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 420 + row * 40))  # Adjusted position
 
     # Draw the inventory
     draw_inventory(screen, inventory)
@@ -233,11 +238,14 @@ def main():
                         random.choice(fruit_personality_keywords[fruit_names[selections[i]]]) for i in range(1, 4)
                     ]
                     elixir_personality.insert(0, personality_keywords[selections[0]])
-                    elixir_title = f"{personality_keywords[selections[0]]} {elixir_color_name} Elixir of Dragon Breeding"
+                    elixir_title = f"{personality_keywords[selections[0]]} {elixir_color_name} Dragon Egg Elixir"
                     # Remove used fruits from inventory
                     for i in range(1, 4):
                         inventory[fruit_names[selections[i]]] -= 1
 
+                    # Draw color swatch behind the background
+                    print("Drawing color swatch with color:", elixir_color)  # Add this line for troubleshooting
+                    pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
         draw_screen()
 
     pygame.quit()
