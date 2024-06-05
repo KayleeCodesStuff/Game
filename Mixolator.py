@@ -69,11 +69,11 @@ fancy_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True)
 fancy_small_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 28)
 
 # Create boxes for selections, adjusted lower and wider for the first box
-selection_boxes = [pygame.Rect(150, 200, 200, 80), pygame.Rect(400, 200, 80, 80),
-                   pygame.Rect(550, 200, 80, 80), pygame.Rect(700, 200, 80, 80)]
+selection_boxes = [pygame.Rect(150, 10, 200, 80), pygame.Rect(400, 10, 80, 80),
+                   pygame.Rect(550, 10, 80, 80), pygame.Rect(700, 10, 80, 80)]
 
 # Create mixalate button, reduced size and moved up to touch the rim of the cauldron
-mixalate_button = pygame.Rect(425, 460, 150, 40)
+mixalate_button = pygame.Rect(425, 370, 150, 40)
 
 # Store selections
 selections = [None, None, None, None]
