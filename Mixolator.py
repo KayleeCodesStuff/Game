@@ -17,6 +17,7 @@ BLACK = (0, 0, 0)
 GREY = (200, 200, 200)
 HOVER_COLOR = (170, 170, 170)
 SELECTED_COLOR = (100, 100, 255)
+TEXT_HIGHLIGHT = (255, 255, 0)  # Highlight color for text
 
 # Load images
 background = pygame.image.load("potionbackground.png").convert_alpha()  # Load with alpha for transparency
@@ -60,7 +61,7 @@ fruit_personality_keywords = {
 }
 
 # Position of the fruit selection boxes
-fruit_positions = [(100, 20), (250, 20), (400, 20), (550, 20), (700, 20)]
+fruit_positions = [(150, 20), (300, 20), (450, 20), (600, 20), (750, 20)]
 
 # Personality keywords for player selection
 personality_keywords = [
@@ -73,13 +74,15 @@ personality_keywords = [
 # Create font
 font = pygame.font.Font(None, 36)
 small_font = pygame.font.Font(None, 28)
+fancy_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 36)
+fancy_small_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 28)
 
-# Create boxes for selections, adjusted lower
-selection_boxes = [pygame.Rect(150, 200, 80, 80), pygame.Rect(300, 200, 80, 80),
-                   pygame.Rect(450, 200, 80, 80), pygame.Rect(600, 200, 80, 80)]
+# Create boxes for selections, adjusted lower and wider for the first box
+selection_boxes = [pygame.Rect(150, 200, 200, 80), pygame.Rect(400, 200, 80, 80),
+                   pygame.Rect(550, 200, 80, 80), pygame.Rect(700, 200, 80, 80)]
 
-# Create mixalate button, moved down to the black part of the cauldron
-mixalate_button = pygame.Rect(400, 450, 200, 50)
+# Create mixalate button, moved up to touch the rim of the cauldron
+mixalate_button = pygame.Rect(400, 470, 200, 50)
 
 # Store selections
 selections = [None, None, None, None]
@@ -105,7 +108,14 @@ def get_color_name(requested_color):
         closest_name = webcolors.rgb_to_name(requested_color)
     except ValueError:
         closest_name = closest_color(requested_color)
-    return closest_name
+    return closest_name.capitalize()
+
+def draw_text(screen, text, font, color, rect, highlight=None):
+    if highlight:
+        highlight_surface = font.render(text, True, highlight)
+        screen.blit(highlight_surface, (rect.x + 1, rect.y + 1))
+    text_surface = font.render(text, True, color)
+    screen.blit(text_surface, rect)
 
 def draw_screen():
     # Draw the color swatch in the center of the screen behind the background
@@ -124,18 +134,18 @@ def draw_screen():
         fruit_name_lines = ["Gleam Berry", "Flame Fruit", "Shimmering Apple", "Ethereal Pear", "Moonbeam Melon"][i].split()
         for line_index, line in enumerate(fruit_name_lines):
             text = small_font.render(line, True, BLACK)
-            screen.blit(text, (pos[0] + 5, pos[1] + 60 + 20 * line_index))
+            screen.blit(text, (pos[0] + (50 - text.get_width()) // 2, pos[1] + 60 + 20 * line_index))
 
     # Draw selection boxes
     for i, box in enumerate(selection_boxes):
         pygame.draw.rect(screen, GREY if selections[i] is None else SELECTED_COLOR, box)
         if selections[i] is None:
             text = font.render("?", True, BLACK)
-            screen.blit(text, (box.x + 25, box.y + 25))
+            screen.blit(text, (box.x + (box.width - text.get_width()) // 2, box.y + (box.height - text.get_height()) // 2))
         else:
             if i == 0:  # Personality word selection
                 text = font.render(personality_keywords[selections[i]], True, BLACK)
-                screen.blit(text, (box.x + 5, box.y + 35))
+                screen.blit(text, (box.x + (box.width - text.get_width()) // 2, box.y + (box.height - text.get_height()) // 2))
             else:  # Fruit selections
                 screen.blit(fruit_images[selections[i]], (box.x + 15, box.y + 15))
 
@@ -148,17 +158,20 @@ def draw_screen():
     # Draw mixalate button
     pygame.draw.rect(screen, GREY if None in selections else WHITE, mixalate_button)
     text = font.render("Mixalate", True, BLACK)
-    screen.blit(text, (mixalate_button.x + 10, mixalate_button.y + 10))
+    screen.blit(text, (mixalate_button.x + (mixalate_button.width - text.get_width()) // 2, mixalate_button.y + (mixalate_button.height - text.get_height()) // 2))
 
     # Draw elixir result if created
     if elixir_color and elixir_personality and elixir_color_name and elixir_title:
-        title_text = small_font.render(elixir_title, True, BLACK)
-        screen.blit(title_text, (WIDTH//2 - title_text.get_width()//2, 510))  # Center the title below the mixalate button
+        title_text = fancy_font.render(elixir_title, True, BLACK)
+        draw_text(screen, elixir_title, fancy_font, BLACK, pygame.Rect(WIDTH//2 - title_text.get_width()//2, 300, title_text.get_width(), title_text.get_height()), TEXT_HIGHLIGHT)  # Center the title below the mixalate button
+
+        # Draw the trait words in two columns of two under the Mixalate button
         for i, word in enumerate(elixir_personality):
-            text = small_font.render(word, True, BLACK)
-            screen.blit(text, (int(WIDTH * 0.65), 550 + i * 30))  # Adjust x-coordinate to 65% of the screen width
-        color_name_text = small_font.render(elixir_color_name, True, BLACK)
-        screen.blit(color_name_text, (int(WIDTH * 0.65), 640))  # Adjust x-coordinate to 65% of the screen width
+            text = fancy_small_font.render(word, True, WHITE)
+            col = i % 2  # Column 0 or 1
+            row = i // 2  # Row 0 or 1
+            x_pos = 330 + col * 180  # Base x-coordinate for columns
+            screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 540 + row * 40))  # Centering text within the columns
 
     pygame.display.flip()
 
@@ -192,7 +205,7 @@ def main():
                     g = random.choice(fruit_rgb_ranges[selections[2]])
                     b = random.choice(fruit_rgb_ranges[selections[3]])
                     elixir_color = (r, g, b)
-                    elixir_color_name = get_color_name(elixir_color)
+                    elixir_color_name = get_color_name(elixir_color).capitalize()
                     elixir_personality = [
                         random.choice(fruit_personality_keywords[selections[i]]) for i in range(1, 4)
                     ]
