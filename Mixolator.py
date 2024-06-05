@@ -62,6 +62,15 @@ personality_keywords = [
     "Cheerful", "Demonic", "Mystical", "Flamboyant", "Awkward",
     "Weird", "Gross", "Gorgeous", "Ethereal", "Blessed"
 ]
+# Define the "Bottle Elixir" button
+bottle_button = pygame.Rect(850, HEIGHT - 150, 120, 40)
+
+# List of image filenames
+image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
+
+# Define inventory slots
+inventory_slots = [None] * 10  # None means empty, else it will store the color and image
+
 
 # Create font
 font = pygame.font.Font(None, 36)
@@ -136,6 +145,16 @@ def draw_gradient_rect(screen, rect, color1, color2):
 def draw_inventory(surface, inventory):
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
     x_offset, y_offset = 10, HEIGHT - 90
+    for i, slot in enumerate(inventory_slots):
+        if slot is None:
+            # Draw empty slot with ?
+            draw_text(surface, "?", small_font, WHITE, pygame.Rect(x_offset, y_offset, 50, 50))
+        else:
+            color, image_filename = slot
+            pygame.draw.rect(surface, color, pygame.Rect(x_offset, y_offset, 50, 50))
+            image = pygame.image.load(image_filename)
+            surface.blit(image, (x_offset, y_offset))
+        x_offset += 60  # Adjust the offset for next slot
     for fruit, image in fruit_images_dict.items():
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(inventory[fruit]), small_font, WHITE, pygame.Rect(x_offset + 20, y_offset + 45, 30, 30))
@@ -148,7 +167,7 @@ def draw_screen(selected_box):
     screen.fill(BLACK)
     
     if elixir_color:
-        pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))# Draw the background image, moved up to align with the inventory
+        pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))  # Draw the background image, moved up to align with the inventory
     
     screen.blit(background, (0, -100))  # Adjust the y-coordinate to move the background up
 
@@ -192,12 +211,15 @@ def draw_screen(selected_box):
             x_pos = 330 + col * 180  # Base x-coordinate for columns
             screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 420 + row * 40))  # Adjusted position
 
+         # Draw "Bottle Elixir" button
+        gradient_rect = pygame.Rect(bottle_button.x - 5, bottle_button.y - 5, bottle_button.width + 10, bottle_button.height + 10)
+        draw_gradient_rect(screen, gradient_rect, (255, 0, 0), (0, 0, 255))  # Same gradient as Mixalate button
+        draw_beveled_button(screen, bottle_button, GREY, "Bottle", font)  # Same style as Mixalate button
+
     # Draw the inventory
     draw_inventory(screen, inventory)
 
     pygame.display.flip()
-
-
 
 # Load the background image without resizing it
 background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
@@ -259,12 +281,19 @@ def main():
                     # Draw color swatch behind the background
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
 
+                # Handle "Bottle Elixir" button press
+                if elixir_color and bottle_button.collidepoint(x, y):
+                    for i in range(len(inventory_slots)):
+                        if inventory_slots[i] is None:
+                            inventory_slots[i] = (elixir_color, random.choice(image_filenames))
+                            break
+
         draw_screen(selected_box)  # Pass selected_box to draw_screen()
 
     pygame.quit()
     sys.exit()
 
-
 if __name__ == "__main__":
     main()
+
 
