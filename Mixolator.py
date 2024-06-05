@@ -8,6 +8,7 @@ pygame.init()
 
 # Screen dimensions
 WIDTH, HEIGHT = 1000, 700
+PLAYABLE_HEIGHT = HEIGHT - 100  # Space for the inventory at the bottom
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Elixir Game")
 
@@ -19,24 +20,25 @@ HOVER_COLOR = (170, 170, 170)
 SELECTED_COLOR = (100, 100, 255)
 TEXT_HIGHLIGHT = (255, 255, 0)  # Highlight color for text
 BLUE = (0, 0, 255)
+RED = (255, 0, 0)
 
 # Load images
-background = pygame.image.load("potionbackground.png").convert_alpha()  # Load with alpha for transparency
-background = pygame.transform.scale(background, (WIDTH, HEIGHT))  # Scale the background to fit the screen
+background = pygame.image.load("potionbackground.png").convert_alpha()
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 ethereal_pear = pygame.image.load("etherealpear.png")
 flame_fruit = pygame.image.load("flamefruit.png")
 gleam_berry = pygame.image.load("gleamberry.png")
 moonbeam_melon = pygame.image.load("moonbeammelon.png")
 shimmering_apple = pygame.image.load("shimmeringapple.png")
 
-# Resize fruit images
-fruit_images = [gleam_berry, flame_fruit, shimmering_apple, ethereal_pear, moonbeam_melon]
-fruit_images = [pygame.transform.scale(fruit, (45, 45)) for fruit in fruit_images]  # Ensuring all fruits are 45x45 pixels
-
-# Assign images to fruit names
-fruit_names_images = [("gleamberry", fruit_images[0]), ("shimmeringapple", fruit_images[1]), 
-                      ("etherealpear", fruit_images[2]), ("flamefruit", fruit_images[3]), 
-                      ("moonbeammelon", fruit_images[4])]
+# Resize fruit images and store in a dictionary
+fruit_images = {
+    "gleamberry": pygame.transform.scale(gleam_berry, (45, 45)),
+    "flamefruit": pygame.transform.scale(flame_fruit, (45, 45)),
+    "shimmeringapple": pygame.transform.scale(shimmering_apple, (45, 45)),
+    "etherealpear": pygame.transform.scale(ethereal_pear, (45, 45)),
+    "moonbeammelon": pygame.transform.scale(moonbeam_melon, (45, 45))
+}
 
 # RGB ranges for each fruit
 fruit_rgb_ranges = {
@@ -89,17 +91,44 @@ elixir_personality = None
 elixir_color_name = None
 elixir_title = None
 
-# Inventory setup
-fruit_names_images = [("gleamberry", gleam_berry), ("shimmeringapple", shimmering_apple), ("etherealpear", ethereal_pear), ("flamefruit", flame_fruit), ("moonbeammelon", moonbeam_melon)]
-
-class Player:
+class Inventory:
     def __init__(self):
-        self.inventory = {fruit: 0 for fruit in ["gleamberry", "shimmeringapple", "etherealpear", "flamefruit", "moonbeammelon"]}
-        # Add any other initialization here
+        self.items = {fruit: 0 for fruit in fruit_images}
+        self.items["gleamberry"] = 5
+        self.selected_fruit = "gleamberry"
 
     def collect_fruit(self, fruit):
-        self.inventory[fruit] += 1
-        # Implement any additional logic needed for collecting fruits
+        self.items[fruit] += 1
+
+    def remove_selected_fruit(self):
+        if self.items[self.selected_fruit] > 0:
+            self.items[self.selected_fruit] -= 1
+
+    def set_selected_fruit(self, fruit):
+        if fruit in self.items:
+            self.selected_fruit = fruit
+
+inventory = Inventory()
+
+def draw_inventory(surface, inventory):
+    pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
+    x_offset, y_offset = 10, HEIGHT - 90
+    for fruit, image in fruit_images.items():
+        resized_image = pygame.transform.scale(image, (40, 40))  # Resize to fit within the inventory area
+        surface.blit(resized_image, (x_offset, y_offset))
+        draw_text(surface, str(inventory.items[fruit]), 18, x_offset + 20, y_offset + 45, WHITE, highlight=None)
+        if fruit == inventory.selected_fruit:
+            pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
+        x_offset += 50
+
+# Ensure to define fruit_images as a dictionary:
+fruit_images = {
+    "gleamberry": pygame.transform.scale(pygame.image.load("gleamberry.png"), (50, 50)),
+    "shimmeringapple": pygame.transform.scale(pygame.image.load("shimmeringapple.png"), (50, 50)),
+    "etherealpear": pygame.transform.scale(pygame.image.load("etherealpear.png"), (50, 50)),
+    "flamefruit": pygame.transform.scale(pygame.image.load("flamefruit.png"), (50, 50)),
+    "moonbeammelon": pygame.transform.scale(pygame.image.load("moonbeammelon.png"), (50, 50))
+}
 
 def closest_color(requested_color):
     min_colors = {}
@@ -118,13 +147,15 @@ def get_color_name(requested_color):
         closest_name = closest_color(requested_color)
     return closest_name.capitalize()
 
-def draw_text(screen, text, font, color, rect, highlight=None):
+def draw_text(surface, text, size, x, y, color, highlight=None):
+    font = pygame.font.SysFont(None, size)
     if highlight:
         highlight_surface = font.render(text, True, highlight)
-        screen.blit(highlight_surface, (rect.x + 1, rect.y + 1))
+        surface.blit(highlight_surface, (x + 1, y + 1))
     text_surface = font.render(text, True, color)
-    screen.blit(text_surface, rect)
-
+    text_rect = text_surface.get_rect(midtop=(x, y))
+    surface.blit(text_surface, text_rect)
+    
 def draw_beveled_button(screen, rect, color, text=None, font=None, text_color=BLACK):
     pygame.draw.rect(screen, color, rect)
     pygame.draw.line(screen, WHITE, rect.topleft, (rect.right, rect.top), 3)
@@ -146,18 +177,7 @@ def draw_gradient_rect(screen, rect, color1, color2):
         ]
         pygame.draw.line(screen, color, (rect.left, y), (rect.right, y))
 
-def draw_inventory(surface, player):
-    pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))
-    x_offset, y_offset = 10, HEIGHT - 90
-    for fruit, image in fruit_names_images:
-        surface.blit(image, (x_offset, y_offset))
-        draw_text(surface, str(player.inventory[fruit]), small_font, WHITE, pygame.Rect(x_offset + 50, y_offset, 50, 50))
-        x_offset += 100  # Adjust the offset to space out the images correctly
-
-
-def draw_screen(player):
-    screen.fill(BLACK)  # Clear the screen with a black color
-    
+def draw_screen():
     # Draw the color swatch in the center of the screen behind the background
     if elixir_color:
         pygame.draw.rect(screen, elixir_color, pygame.Rect(WIDTH // 2 - 150, HEIGHT // 2 - 50, 400, 400))
@@ -169,7 +189,7 @@ def draw_screen(player):
     for i, pos in enumerate(fruit_positions):
         if pygame.Rect(pos[0], pos[1], 50, 50).collidepoint(pygame.mouse.get_pos()):
             pygame.draw.rect(screen, HOVER_COLOR, pygame.Rect(pos[0] - 5, pos[1] - 5, 60, 60))
-        screen.blit(fruit_images[i], pos)
+        screen.blit(fruit_images[list(fruit_images.keys())[i]], pos)
         # Draw fruit labels under the fruit icons
         fruit_name_lines = ["Gleam Berry", "Flame Fruit", "Shimmering Apple", "Ethereal Pear", "Moonbeam Melon"][i].split()
         for line_index, line in enumerate(fruit_name_lines):
@@ -184,7 +204,7 @@ def draw_screen(player):
                 text = font.render(personality_keywords[selections[i]], True, BLACK)
                 screen.blit(text, (box.x + (box.width - text.get_width()) // 2, box.y + (box.height - text.get_height()) // 2))
             else:  # Fruit selections
-                screen.blit(fruit_images[selections[i]], (box.x + 15, box.y + 15))
+                screen.blit(fruit_images[list(fruit_images.keys())[selections[i]]], (box.x + 15, box.y + 15))
 
     # Draw personality word options on the left
     for i, keyword in enumerate(personality_keywords):
@@ -210,17 +230,14 @@ def draw_screen(player):
             x_pos = 330 + col * 180  # Base x-coordinate for columns
             screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 510 + row * 40))  # Centering text within the columns
 
-    # Draw the inventory at the end
-    draw_inventory(screen, player)
+    draw_inventory(screen, inventory)  # Draw the inventory
 
     pygame.display.flip()
-
 
 def main():
     global elixir_color, elixir_personality, elixir_color_name, elixir_title
     running = True
     selected_box = None
-    player = Player()
 
     while running:
         for event in pygame.event.get():
@@ -236,7 +253,6 @@ def main():
                         if selected_box is not None and selected_box > 0:
                             selections[selected_box] = i
                             selected_box = None
-                            player.collect_fruit(fruit_names_images[i][0])
                 for i in range(len(personality_keywords)):
                     if pygame.Rect(10, 100 + 30 * i, 200, 30).collidepoint(x, y):
                         if selected_box == 0:
@@ -254,13 +270,13 @@ def main():
                     ]
                     elixir_personality.insert(0, personality_keywords[selections[0]])
                     elixir_title = f"{personality_keywords[selections[0]]} {elixir_color_name} Elixir of Dragon Breeding"
-                    # print(f"Dragon Elixir Created! Color: {elixir_color_name}, Personality: {elixir_personality}")
+                    #print(f"Dragon Elixir Created! Color: {elixir_color_name}, Personality: {elixir_personality}")
 
-        draw_screen(player)
-        pygame.display.flip()
+        draw_screen()
 
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
     main()
+
