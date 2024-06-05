@@ -18,7 +18,7 @@ GREY = (200, 200, 200)
 HOVER_COLOR = (170, 170, 170)
 SELECTED_COLOR1 = (100, 100, 255)
 SELECTED_COLOR2 = (255, 100, 100)
-TEXT_HIGHLIGHT = (255, 255, 0)  # Highlight color for text
+TEXT_HIGHLIGHT = (255, 0, 255)  # Highlight color for text
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
@@ -40,12 +40,17 @@ fruit_images_dict = dict(zip(fruit_names, fruit_images))
 # RGB ranges for each fruit
 fruit_rgb_ranges = {
     "gleamberry": range(0, 51),
+    "flamefruit": range(51, 102),
+    "shimmeringapple": range(102, 153),
+    "etherealpear": range(153, 204),
+    "moonbeammelon": range(204, 255)
+}
+
+ "gleamberry": range(0, 51),
     "flamefruit": range(153, 204),
     "shimmeringapple": range(51, 102),
     "etherealpear": range(102, 153),
     "moonbeammelon": range(204, 255)
-}
-
 # Personality keywords for each fruit
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
@@ -118,7 +123,7 @@ def get_color_name(requested_color):
 
 def draw_text(screen, text, font, color, rect, highlight=None):
     if highlight:
-        highlight_surface = font.render(text, True, highlight)
+        highlight_surface = font.render(text, True, elixir_color)
         screen.blit(highlight_surface, (rect.x + 1, rect.y + 1))
     text_surface = font.render(text, True, color)
     screen.blit(text_surface, rect)
@@ -211,7 +216,7 @@ def draw_screen(selected_box):
         x_offset = 50  # Adjust the offset as needed
         title_text = fancy_font.render(elixir_title, True, BLACK)
         text_rect = pygame.Rect((WIDTH//2 - title_text.get_width()//2) + x_offset, 150, title_text.get_width(), title_text.get_height())
-        draw_text(screen, elixir_title, fancy_font, BLACK, text_rect, TEXT_HIGHLIGHT)
+        draw_text(screen, elixir_title, fancy_font, BLACK, text_rect, highlight=elixir_color_name)
 
         # Draw the trait words in two columns of two under the Mixalate button
         for i, word in enumerate(elixir_personality):
