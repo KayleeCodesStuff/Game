@@ -16,7 +16,8 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GREY = (200, 200, 200)
 HOVER_COLOR = (170, 170, 170)
-SELECTED_COLOR = (100, 100, 255)
+SELECTED_COLOR1 = (100, 100, 255)
+SELECTED_COLOR2 = (255, 100, 100)
 TEXT_HIGHLIGHT = (255, 255, 0)  # Highlight color for text
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
@@ -142,7 +143,7 @@ def draw_inventory(surface, inventory):
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50
 
-def draw_screen():
+def draw_screen(selected_box):
     # Clear screen
     screen.fill(BLACK)
     
@@ -153,7 +154,10 @@ def draw_screen():
 
     # Draw the selection boxes
     for i, box in enumerate(selection_boxes):
-        pygame.draw.rect(screen, GREY if selections[i] is None else SELECTED_COLOR, box)
+        if i == selected_box:  # Highlight the selected box
+            draw_gradient_rect(screen, box, SELECTED_COLOR1, SELECTED_COLOR2)  # Draw a gradient in the selected box
+        else:
+            pygame.draw.rect(screen, GREY if selections[i] is None else SELECTED_COLOR1, box)
         if selections[i] is not None:
             if i == 0:  # Personality word selection
                 text = font.render(personality_keywords[selections[i]], True, BLACK)
@@ -193,6 +197,8 @@ def draw_screen():
 
     pygame.display.flip()
 
+
+
 # Load the background image without resizing it
 background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
 
@@ -202,6 +208,13 @@ def main():
     selected_box = None
 
     while running:
+        # Automatically select the first empty box if no box is selected
+        if selected_box is None:
+            for i, selection in enumerate(selections):
+                if selection is None:
+                    selected_box = i
+                    break
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -244,12 +257,13 @@ def main():
                         inventory[fruit_names[selections[i]]] -= 1
 
                     # Draw color swatch behind the background
-                    print("Drawing color swatch with color:", elixir_color)  # Add this line for troubleshooting
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
-        draw_screen()
+
+        draw_screen(selected_box)  # Pass selected_box to draw_screen()
 
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()
