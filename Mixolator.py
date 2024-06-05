@@ -74,15 +74,12 @@ personality_keywords = [
 font = pygame.font.Font(None, 36)
 small_font = pygame.font.Font(None, 28)
 
-# Create boxes for selections
-selection_boxes = [pygame.Rect(150, 100, 100, 100), pygame.Rect(300, 100, 100, 100),
-                   pygame.Rect(450, 100, 100, 100), pygame.Rect(600, 100, 100, 100)]
+# Create boxes for selections, adjusted lower
+selection_boxes = [pygame.Rect(150, 200, 80, 80), pygame.Rect(300, 200, 80, 80),
+                   pygame.Rect(450, 200, 80, 80), pygame.Rect(600, 200, 80, 80)]
 
-# Move the personality word selection box to the first position
-selection_boxes.insert(0, selection_boxes.pop())
-
-# Create mixalate button
-mixalate_button = pygame.Rect(400, 250, 200, 50)
+# Create mixalate button, moved down to the black part of the cauldron
+mixalate_button = pygame.Rect(400, 450, 200, 50)
 
 # Store selections
 selections = [None, None, None, None]
@@ -113,7 +110,7 @@ def get_color_name(requested_color):
 def draw_screen():
     # Draw the color swatch in the center of the screen behind the background
     if elixir_color:
-         pygame.draw.rect(screen, elixir_color, pygame.Rect(WIDTH//2 - 150, HEIGHT//2 - 50, 400, 400))
+        pygame.draw.rect(screen, elixir_color, pygame.Rect(WIDTH//2 - 150, HEIGHT//2 - 50, 400, 400))
 
     # Draw the background on top
     screen.blit(background, (0, 0))
@@ -123,23 +120,24 @@ def draw_screen():
         if pygame.Rect(pos[0], pos[1], 50, 50).collidepoint(pygame.mouse.get_pos()):
             pygame.draw.rect(screen, HOVER_COLOR, pygame.Rect(pos[0] - 5, pos[1] - 5, 60, 60))
         screen.blit(fruit_images[i], pos)
+        # Draw fruit labels under the fruit icons
+        fruit_name_lines = ["Gleam Berry", "Flame Fruit", "Shimmering Apple", "Ethereal Pear", "Moonbeam Melon"][i].split()
+        for line_index, line in enumerate(fruit_name_lines):
+            text = small_font.render(line, True, BLACK)
+            screen.blit(text, (pos[0] + 5, pos[1] + 60 + 20 * line_index))
 
     # Draw selection boxes
     for i, box in enumerate(selection_boxes):
         pygame.draw.rect(screen, GREY if selections[i] is None else SELECTED_COLOR, box)
         if selections[i] is None:
             text = font.render("?", True, BLACK)
-            screen.blit(text, (box.x + 35, box.y + 35))
+            screen.blit(text, (box.x + 25, box.y + 25))
         else:
             if i == 0:  # Personality word selection
                 text = font.render(personality_keywords[selections[i]], True, BLACK)
                 screen.blit(text, (box.x + 5, box.y + 35))
             else:  # Fruit selections
-                screen.blit(fruit_images[selections[i]], (box.x + 25, box.y + 15))
-                fruit_name_lines = ["Gleam Berry", "Flame Fruit", "Shimmering Apple", "Ethereal Pear", "Moonbeam Melon"][selections[i]].split()
-                for line_index, line in enumerate(fruit_name_lines):
-                    text = small_font.render(line, True, BLACK)
-                    screen.blit(text, (box.x + 5, box.y + 75 + 20 * line_index))
+                screen.blit(fruit_images[selections[i]], (box.x + 15, box.y + 15))
 
     # Draw personality word options on the left
     for i, keyword in enumerate(personality_keywords):
@@ -152,15 +150,15 @@ def draw_screen():
     text = font.render("Mixalate", True, BLACK)
     screen.blit(text, (mixalate_button.x + 10, mixalate_button.y + 10))
 
-       # Draw elixir result if created
+    # Draw elixir result if created
     if elixir_color and elixir_personality and elixir_color_name and elixir_title:
+        title_text = small_font.render(elixir_title, True, BLACK)
+        screen.blit(title_text, (WIDTH//2 - title_text.get_width()//2, 510))  # Center the title below the mixalate button
         for i, word in enumerate(elixir_personality):
             text = small_font.render(word, True, BLACK)
-            screen.blit(text, (int(WIDTH * 0.65), 500 + i * 30))  # Adjust x-coordinate to 65% of the screen width
+            screen.blit(text, (int(WIDTH * 0.65), 550 + i * 30))  # Adjust x-coordinate to 65% of the screen width
         color_name_text = small_font.render(elixir_color_name, True, BLACK)
-        screen.blit(color_name_text, (int(WIDTH * 0.65), 610))  # Adjust x-coordinate to 65% of the screen width
-        title_text = small_font.render(elixir_title, True, BLACK)
-        screen.blit(title_text, (int(WIDTH * 0.65), 640))  # Adjust x-coordinate to 65% of the screen width
+        screen.blit(color_name_text, (int(WIDTH * 0.65), 640))  # Adjust x-coordinate to 65% of the screen width
 
     pygame.display.flip()
 
