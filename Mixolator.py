@@ -65,12 +65,12 @@ personality_keywords = [
 # Create font
 font = pygame.font.Font(None, 36)
 small_font = pygame.font.Font(None, 28)
-fancy_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 36)
+fancy_font = pygame.font.Font(pygame.font.match_font('georgia', bold=True), 36)
 fancy_small_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 28)
 
 # Create boxes for selections, adjusted lower and wider for the first box
-selection_boxes = [pygame.Rect(150, 10, 200, 80), pygame.Rect(400, 10, 80, 80),
-                   pygame.Rect(550, 10, 80, 80), pygame.Rect(700, 10, 80, 80)]
+selection_boxes = [pygame.Rect(150, 10, 200, 60), pygame.Rect(400, 10, 80, 60),
+                   pygame.Rect(550, 10, 80, 60), pygame.Rect(700, 10, 80, 60)]
 
 # Create mixalate button, reduced size and moved up to touch the rim of the cauldron
 mixalate_button = pygame.Rect(425, 370, 150, 40)
@@ -161,9 +161,9 @@ def draw_screen():
 
     # Draw personality word options on the left
     for i, keyword in enumerate(personality_keywords):
-        color = HOVER_COLOR if pygame.Rect(10, 100 + 30 * i, 200, 30).collidepoint(pygame.mouse.get_pos()) else BLACK
+        color = HOVER_COLOR if pygame.Rect(10, 10 + 30 * i, 200, 30).collidepoint(pygame.mouse.get_pos()) else BLACK
         text = small_font.render(keyword, True, color)
-        screen.blit(text, (10, 100 + 30 * i))
+        screen.blit(text, (10, 10 + 30 * i))
 
     # Draw mixalate button with rainbow gradient and beveled edges
     gradient_rect = pygame.Rect(mixalate_button.x - 5, mixalate_button.y - 5, mixalate_button.width + 10, mixalate_button.height + 10)
@@ -205,6 +205,11 @@ def main():
                 for i, box in enumerate(selection_boxes):
                     if box.collidepoint(x, y):
                         selected_box = i
+                for i in range(len(personality_keywords)):
+                    if pygame.Rect(10, 10 + 30 * i, 200, 30).collidepoint((x, y)):
+                        if selected_box == 0:
+                            selections[selected_box] = i
+                            selected_box = None
                 x_offset = 10
                 for i, fruit in enumerate(fruit_names):
                     if pygame.Rect(x_offset, HEIGHT - 90, 50, 50).collidepoint(x, y):
