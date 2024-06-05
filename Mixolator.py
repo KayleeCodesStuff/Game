@@ -45,12 +45,6 @@ fruit_rgb_ranges = {
     "etherealpear": range(153, 204),
     "moonbeammelon": range(204, 255)
 }
-
- "gleamberry": range(0, 51),
-    "flamefruit": range(153, 204),
-    "shimmeringapple": range(51, 102),
-    "etherealpear": range(102, 153),
-    "moonbeammelon": range(204, 255)
 # Personality keywords for each fruit
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
