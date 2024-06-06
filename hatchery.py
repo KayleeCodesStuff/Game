@@ -121,22 +121,29 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                # Check if an inventory slot was clicked
-                for i, rect in enumerate(inventory_boxes):
-                    if rect.collidepoint(x, y) and inventory_slots[i] is not None:
-                        selected_elixir = inventory_slots[i]
-                        elixir_color = selected_elixir[0]
-                        break
                 # Check if an egg was clicked
+                egg_selected = False
                 for j, egg_rect in enumerate(egg_positions):
-                    if egg_rect.collidepoint(x, y) and selected_elixir is not None:
-                        # Select the clicked egg and apply the elixir to it
+                    if egg_rect.collidepoint(x, y):
+                        # Select the clicked egg
                         selected_egg_index = j
-                        egg_colors[j] = elixir_color
-                        # Remove the elixir from the inventory
-                        inventory_slots[i] = None
-                        elixir_color = None
+                        egg_selected = True
                         break
+
+                if not egg_selected:
+                    # Check if an inventory slot was clicked
+                    for i, rect in enumerate(inventory_boxes):
+                        if rect.collidepoint(x, y) and inventory_slots[i] is not None:
+                            selected_elixir = inventory_slots[i]
+                            elixir_color = selected_elixir[0]
+                            if selected_egg_index is not None:
+                                # Apply the elixir to the selected egg
+                                egg_colors[selected_egg_index] = elixir_color
+                                # Remove the elixir from the inventory
+                                inventory_slots[i] = None
+                                elixir_color = None
+                                selected_egg_index = None  # Reset the selected egg index
+                            break
 
         draw_screen(selected_egg_index)
 

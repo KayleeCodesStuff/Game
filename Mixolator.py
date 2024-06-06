@@ -282,7 +282,7 @@ def main():
                         random.choice(fruit_personality_keywords[fruit_names[selections[i]]]) for i in range(1, 4)
                     ]
                     elixir_personality.insert(0, personality_keywords[selections[0]])
-                    elixir_title = f"{personality_keywords[selections[0]]} {elixir_color_name} Dragon Egg Elixir"
+                    elixir_title = f"{elixir_color_name} {personality_keywords[selections[0]]} Dragon Egg Elixir"
                     # Remove used fruits from inventory
                     for i in range(1, 4):
                         inventory[fruit_names[selections[i]]] -= 1
