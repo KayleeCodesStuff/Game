@@ -2,6 +2,7 @@ import os
 import random
 import sqlite3
 import pandas as pd
+from g4f.client import Client
 
 # Define the folder containing the images
 image_folder = r'C:\Users\kayle\PycharmProjects\Game\dragons'
@@ -10,30 +11,28 @@ image_folder = r'C:\Users\kayle\PycharmProjects\Game\dragons'
 primary_characteristics = ["Curious", "Playful", "Adventurous", "Resourceful", "Sociable", "Thoughtful", "Confident", "Generous", "Reflective", "Strategic", "Cheerful", "Demonic", "Mystical", "Flamboyant", "Awkward", "Weird", "Gross", "Gorgeous", "Ethereal", "Blessed"]
 secondary_characteristics = ["Dark", "Brooding", "Responsible", "Common", "Distraction", "Fierce", "Fiery", "Showy", "Speed", "Flightiness", "Drive", "Ambition", "Earthy", "Pragmatic", "Stout", "Loyal", "Angelic", "Unique", "Pure", "Self-righteous"]
 
-# Predefined names assigned to respective ID numbers
-predefined_names = ["Quip", "Sasha", "Buggs", "Snarl", "Spitfire", "Squee", "Loki", "Jazz", "Joy", "Skye",
-                    "Flare", "Blitz", "Ziggy", "Nova", "Blaze", "Pippin", "Zippy", "Sparx", "Razz", "Fizz",
-                    "Dusk", "Misty", "Blaze", "Pixie", "Rumble", "Flick", "Gloom", "Flash", "Twinkle", "Sprout",
-                    "Dazzle", "Whisk", "Glimmer", "Trix", "Bramble", "Fizzle", "Flicker", "Muddle", "Puddle", "Ruffle",
-                    "Smudge", "Sparky", "Whimsy", "Wisp", "Glint", "Spark", "Glow", "Zip", "Frost", "Ember",
-                    "Whirl", "Gleam", "Shimmer", "Twirl", "Nimbus", "Aurora", "Stormy", "Drizzle", "Flurry", "Flit",
-                    "Puff", "Zephyr", "Shroud", "Tempest", "Glint", "Rustle", "Tumble", "Twine", "Quirk", "Mirth",
-                    "Flutter", "Twinkle", "Glint", "Breezy", "Starlight", "Flicker", "Fable", "Tinker", "Glisten",
-                    "Gleef", "Chirp", "Quirk", "Blip", "Pebble"]
+# List of predefined names for fallback
+predefined_names = ["Quip", "Joy", "Buggs", "Snarl", "Spitfire", "Sasha", "Squee", "Loki", "Jazz"]
 
-# Function to generate a description for the dragon
-def generate_description(dragon_type, name, primary_characteristic, secondary_characteristics, additional_word):
-    description = f"{name} is a {dragon_type} dragon known for being {primary_characteristic}. With traits like {', '.join(secondary_characteristics)}, it exhibits a unique personality. It is also {additional_word}, making it stand out. Its appearance is characterized by its majestic presence and the way it commands attention."
-    return description
+# Initialize the client
+client = Client()
 
-# Function to determine RGB value range based on dragon type
-def get_rgb_range(dragon_type):
-    if dragon_type == 'Gold':
-        return "(0-21, 0-21, 0-21)"
-    elif dragon_type == 'Silver':
-        return "(21-51, 21-51, 21-51)"
-    else:
-        return "(0-255, 0-255, 0-255)"
+# Function to generate a GPT-created name
+def generate_name():
+    try:
+        chat_completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "In a 1 word response, generate a short, cute, unique name for a dragon."}],
+        )
+        name = chat_completion.choices[0].message.content.strip()
+        # Ensure the name is appropriate
+        if len(name) <= 10 and name.isalpha():
+            return name
+        else:
+            return random.choice(predefined_names)  # Use predefined name if generated name is not appropriate
+    except Exception as e:
+        print(f"Error generating name: {e}")
+        return random.choice(predefined_names)
 
 # Function to parse the filename
 def parse_filename(filename):
@@ -58,26 +57,17 @@ def parse_filename(filename):
     # Remove the ID number from the name
     name = name[len(id_str):]
     
-    # Handle specific cases for primary characteristics
+    # Extract special words
     special_ability = ""
-    primary_char = None
-    if "bless" in name:
-        primary_char = "Blessed"
-        name = name.replace("bless", "")
-    elif "demon" in name:
-        primary_char = "Demonic"
-        name = name.replace("demon", "")
-    
-    if not primary_char:
-        primary_char = next((pc for pc in primary_characteristics if name.startswith(pc.lower())), None)
+    primary_char = next((pc for pc in primary_characteristics if name.startswith(pc.lower())), None)
+    if primary_char:
+        name = name[len(primary_char):]
+    else:
+        primary_char = next((sc for sc in secondary_characteristics if name.startswith(sc.lower())), None)
         if primary_char:
             name = name[len(primary_char):]
         else:
-            primary_char = next((sc for sc in secondary_characteristics if name.startswith(sc.lower())), None)
-            if primary_char:
-                name = name[len(primary_char):]
-            else:
-                primary_char = random.choice(primary_characteristics)  # Default to a random primary characteristic
+            primary_char = random.choice(predefined_names)  # Default to the first predefined name
 
     secondary_chars = []
     for secondary in secondary_characteristics:
@@ -108,12 +98,8 @@ def generate_dragon_data(image_folder):
                 if id_number in processed_ids:
                     continue  # Skip if this ID has already been processed
                 
-                # Assign a predefined name based on the ID number
-                name = predefined_names[id_number - 1]  # Adjust for zero-based index
-                
-                # Generate the description and RGB value range
-                description = generate_description(dragon_type, name, primary_char, secondary_chars, special_ability)
-                rgb_value_range = get_rgb_range(dragon_type)
+                # Generate a name for the dragon
+                name = generate_name()
                 
                 dragon_data = {
                     "id": id_number,
@@ -123,8 +109,6 @@ def generate_dragon_data(image_folder):
                     "primary_characteristic": primary_char,
                     "secondary_characteristics": secondary_chars,
                     "special_abilities": special_ability,
-                    "description": description,
-                    "rgb_value_range": rgb_value_range
                 }
                 dragons.append(dragon_data)
                 processed_ids.add(id_number)
@@ -144,16 +128,14 @@ def insert_into_db(dragons, db_name='dragons.db'):
         name TEXT NOT NULL,
         primary_characteristic TEXT NOT NULL,
         secondary_characteristics TEXT NOT NULL,
-        special_abilities TEXT,
-        description TEXT,
-        rgb_value_range TEXT
+        special_abilities TEXT
     )
     ''')
     for dragon in dragons:
         cursor.execute('''
-        INSERT INTO dragons (id, filename, type, name, primary_characteristic, secondary_characteristics, special_abilities, description, rgb_value_range)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (dragon['id'], dragon['filename'], dragon['type'], dragon['name'], dragon['primary_characteristic'], ','.join(dragon['secondary_characteristics']), dragon['special_abilities'], dragon['description'], dragon['rgb_value_range']))
+        INSERT INTO dragons (id, filename, type, name, primary_characteristic, secondary_characteristics, special_abilities)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (dragon['id'], dragon['filename'], dragon['type'], dragon['name'], dragon['primary_characteristic'], ','.join(dragon['secondary_characteristics']), dragon['special_abilities']))
     conn.commit()
     conn.close()
 
