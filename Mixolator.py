@@ -1,8 +1,15 @@
 import pygame
+import os
 import random
 import sys
 import webcolors
 from webcolors import CSS3_HEX_TO_NAMES, hex_to_rgb
+import sqlite3
+import json
+import tkinter as tk
+from tkinter import filedialog
+
+
 
 pygame.init()
 
@@ -63,6 +70,9 @@ personality_keywords = [
 ]
 # Define the "Bottle Elixir" button
 bottle_button = pygame.Rect(850, HEIGHT - 150, 120, 40)
+
+# Define the "delete" button
+delete_button = pygame.Rect(850, HEIGHT - 200, 120, 40)
 
 # List of image filenames
 image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
@@ -170,6 +180,73 @@ def draw_inventory(surface, inventory):
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50  # Move right for the next fruit
 
+def select_or_create_file():
+    from tkinter import Tk, filedialog
+    
+    root = Tk()
+    root.withdraw()  # Hide the main tkinter window
+    file_path = filedialog.asksaveasfilename(defaultextension=".db",
+                                             filetypes=[("SQLite database", "*.db"), ("JSON file", "*.json")],
+                                             title="Select or Create File")
+    return file_path
+
+
+def initialize_file(file_path):
+    if file_path.endswith(".db"):
+        conn = sqlite3.connect(file_path)
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs
+                          (id INTEGER PRIMARY KEY, rgb TEXT, title TEXT, primary_trait TEXT,
+                           secondary_traits TEXT, image_file TEXT, position INTEGER)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS fruits
+                          (id INTEGER PRIMARY KEY, gleamberry INTEGER, flamefruit INTEGER,
+                           shimmeringapple INTEGER, etherealpear INTEGER, moonbeammelon INTEGER)''')
+        conn.commit()
+        conn.close()
+    elif file_path.endswith(".json"):
+        with open(file_path, 'w') as f:
+            json.dump({"elixirs": [], "fruits": {}}, f)
+
+def save_elixir_data(file_path, elixir_data, fruit_counts):
+    if file_path.endswith(".db"):
+        conn = sqlite3.connect(file_path)
+        cursor = conn.cursor()
+        rgb_string = str(elixir_data['rgb'])
+        secondary_traits_str = ', '.join(elixir_data['secondary_traits'])
+
+        cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
+                          VALUES (?, ?, ?, ?, ?, ?)''',
+                       (rgb_string, elixir_data['rgb'], elixir_data['title'], elixir_data['primary_trait'],
+                        json.dumps(elixir_data['secondary_traits']), elixir_data['image_file'],
+                        elixir_data['position']))
+        cursor.execute('''REPLACE INTO fruits (id, gleamberry, flamefruit, shimmeringapple, etherealpear, moonbeammelon)
+                          VALUES (1, ?, ?, ?, ?, ?)''',
+                       (fruit_counts['gleamberry'], fruit_counts['flamefruit'], fruit_counts['shimmeringapple'],
+                        fruit_counts['etherealpear'], fruit_counts['moonbeammelon']))
+        conn.commit()
+        conn.close()
+    elif file_path.endswith(".json"):
+        with open(file_path, 'r+') as f:
+            data = json.load(f)
+            data['elixirs'].append(elixir_data)
+            data['fruits'] = fruit_counts
+            f.seek(0)
+            json.dump(data, f, indent=4)
+
+def delete_elixir_data(file_path, position):
+    if file_path.endswith(".db"):
+        conn = sqlite3.connect(file_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM elixirs WHERE position = ?', (position,))
+        conn.commit()
+        conn.close()
+    elif file_path.endswith(".json"):
+        with open(file_path, 'r+') as f:
+            data = json.load(f)
+            data['elixirs'] = [elixir for elixir in data['elixirs'] if elixir['position'] != position]
+            f.seek(0)
+            f.truncate()
+            json.dump(data, f, indent=4)
 
 def draw_screen(selected_box):
     # Clear screen
@@ -224,6 +301,7 @@ def draw_screen(selected_box):
         gradient_rect = pygame.Rect(bottle_button.x - 5, bottle_button.y - 5, bottle_button.width + 10, bottle_button.height + 10)
         draw_gradient_rect(screen, gradient_rect, (255, 0, 0), (0, 0, 255))  # Same gradient as Mixalate button
         draw_beveled_button(screen, bottle_button, GREY, "Bottle", font)  # Same style as Mixalate button
+        draw_beveled_button(screen, delete_button, GREY, "Delete", font)
 
     # Draw the inventory
     draw_inventory(screen, inventory)
@@ -234,9 +312,11 @@ def draw_screen(selected_box):
 background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
 
 def main():
-    global elixir_color, elixir_personality, elixir_color_name, elixir_title
+    global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path
     running = True
     selected_box = None
+    file_path = None
+    delete_button = pygame.Rect(850, HEIGHT - 200, 120, 40)
 
     while running:
         # Automatically select the first empty box if no box is selected
@@ -290,12 +370,34 @@ def main():
                     # Draw color swatch behind the background
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
 
-                # Handle "Bottle Elixir" button press
                 if elixir_color and bottle_button.collidepoint(x, y):
+                    if not file_path:
+                        file_path = select_or_create_file()
+                        initialize_file(file_path)
                     for i in range(len(inventory_slots)):
                         if inventory_slots[i] is None:
-                            inventory_slots[i] = (elixir_color, random.choice(image_filenames))
+                            image_file = random.choice(image_filenames)
+                            inventory_slots[i] = (elixir_color, image_file)
+                            elixir_data = {
+                                'rgb': elixir_color,
+                                'title': elixir_title,
+                                'primary_trait': personality_keywords[selections[0]],
+                                'secondary_traits': elixir_personality[1:],
+                                'image_file': image_file,
+                                'position': i + 1
+                            }
+                            fruit_counts = {fruit: count for fruit, count in inventory.items()}
+                            save_elixir_data(file_path, elixir_data, fruit_counts)
                             break
+
+
+                # Handle delete button press
+                    for i, slot in enumerate(inventory_slots):
+                        if slot and delete_button.collidepoint(x, y):
+                            inventory_slots[i] = None
+                            delete_elixir_data(file_path, i + 1)
+                            break
+
 
         draw_screen(selected_box)  # Pass selected_box to draw_screen()
 
