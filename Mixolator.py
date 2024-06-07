@@ -153,19 +153,22 @@ def draw_gradient_rect(screen, rect, color1, color2):
         ]
         pygame.draw.line(screen, color, (rect.left, y), (rect.right, y))
 
-def draw_inventory(surface, inventory):
+def draw_inventory(surface, inventory, selected_inventory_slot=None):
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
 
     # Draw potion inventory slots
     x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
     y_offset = HEIGHT - 90
     for i, slot in enumerate(inventory_slots):
+        box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
+        if i == selected_inventory_slot:
+            pygame.draw.rect(surface, RED, box_rect, 2)  # Highlight selected slot
         if slot is None:
             # Draw empty slot with ?
-            draw_text(surface, "?", small_font, WHITE, pygame.Rect(x_offset, y_offset, 50, 50))
+            draw_text(surface, "?", small_font, WHITE, box_rect)
         else:
             color, image_filename = slot
-            pygame.draw.rect(surface, color, pygame.Rect(x_offset, y_offset, 50, 50))
+            pygame.draw.rect(surface, color, box_rect)
             image = pygame.image.load(image_filename)
             image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
             surface.blit(image, (x_offset, y_offset))
@@ -179,7 +182,6 @@ def draw_inventory(surface, inventory):
         if selections[1:] and list(fruit_images_dict.keys()).index(fruit) in selections[1:]:
             pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
         x_offset += 50  # Move right for the next fruit
-
 def select_or_create_file():
     from tkinter import Tk, filedialog
     
@@ -262,7 +264,7 @@ def delete_elixir_data(file_path, position):
             f.truncate()
             json.dump(data, f, indent=4)
 
-def draw_screen(selected_box):
+def draw_screen(selected_box, selected_inventory_slot):
     # Clear screen
     screen.fill(BLACK)
     
@@ -311,26 +313,24 @@ def draw_screen(selected_box):
             x_pos = 330 + col * 180  # Base x-coordinate for columns
             screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 420 + row * 40))  # Adjusted position
 
-         # Draw "Bottle Elixir" button
+        # Draw "Bottle" button
         gradient_rect = pygame.Rect(bottle_button.x - 5, bottle_button.y - 5, bottle_button.width + 10, bottle_button.height + 10)
         draw_gradient_rect(screen, gradient_rect, (255, 0, 0), (0, 0, 255))  # Same gradient as Mixalate button
         draw_beveled_button(screen, bottle_button, GREY, "Bottle", font)  # Same style as Mixalate button
         draw_beveled_button(screen, delete_button, GREY, "Delete", font)
 
     # Draw the inventory
-    draw_inventory(screen, inventory)
+    draw_inventory(screen, inventory, selected_inventory_slot)
 
     pygame.display.flip()
 
-# Load the background image without resizing it
-background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
-
+# Updated main function call
 def main():
-    global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path
+    global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path, selected_inventory_slot
     running = True
     selected_box = None
     file_path = None
-    delete_button = pygame.Rect(850, HEIGHT - 200, 120, 40)
+    selected_inventory_slot = None
 
     while running:
         # Automatically select the first empty box if no box is selected
@@ -404,22 +404,26 @@ def main():
                             save_elixir_data(file_path, elixir_data, fruit_counts)
                             break
 
+                # Handle elixir slot click
+                x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
+                y_offset = HEIGHT - 90
+                for i in range(len(inventory_slots)):
+                    if pygame.Rect(x_offset + i * 60, y_offset, 50, 50).collidepoint(x, y):
+                        selected_inventory_slot = i
 
                 # Handle delete button press
-                    for i, slot in enumerate(inventory_slots):
-                        if slot and delete_button.collidepoint(x, y):
-                            inventory_slots[i] = None
-                            delete_elixir_data(file_path, i + 1)
-                            break
+                if delete_button.collidepoint(x, y) and selected_inventory_slot is not None:
+                    inventory_slots[selected_inventory_slot] = None
+                    delete_elixir_data(file_path, selected_inventory_slot + 1)
+                    selected_inventory_slot = None
 
-
-        draw_screen(selected_box)  # Pass selected_box to draw_screen()
+        draw_screen(selected_box, selected_inventory_slot)  # Pass selected_inventory_slot to draw_screen()
 
     pygame.quit()
     sys.exit()
 
-
 if __name__ == "__main__":
     main()
+
 
 
