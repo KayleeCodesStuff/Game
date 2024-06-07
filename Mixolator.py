@@ -31,7 +31,6 @@ RED = (255, 0, 0)
 
 # Load images
 background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()  # Load with alpha for transparency
-background = pygame.transform.scale(background, (WIDTH, HEIGHT - 100))  # Scale the background to fit the screen minus inventory space
 ethereal_pear = pygame.image.load("etherealpear.png")
 flame_fruit = pygame.image.load("flamefruit.png")
 gleam_berry = pygame.image.load("gleamberry.png")
@@ -162,7 +161,7 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
     for i, slot in enumerate(inventory_slots):
         box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
         if i == selected_inventory_slot:
-            pygame.draw.rect(surface, RED, box_rect, 2)  # Highlight selected slot
+            pygame.draw.rect(surface, RED, box_rect, 3)  # Highlight selected slot
         if slot is None:
             # Draw empty slot with ?
             draw_text(surface, "?", small_font, WHITE, box_rect)
@@ -173,6 +172,9 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
             image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
             surface.blit(image, (x_offset, y_offset))
         x_offset += 60  # Move left for the next slot
+         # Draw outline if this slot is selected
+        if i == selected_inventory_slot:
+            pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
 
     # Draw the fruits in the remaining space
     x_offset = 10  # Reset x_offset for fruit images
