@@ -192,46 +192,60 @@ def select_or_create_file():
 
 
 def initialize_file(file_path):
-    if file_path.endswith(".db"):
-        conn = sqlite3.connect(file_path)
-        cursor = conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs
-                          (id INTEGER PRIMARY KEY, rgb TEXT, title TEXT, primary_trait TEXT,
-                           secondary_traits TEXT, image_file TEXT, position INTEGER)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS fruits
-                          (id INTEGER PRIMARY KEY, gleamberry INTEGER, flamefruit INTEGER,
-                           shimmeringapple INTEGER, etherealpear INTEGER, moonbeammelon INTEGER)''')
-        conn.commit()
-        conn.close()
-    elif file_path.endswith(".json"):
-        with open(file_path, 'w') as f:
-            json.dump({"elixirs": [], "fruits": {}}, f)
+    conn = sqlite3.connect(file_path)
+    cursor = conn.cursor()
+    
+    # Create elixirs table
+    cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs (
+                        id INTEGER PRIMARY KEY,
+                        rgb TEXT,
+                        title TEXT,
+                        primary_trait TEXT,
+                        secondary_traits TEXT,
+                        image_file TEXT,
+                        position INTEGER
+                      )''')
+    
+    # Create inventory table with fruit as UNIQUE
+    cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
+                        id INTEGER PRIMARY KEY,
+                        fruit TEXT UNIQUE,
+                        count INTEGER
+                      )''')
+    
+    conn.commit()
+    conn.close()
+
+    #elif file_path.endswith(".json"):
+        #with open(file_path, 'w') as f:
+            #json.dump({"elixirs": [], "fruits": {}}, f)
 
 def save_elixir_data(file_path, elixir_data, fruit_counts):
-    if file_path.endswith(".db"):
-        conn = sqlite3.connect(file_path)
-        cursor = conn.cursor()
-        rgb_string = str(elixir_data['rgb'])
-        secondary_traits_str = ', '.join(elixir_data['secondary_traits'])
+    conn = sqlite3.connect(file_path)
+    cursor = conn.cursor()
+    
+    # Insert elixir data
+    cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
+                      VALUES (?, ?, ?, ?, ?, ?)''',
+                   (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
+                    ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
 
-        cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
-                          VALUES (?, ?, ?, ?, ?, ?)''',
-                       (rgb_string, elixir_data['rgb'], elixir_data['title'], elixir_data['primary_trait'],
-                        json.dumps(elixir_data['secondary_traits']), elixir_data['image_file'],
-                        elixir_data['position']))
-        cursor.execute('''REPLACE INTO fruits (id, gleamberry, flamefruit, shimmeringapple, etherealpear, moonbeammelon)
-                          VALUES (1, ?, ?, ?, ?, ?)''',
-                       (fruit_counts['gleamberry'], fruit_counts['flamefruit'], fruit_counts['shimmeringapple'],
-                        fruit_counts['etherealpear'], fruit_counts['moonbeammelon']))
-        conn.commit()
-        conn.close()
-    elif file_path.endswith(".json"):
-        with open(file_path, 'r+') as f:
-            data = json.load(f)
-            data['elixirs'].append(elixir_data)
-            data['fruits'] = fruit_counts
-            f.seek(0)
-            json.dump(data, f, indent=4)
+    # Update fruit counts
+    for fruit, count in fruit_counts.items():
+        cursor.execute('''INSERT INTO inventory (fruit, count)
+                          VALUES (?, ?)
+                          ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
+
+    conn.commit()
+    conn.close()
+
+    #elif file_path.endswith(".json"):
+        #with open(file_path, 'r+') as f:
+            #data = json.load(f)
+            #data['elixirs'].append(elixir_data)
+            #data['fruits'] = fruit_counts
+            #f.seek(0)
+            #json.dump(data, f, indent=4)
 
 def delete_elixir_data(file_path, position):
     if file_path.endswith(".db"):
