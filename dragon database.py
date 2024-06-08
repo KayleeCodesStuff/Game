@@ -12,14 +12,21 @@ secondary_characteristics = ["Dark", "Brooding", "Responsible", "Common", "Distr
 
 # Predefined names assigned to respective ID numbers
 predefined_names = ["Quip", "Sasha", "Buggs", "Snarl", "Spitfire", "Squee", "Loki", "Jazz", "Joy", "Skye",
-                    "Flare", "Blitz", "Ziggy", "Nova", "Blaze", "Pippin", "Zippy", "Sparx", "Razz", "Fizz",
-                    "Dusk", "Misty", "Blaze", "Pixie", "Rumble", "Flick", "Gloom", "Flash", "Twinkle", "Sprout",
-                    "Dazzle", "Whisk", "Glimmer", "Trix", "Bramble", "Fizzle", "Flicker", "Muddle", "Puddle", "Ruffle",
+                    "Flare", "Blitz", "Ziggy", "Nova", "Pippin", "Zippy", "Sparx", "Razz", "Fizz",
+                    "Gizmo", "Misty", "Blaze", "Pixie", "Rumble", "Flick", "Gloom", "Flash", "Sprout",
+                    "Dazzle", "Whisk", "Glimmer", "Trix", "Bramble", "Fizzle", "Muddle", "Puddle", "Ruffle",
                     "Smudge", "Sparky", "Whimsy", "Wisp", "Glint", "Spark", "Glow", "Zip", "Frost", "Ember",
-                    "Whirl", "Gleam", "Shimmer", "Twirl", "Nimbus", "Aurora", "Stormy", "Drizzle", "Flurry", "Flit",
-                    "Puff", "Zephyr", "Shroud", "Tempest", "Glint", "Rustle", "Tumble", "Twine", "Quirk", "Mirth",
-                    "Flutter", "Twinkle", "Glint", "Breezy", "Starlight", "Flicker", "Fable", "Tinker", "Glisten",
-                    "Gleef", "Chirp", "Quirk", "Blip", "Pebble"]
+                    "Whirl", "Gleam", "Shine", "Twirl", "Nimbus", "Aurora", "Stormy", "Drizzle", "Flurry", "Flit",
+                    "Puff", "Zephyr", "Shroud", "Tempest", "Rustle", "Tumble", "Twine", "Quirk", "Mirth",
+                    "Flutter", "Twinkle", "Breezy", "Starlight", "Flicker", "Fable", "Tinker", "Glisten",
+                    "Gleef", "Chirp", "Quirk", "Blip", "Pebble", "Niffler", "Glimpse", "Shimmer", "Querkle", 
+                    "Giggle", "Squirm", "Thorn", "Cloud", "Moon", "Peace", "Vision", "Ghost", "Shadow", 
+                    "Snow", "Dawn", "Dusk", "Zomp", "Zillow", "Xanth", "Smolder", "Smoke", "Frost", "Crimson", 
+                    "Quasar", "Quark", "Quillion", "Licked", "Bounce", "Batty", "Blink", "Korax", "Steep", 
+                    "Serenity", "Shade", "Ginko", "Goji", "Sparkle", "Hiccup", "Halo", "Heap", "Haze","Hoax", 
+                    "Squirt", "Sprite", "Snicker", "Doodle", "Syntax", "Digit", "Pearl", "Tease", "Swing", 
+                    "Jinx", "Quibble", "Jax", "Prank", "Secret", "Whisper", "Ditzel", "Speck", "Pickle", 
+                    "Squeal", "Cookie", "Brownie", "Zephyr", "Lolli", "Lisp", "Spree", "Squeak", "Squish", "Squeeze"]
 
 # Function to generate a description for the dragon
 def generate_description(dragon_type, name, primary_characteristic, secondary_characteristics, additional_word):
