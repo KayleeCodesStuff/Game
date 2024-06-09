@@ -355,6 +355,7 @@ def determine_egg_phenotype(genotype):
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
     egg_phenotype, egg_image = determine_egg_phenotype(egg_genotype)
+    print(f"Created egg with genotype {egg_genotype} and phenotype {egg_phenotype}")
     egg = {
         "genotype": egg_genotype,
         "phenotype": egg_phenotype,
@@ -362,7 +363,6 @@ def create_egg(dragon1, dragon2, position):
         "rect": pygame.image.load(egg_image).get_rect(topleft=position)
     }
     eggs_on_board.append(egg)
-
 
 # Function to move dragons
 def move_dragons():
@@ -404,22 +404,6 @@ def move_dragons():
                             heart_position = ((dragon["rect"].x + other_dragon["rect"].x) // 2,
                                               (dragon["rect"].y + other_dragon["rect"].y) // 2)
                             hearts_on_board.append({"position": heart_position, "start_time": pygame.time.get_ticks()})
-                            
-                            # Compatibility test reporting
-                            char_set_1 = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
-                            char_set_2 = set([other_dragon["primary_characteristic"]] + other_dragon["secondary_characteristics"])
-
-                            if dragon["holding_fruit"]:
-                                fruit_char_1 = get_unique_fruit_characteristic(dragon, fruit_personality_keywords[dragon["holding_fruit"]])
-                                if fruit_char_1:
-                                    char_set_1.add(fruit_char_1)
-                            if other_dragon["holding_fruit"]:
-                                fruit_char_2 = get_unique_fruit_characteristic(other_dragon, fruit_personality_keywords[other_dragon["holding_fruit"]])
-                                if fruit_char_2:
-                                    char_set_2.add(fruit_char_2)
-
-                            print(f"Dragon {dragon['name']} characteristics: {char_set_1}")
-                            print(f"Dragon {other_dragon['name']} characteristics: {char_set_2}")
 
                             compatible = compatibility_test(dragon, other_dragon, fruit_personality_keywords)
                             print(f"Compatibility test between {dragon['name']} and {other_dragon['name']}: {'Compatible' if compatible else 'Not compatible'}")
@@ -454,6 +438,7 @@ def move_dragons():
                             fruits_on_board.remove(fruit)
                             break
                 dragon["target"] = determine_target(dragon)  # Reassign target
+
 
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
