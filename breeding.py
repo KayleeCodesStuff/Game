@@ -46,6 +46,14 @@ heart_image = pygame.image.load("heart.png")
 heart_image = pygame.transform.scale(heart_image, (30, 30))
 hearts_on_board = []
 
+fruit_personality_keywords = {
+    "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
+    "flamefruit": ["Distraction", "Fierce", "Fiery", "Showy"],
+    "shimmeringapple": ["Speed", "Flightiness", "Drive", "Ambition"],
+    "etherealpear": ["Earthy", "Pragmatic", "Stout", "Loyal"],
+    "moonbeammelon": ["Angelic", "Unique", "Pure", "Self-righteous"]
+}
+
 def draw_hearts(surface):
     current_time = pygame.time.get_ticks()
     for heart in hearts_on_board[:]:
@@ -54,6 +62,7 @@ def draw_hearts(surface):
         else:
             surface.blit(heart_image, heart["position"])
 
+repulsor_counter = 0
 
 # Load fruit counts from the save file or use default values
 default_fruit_counts = {"gleamberry": 5, "flamefruit": 5, "shimmeringapple": 5, "etherealpear": 5, "moonbeammelon": 5}
@@ -223,7 +232,7 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
             image = pygame.image.load(image_filename)
             image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
             surface.blit(image, (x_offset, y_offset))
-        x_offset += 60  # Move left for the next slot
+        x_offset += 60  # Move ``left for the next slot
 
         # Draw outline if this slot is selected
         if i == selected_inventory_slot:
@@ -234,7 +243,7 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
     for fruit, image in fruit_images_dict.items():
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
-        x_offset += 60  # Move right for the next fruit
+        x_offset += 60  # Move          right for the next fruit
 
 # Function to draw dragons
 def draw_dragons(surface):
@@ -271,24 +280,49 @@ def determine_target(dragon):
         fruits_on_board.sort(key=lambda f: calculate_distance(dragon["rect"].topleft, f["position"]))
         return fruits_on_board[0]["position"]
     else:
-        targets = [d for d in dragons if d["gender"] != dragon["gender"]]
+        targets = [d for d in dragons if d["gender"] != dragon["gender"] and d.get("repulsor_tag") != dragon.get("repulsor_tag")]
         if targets:
             targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
             return targets[0]["rect"].topleft
     return None
-def compatibility_test(dragon1, dragon2):
+import random
+
+def get_unique_fruit_characteristic(dragon, fruit_characteristics):
+    current_characteristics = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
+    possible_characteristics = [char for char in fruit_characteristics if char not in current_characteristics]
+    if possible_characteristics:
+        return random.choice(possible_characteristics)
+    return None
+
+def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
     if dragon1["gender"] == dragon2["gender"]:
         return False
+    
     characteristics1 = set([dragon1["primary_characteristic"]] + dragon1["secondary_characteristics"])
     characteristics2 = set([dragon2["primary_characteristic"]] + dragon2["secondary_characteristics"])
+
+    # Add unique fruit characteristic for dragon1
+    if dragon1["holding_fruit"]:
+        fruit_characteristics = fruit_personality_keywords[dragon1["holding_fruit"]]
+        unique_fruit_char1 = get_unique_fruit_characteristic(dragon1, fruit_characteristics)
+        if unique_fruit_char1:
+            characteristics1.add(unique_fruit_char1)
+    
+    # Add unique fruit characteristic for dragon2
+    if dragon2["holding_fruit"]:
+        fruit_characteristics = fruit_personality_keywords[dragon2["holding_fruit"]]
+        unique_fruit_char2 = get_unique_fruit_characteristic(dragon2, fruit_characteristics)
+        if unique_fruit_char2:
+            characteristics2.add(unique_fruit_char2)
+    
     return bool(characteristics1 & characteristics2)
 
 # Function to move dragons
 def move_dragons():
+    global repulsor_counter
     for dragon in dragons:
         if not dragon["target"]:
             dragon["target"] = determine_target(dragon)
-            print(f"Dragon {dragon['name']} targeting {dragon['target']}")
         if dragon["target"]:
             dx, dy = dragon["target"][0] - dragon["rect"].x, dragon["target"][1] - dragon["rect"].y
             distance = math.sqrt(dx**2 + dy**2)
@@ -320,9 +354,36 @@ def move_dragons():
                         heart_position = ((dragon["rect"].x + other_dragon["rect"].x) // 2,
                                           (dragon["rect"].y + other_dragon["rect"].y) // 2)
                         hearts_on_board.append({"position": heart_position, "start_time": pygame.time.get_ticks()})
-                        if compatibility_test(dragon, other_dragon):
+                        
+                        # Compatibility test reporting
+                        char_set_1 = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
+                        char_set_2 = set([other_dragon["primary_characteristic"]] + other_dragon["secondary_characteristics"])
+
+                        if dragon["holding_fruit"]:
+                            fruit_char_1 = get_unique_fruit_characteristic(dragon, fruit_personality_keywords[dragon["holding_fruit"]])
+                            if fruit_char_1:
+                                char_set_1.add(fruit_char_1)
+                        if other_dragon["holding_fruit"]:
+                            fruit_char_2 = get_unique_fruit_characteristic(other_dragon, fruit_personality_keywords[other_dragon["holding_fruit"]])
+                            if fruit_char_2:
+                                char_set_2.add(fruit_char_2)
+
+                        print(f"Dragon {dragon['name']} characteristics: {char_set_1}")
+                        print(f"Dragon {other_dragon['name']} characteristics: {char_set_2}")
+
+                        compatible = compatibility_test(dragon, other_dragon, fruit_personality_keywords)
+                        print(f"Compatibility test between {dragon['name']} and {other_dragon['name']}: {'Compatible' if compatible else 'Not compatible'}")
+
+                        if compatible:
                             # Logic when dragons are compatible
                             pass
+                        else:
+                            # Assign unique repulsor tag
+                            repulsor_tag = f"repulsor_{repulsor_counter}"
+                            repulsor_counter += 1
+                            dragon["repulsor_tag"] = repulsor_tag
+                            other_dragon["repulsor_tag"] = repulsor_tag
+
                         dragon["target"] = None
                         other_dragon["target"] = None
                         collision_occurred = True
@@ -331,7 +392,6 @@ def move_dragons():
                 if not collision_occurred:
                     dragon["rect"].x = new_x
                     dragon["rect"].y = new_y
-                    print(f"Dragon {dragon['name']} moving to {dragon['rect'].topleft}")
 
             if distance < 5:  # Reached target
                 # Collect fruit if target is a fruit
@@ -340,7 +400,6 @@ def move_dragons():
                         if fruit["position"] == dragon["target"]:
                             dragon["holding_fruit"] = fruit["type"]
                             fruits_on_board.remove(fruit)
-                            print(f"Dragon {dragon['name']} collected {fruit['type']}")
                             break
                 dragon["target"] = determine_target(dragon)  # Reassign target
 
