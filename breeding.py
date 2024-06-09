@@ -75,6 +75,24 @@ fruit_personality_keywords = {
     "moonbeammelon": ["Angelic", "Unique", "Pure", "Self-righteous"]
 }
 
+tested_pairs = set()
+
+# Define the alleles and their dominance hierarchy
+allele_dominance = {
+    'B': 'Black',
+    'W': 'White',
+    'R': 'Rainbow',
+    'M': 'Metallic'
+}
+
+# Possible genotypes for each phenotype
+phenotype_to_genotypes = {
+    'Black': [('B', 'B'), ('B', 'W'), ('B', 'R'), ('B', 'M')],
+    'White': [('W', 'W'), ('W', 'R'), ('W', 'M')],
+    'Rainbow': [('R', 'R'), ('R', 'M')],
+    'Metallic': [('M', 'M')]
+}
+
 def draw_hearts(surface):
     current_time = pygame.time.get_ticks()
     for heart in hearts_on_board[:]:
@@ -178,6 +196,20 @@ random.shuffle(positions)
 def is_aspect_ratio_16_9(width, height):
     return abs((width / height) - (16 / 9)) < 0.01  # Allowing a small margin for floating point comparisons
 
+def assign_genotype(dragon):
+    phenotype = dragon["type"]  # Assuming 'type' is used for phenotype
+    if phenotype in ["Gold", "Silver", "Metal"]:
+        phenotype = "Metallic"
+    if phenotype == "Black":
+        genotype = random.choice(phenotype_to_genotypes["Black"])
+    elif phenotype == "White":
+        genotype = random.choice(phenotype_to_genotypes["White"])
+    elif phenotype == "Rainbow":
+        genotype = random.choice(phenotype_to_genotypes["Rainbow"])
+    else:
+        genotype = random.choice(phenotype_to_genotypes[phenotype])
+    dragon["genotype"] = genotype
+
 # Function to outline image
 def outline_image(image, color, thickness=3):
     mask = pygame.mask.from_surface(image)
@@ -186,7 +218,7 @@ def outline_image(image, color, thickness=3):
     pygame.draw.lines(outline_surface, color, True, outline, thickness)
     return outline_surface
 
-# Create dragon dictionary
+# Create dragon dictionary with valid genotypes
 for i, dragon_data in enumerate(selected_dragons):
     dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, dragon_data[1])
     dragon_image = pygame.image.load(dragon_image_path)
@@ -207,6 +239,11 @@ for i, dragon_data in enumerate(selected_dragons):
     dragon_image = outline_image(dragon_image, outline_color)
     
     initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
+
+    phenotype = dragon_data[2]
+    if phenotype in ["Gold", "Silver", "Metal"]:
+        phenotype = "Metallic"
+    genotype = random.choice(phenotype_to_genotypes[phenotype])
     
     dragon = {
         "id": dragon_data[0],
@@ -223,9 +260,14 @@ for i, dragon_data in enumerate(selected_dragons):
         "rect": dragon_image.get_rect(topleft=positions[i]),
         "speed": initial_speed,
         "target": None,
-        "holding_fruit": None
+        "holding_fruit": None,
+        "genotype": genotype
     }
     dragons.append(dragon)
+
+for dragon in dragons:
+    if "genotype" not in dragon:
+        assign_genotype(dragon)
 
 # Function to draw text
 def draw_text(surface, text, font, color, position):
@@ -264,7 +306,7 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
     for fruit, image in fruit_images_dict.items():
         surface.blit(image, (x_offset, y_offset))
         draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
-        x_offset += 60  # Move          right for the next fruit
+        x_offset += 60  # Move right for the next fruit
 
 # Function to draw dragons
 def draw_dragons(surface):
@@ -306,7 +348,6 @@ def determine_target(dragon):
             targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
             return targets[0]["rect"].topleft
     return None
-import random
 
 def get_unique_fruit_characteristic(dragon, fruit_characteristics):
     current_characteristics = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
@@ -338,63 +379,12 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
     
     return bool(characteristics1 & characteristics2)
 
-# Define the tracking set
-tested_pairs = set()
-
-def assign_genotype(dragon):
-    phenotype = dragon["type"]  # Assuming 'type' is used for phenotype
-    if phenotype == "Black":
-        dragon["genotype"] = random.choice(["Black-Black", "Black-White", "Black-Rainbow", "Black-Metallic"])
-    elif phenotype == "White":
-        dragon["genotype"] = random.choice(["White-White", "White-Rainbow", "White-Metallic"])
-    elif phenotype == "Rainbow":
-        dragon["genotype"] = random.choice(["Rainbow-Rainbow", "Rainbow-Metallic"])
-    elif phenotype in ["Metal", "Gold", "Silver"]:
-        dragon["genotype"] = "Metallic-Metallic"
-
-for dragon in dragons:
-    if "genotype" not in dragon:
-        assign_genotype(dragon)
-
-# Function to draw eggs on the game board
-eggs_on_board = []
-
-def draw_eggs_on_board(surface):
-    for egg in eggs_on_board:
-        surface.blit(egg["image"], egg["rect"].topleft)
-# Define the alleles and their dominance hierarchy
-allele_dominance = {
-    'B': 'Black',
-    'W': 'White',
-    'R': 'Rainbow',
-    'M': 'Metallic'
-}
-
-# Possible genotypes for each phenotype
-phenotype_to_genotypes = {
-    'Black': [('B', 'B'), ('B', 'W'), ('B', 'R'), ('B', 'M')],
-    'White': [('W', 'W'), ('W', 'R'), ('W', 'M')],
-    'Rainbow': [('R', 'R'), ('R', 'M')],
-    'Metallic': [('M', 'M')]
-}
-
 def get_egg_genotype(parent1, parent2):
-    allele1 = random.choice(parent1["genotype"].split('-'))
-    allele2 = random.choice(parent2["genotype"].split('-'))
-    return f"{allele1}-{allele2}"
+    allele1 = random.choice(parent1["genotype"])
+    allele2 = random.choice(parent2["genotype"])
+    return (allele1, allele2)
 
-def determine_egg_phenotype(genotype):
-    if "Black" in genotype:
-        return "Black", egg_images_dict["Black"]
-    elif "White" in genotype:
-        return "White", egg_images_dict["White"]
-    elif "Rainbow" in genotype:
-        return "Rainbow", egg_images_dict["Rainbow"]
-    else:
-        return "Metallic", egg_images_dict["Metallic"]
 def determine_phenotype(genotype):
-    allele1, allele2 = genotype
-    # Check for dominance hierarchy
     if 'B' in genotype:
         return 'Black'
     elif 'W' in genotype:
@@ -405,10 +395,7 @@ def determine_phenotype(genotype):
         return 'Metallic'
 
 def create_egg(dragon1, dragon2, position):
-    # Randomly select one allele from each parent
-    parent1_allele = random.choice(dragon1["genotype"])
-    parent2_allele = random.choice(dragon2["genotype"])
-    egg_genotype = (parent1_allele, parent2_allele)
+    egg_genotype = get_egg_genotype(dragon1, dragon2)
     egg_phenotype = determine_phenotype(egg_genotype)
     egg_image = egg_images_dict[egg_phenotype]
     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position}")
@@ -419,6 +406,17 @@ def create_egg(dragon1, dragon2, position):
         "image": egg_image,
         "rect": egg_image.get_rect(topleft=position)
     })
+
+# Function to draw eggs on the game board
+eggs_on_board = []
+
+def draw_eggs_on_board(surface):
+    for egg in eggs_on_board:
+        surface.blit(egg["image"], egg["rect"].topleft)
+
+for dragon in dragons:
+    if "genotype" not in dragon:
+        assign_genotype(dragon)
 
 # Function to move dragons
 def move_dragons():
@@ -495,7 +493,6 @@ def move_dragons():
                             break
                 dragon["target"] = determine_target(dragon)  # Reassign target
 
-
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
@@ -510,9 +507,6 @@ def place_fruit(x, y, selected_fruit):
                 dragon["target"] = determine_target(dragon)
         print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
 
-# Main game loop with interactivity
-# Main game loop with interactivity
-# Main game loop with interactivity
 # Main game loop with interactivity
 def main():
     running = True
@@ -551,8 +545,6 @@ def main():
         clock.tick(10)  # Set the frame rate to 10 FPS
 
     pygame.quit()
-
-
 
 if __name__ == "__main__":
     main()
