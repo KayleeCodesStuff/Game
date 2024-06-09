@@ -320,10 +320,54 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
 # Define the tracking set
 tested_pairs = set()
 
+def assign_genotype(dragon):
+    phenotype = dragon["type"]  # Assuming 'type' is used for phenotype
+    if phenotype == "Black":
+        dragon["genotype"] = random.choice(["Black-Black", "Black-White", "Black-Rainbow", "Black-Metallic"])
+    elif phenotype == "White":
+        dragon["genotype"] = random.choice(["White-White", "White-Rainbow", "White-Metallic"])
+    elif phenotype == "Rainbow":
+        dragon["genotype"] = random.choice(["Rainbow-Rainbow", "Rainbow-Metallic"])
+    elif phenotype in ["Metal", "Gold", "Silver"]:
+        dragon["genotype"] = "Metallic-Metallic"
+
+for dragon in dragons:
+    if "genotype" not in dragon:
+        assign_genotype(dragon)
+
+eggs_on_board = []
+
+def get_egg_genotype(parent1, parent2):
+    allele1 = random.choice(parent1["genotype"].split('-'))
+    allele2 = random.choice(parent2["genotype"].split('-'))
+    return f"{allele1}-{allele2}"
+
+def determine_egg_phenotype(genotype):
+    if "Black" in genotype:
+        return "Black", "black_egg.png"
+    elif "White" in genotype:
+        return "White", "white_egg.png"
+    elif "Rainbow" in genotype:
+        return "Rainbow", "rainbow_egg.png"
+    else:
+        return "Metallic", "metallic_egg.png"
+
+def create_egg(dragon1, dragon2, position):
+    egg_genotype = get_egg_genotype(dragon1, dragon2)
+    egg_phenotype, egg_image = determine_egg_phenotype(egg_genotype)
+    egg = {
+        "genotype": egg_genotype,
+        "phenotype": egg_phenotype,
+        "image": pygame.image.load(egg_image),
+        "rect": pygame.image.load(egg_image).get_rect(topleft=position)
+    }
+    eggs_on_board.append(egg)
+
+
 # Function to move dragons
 def move_dragons():
     global repulsor_counter
-    for dragon in dragons:
+    for dragon in dragons[:]:
         if not dragon["target"]:
             dragon["target"] = determine_target(dragon)
         if dragon["target"]:
@@ -381,8 +425,10 @@ def move_dragons():
                             print(f"Compatibility test between {dragon['name']} and {other_dragon['name']}: {'Compatible' if compatible else 'Not compatible'}")
 
                             if compatible:
-                                # Logic when dragons are compatible
-                                pass
+                                # Create egg and remove dragons
+                                create_egg(dragon, other_dragon, heart_position)
+                                dragons.remove(dragon)
+                                dragons.remove(other_dragon)
                             else:
                                 # Assign unique repulsor tag
                                 repulsor_tag = f"repulsor_{repulsor_counter}"
