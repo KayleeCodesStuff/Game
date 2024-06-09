@@ -2,6 +2,7 @@ import pygame
 import sqlite3
 import os
 import random
+import math
 from tkinter import Tk, filedialog
 
 # Constants
@@ -11,6 +12,10 @@ RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 BACKGROUND_IMAGE = "breedingbackground.png"
 DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
+FRUIT_SPEED_MODIFIERS = {
+    "gleamberry": -0.5,
+    "shimmeringapple": 0.5,
+}
 
 # Initialize Pygame
 pygame.init()
@@ -18,6 +23,7 @@ pygame.font.init()  # Initialize the font module
 
 # Define font
 small_font = pygame.font.Font(None, 24)
+large_font = pygame.font.Font(None, 36)
 
 # Load background image
 background = pygame.image.load(BACKGROUND_IMAGE)
@@ -147,6 +153,8 @@ for i, dragon_data in enumerate(selected_dragons):
     
     dragon_image = pygame.transform.scale(dragon_image, new_size)
     
+    initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
+    
     dragon = {
         "id": dragon_data[0],
         "name": dragon_data[3],
@@ -159,14 +167,19 @@ for i, dragon_data in enumerate(selected_dragons):
         "nurture": dragon_data[9],
         "gender": dragon_data[10],
         "image": dragon_image,
-        "position": positions[i]
+        "position": list(positions[i]),  # Convert tuple to list for mutability
+        "speed": initial_speed,
+        "target": None,
+        "holding_fruit": None
     }
     dragons.append(dragon)
 
-def draw_text(surface, text, font, color, rect):
+# Function to draw text
+def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
-    surface.blit(text_surface, (rect.x + (rect.width - text_surface.get_width()) // 2, rect.y + (rect.height - text_surface.get_height()) // 2))
+    surface.blit(text_surface, position)
 
+# Function to draw inventory
 def draw_inventory(surface, inventory, selected_inventory_slot=None):
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
 
@@ -180,7 +193,7 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
             pygame.draw.rect(surface, RED, box_rect, 3)  # Highlight selected slot
         if slot is None:
             # Draw empty slot with ?
-            draw_text(surface, "?", small_font, WHITE, box_rect)
+            draw_text(surface, "?", small_font, WHITE, (x_offset + 15, y_offset + 15))
         else:
             color, image_filename = slot
             pygame.draw.rect(surface, color, box_rect)
@@ -197,19 +210,77 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
     x_offset = 10  # Reset x_offset for fruit images
     for fruit, image in fruit_images_dict.items():
         surface.blit(image, (x_offset, y_offset))
-        draw_text(surface, str(inventory[fruit]), small_font, WHITE, pygame.Rect(x_offset + 20, y_offset + 45, 30, 30))
+        draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
         x_offset += 60  # Move right for the next fruit
 
 # Function to draw dragons
 def draw_dragons(surface):
     for dragon in dragons:
         surface.blit(dragon["image"], dragon["position"])
+        gender_symbol = "♂" if dragon["gender"] == "Male" else "♀"
+        draw_text(surface, gender_symbol, large_font, RED, (dragon["position"][0], dragon["position"][1] - 30))
+        if dragon["holding_fruit"]:
+            fruit_image = fruit_images_dict[dragon["holding_fruit"]]
+            surface.blit(fruit_image, (dragon["position"][0] + 25, dragon["position"][1] + 25))
 
 # Function to draw fruits on the game board
 fruits_on_board = []
+
+def spawn_fruits():
+    fruit_types = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear"]
+    for fruit_type in fruit_types:
+        while True:
+            x, y = random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150)
+            # Ensure fruits do not spawn on top of dragons
+            if all(calculate_distance((x, y), dragon["position"]) > 50 for dragon in dragons):
+                fruits_on_board.append({"type": fruit_type, "position": (x, y)})
+                break
+
 def draw_fruits_on_board(surface):
     for fruit in fruits_on_board:
         surface.blit(fruit_images_dict[fruit["type"]], fruit["position"])
+
+# Function to calculate distance between two points
+def calculate_distance(pos1, pos2):
+    return math.sqrt((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2)
+
+# Function to determine target for a dragon
+def determine_target(dragon):
+    if dragon["holding_fruit"] == "flamefruit":
+        targets = [d for d in dragons if d["holding_fruit"] == "flamefruit" and d["id"] != dragon["id"]]
+        if targets:
+            targets.sort(key=lambda d: calculate_distance(dragon["position"], d["position"]))
+            return targets[0]["position"]
+    elif dragon["holding_fruit"]:
+        targets = [d for d in dragons if d["gender"] != dragon["gender"]]
+        if targets:
+            targets.sort(key=lambda d: calculate_distance(dragon["position"], d["position"]))
+            return targets[0]["position"]
+    else:
+        if fruits_on_board:
+            fruits_on_board.sort(key=lambda f: calculate_distance(dragon["position"], f["position"]))
+            return fruits_on_board[0]["position"]
+    return None
+
+# Function to move dragons
+def move_dragons():
+    for dragon in dragons:
+        if not dragon["target"]:
+            dragon["target"] = determine_target(dragon)
+            print(f"Dragon {dragon['name']} targeting {dragon['target']}")
+        if dragon["target"]:
+            dx, dy = dragon["target"][0] - dragon["position"][0], dragon["target"][1] - dragon["position"][1]
+            distance = math.sqrt(dx**2 + dy**2)
+            if distance > 0:
+                dx, dy = dx / distance, dy / distance  # Normalize
+                speed_modifier = FRUIT_SPEED_MODIFIERS.get(dragon["holding_fruit"], 0)
+                dragon["speed"] = 1.5 + speed_modifier  # Ensure speed is recalculated correctly
+                dragon["position"][0] += dx * dragon["speed"]
+                dragon["position"][1] += dy * dragon["speed"]
+                print(f"Dragon {dragon['name']} moving to {dragon['position']}")
+            if distance < 5:  # Reached target
+                dragon["target"] = None
+                print(f"Dragon {dragon['name']} reached the target")
 
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -220,6 +291,7 @@ def main():
     running = True
     selected_inventory_slot = None
     selected_fruit = None
+    spawn_fruits()  # Spawn initial fruits on the board
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -237,6 +309,8 @@ def main():
                     fruits_on_board.append({"type": selected_fruit, "position": (x - 25, y - 25)})
                     fruit_counts[selected_fruit] -= 1
                     selected_fruit = None
+
+        move_dragons()  # Update dragon positions
 
         screen.fill((0, 0, 0))  # Clear the screen with black
         screen.blit(background, (0, 0))  # Draw background image
