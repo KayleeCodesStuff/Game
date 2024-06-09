@@ -46,6 +46,27 @@ heart_image = pygame.image.load("heart.png")
 heart_image = pygame.transform.scale(heart_image, (30, 30))
 hearts_on_board = []
 
+# Load and resize egg images
+black_egg = pygame.image.load("black_egg.png")
+black_egg = pygame.transform.scale(black_egg, (50, 50))
+
+white_egg = pygame.image.load("white_egg.png")
+white_egg = pygame.transform.scale(white_egg, (50, 50))
+
+rainbow_egg = pygame.image.load("rainbow_egg.png")
+rainbow_egg = pygame.transform.scale(rainbow_egg, (50, 50))
+
+metallic_egg = pygame.image.load("metallic_egg.png")
+metallic_egg = pygame.transform.scale(metallic_egg, (50, 50))
+
+# Create a dictionary for egg images
+egg_images_dict = {
+    "Black": black_egg,
+    "White": white_egg,
+    "Rainbow": rainbow_egg,
+    "Metallic": metallic_egg
+}
+
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
     "flamefruit": ["Distraction", "Fierce", "Fiery", "Showy"],
@@ -335,7 +356,27 @@ for dragon in dragons:
     if "genotype" not in dragon:
         assign_genotype(dragon)
 
+# Function to draw eggs on the game board
 eggs_on_board = []
+
+def draw_eggs_on_board(surface):
+    for egg in eggs_on_board:
+        surface.blit(egg["image"], egg["rect"].topleft)
+# Define the alleles and their dominance hierarchy
+allele_dominance = {
+    'B': 'Black',
+    'W': 'White',
+    'R': 'Rainbow',
+    'M': 'Metallic'
+}
+
+# Possible genotypes for each phenotype
+phenotype_to_genotypes = {
+    'Black': [('B', 'B'), ('B', 'W'), ('B', 'R'), ('B', 'M')],
+    'White': [('W', 'W'), ('W', 'R'), ('W', 'M')],
+    'Rainbow': [('R', 'R'), ('R', 'M')],
+    'Metallic': [('M', 'M')]
+}
 
 def get_egg_genotype(parent1, parent2):
     allele1 = random.choice(parent1["genotype"].split('-'))
@@ -344,25 +385,40 @@ def get_egg_genotype(parent1, parent2):
 
 def determine_egg_phenotype(genotype):
     if "Black" in genotype:
-        return "Black", "black_egg.png"
+        return "Black", egg_images_dict["Black"]
     elif "White" in genotype:
-        return "White", "white_egg.png"
+        return "White", egg_images_dict["White"]
     elif "Rainbow" in genotype:
-        return "Rainbow", "rainbow_egg.png"
+        return "Rainbow", egg_images_dict["Rainbow"]
     else:
-        return "Metallic", "metallic_egg.png"
+        return "Metallic", egg_images_dict["Metallic"]
+def determine_phenotype(genotype):
+    allele1, allele2 = genotype
+    # Check for dominance hierarchy
+    if 'B' in genotype:
+        return 'Black'
+    elif 'W' in genotype:
+        return 'White'
+    elif 'R' in genotype:
+        return 'Rainbow'
+    else:
+        return 'Metallic'
 
 def create_egg(dragon1, dragon2, position):
-    egg_genotype = get_egg_genotype(dragon1, dragon2)
-    egg_phenotype, egg_image = determine_egg_phenotype(egg_genotype)
-    print(f"Created egg with genotype {egg_genotype} and phenotype {egg_phenotype}")
-    egg = {
+    # Randomly select one allele from each parent
+    parent1_allele = random.choice(dragon1["genotype"])
+    parent2_allele = random.choice(dragon2["genotype"])
+    egg_genotype = (parent1_allele, parent2_allele)
+    egg_phenotype = determine_phenotype(egg_genotype)
+    egg_image = egg_images_dict[egg_phenotype]
+    print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position}")
+
+    eggs_on_board.append({
         "genotype": egg_genotype,
         "phenotype": egg_phenotype,
-        "image": pygame.image.load(egg_image),
-        "rect": pygame.image.load(egg_image).get_rect(topleft=position)
-    }
-    eggs_on_board.append(egg)
+        "image": egg_image,
+        "rect": egg_image.get_rect(topleft=position)
+    })
 
 # Function to move dragons
 def move_dragons():
@@ -456,6 +512,8 @@ def place_fruit(x, y, selected_fruit):
 
 # Main game loop with interactivity
 # Main game loop with interactivity
+# Main game loop with interactivity
+# Main game loop with interactivity
 def main():
     running = True
     selected_inventory_slot = None
@@ -486,12 +544,15 @@ def main():
         draw_inventory(screen, fruit_counts, selected_inventory_slot)
         draw_dragons(screen)
         draw_fruits_on_board(screen)
+        draw_eggs_on_board(screen)  # Draw eggs on the board
         draw_hearts(screen)  # Draw hearts on the board
         pygame.display.flip()  # Update the display
 
         clock.tick(10)  # Set the frame rate to 10 FPS
 
     pygame.quit()
+
+
 
 if __name__ == "__main__":
     main()
