@@ -317,6 +317,7 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
     
     return bool(characteristics1 & characteristics2)
 
+
 # Function to move dragons
 def move_dragons():
     global repulsor_counter
