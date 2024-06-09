@@ -317,6 +317,8 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
     
     return bool(characteristics1 & characteristics2)
 
+# Define the tracking set
+tested_pairs = set()
 
 # Function to move dragons
 def move_dragons():
@@ -352,43 +354,46 @@ def move_dragons():
                 collision_occurred = False
                 for other_dragon in dragons:
                     if other_dragon["id"] != dragon["id"] and dragon_rect_copy.colliderect(other_dragon["rect"]):
-                        heart_position = ((dragon["rect"].x + other_dragon["rect"].x) // 2,
-                                          (dragon["rect"].y + other_dragon["rect"].y) // 2)
-                        hearts_on_board.append({"position": heart_position, "start_time": pygame.time.get_ticks()})
-                        
-                        # Compatibility test reporting
-                        char_set_1 = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
-                        char_set_2 = set([other_dragon["primary_characteristic"]] + other_dragon["secondary_characteristics"])
+                        pair = tuple(sorted((dragon["id"], other_dragon["id"])))
+                        if pair not in tested_pairs:
+                            tested_pairs.add(pair)
+                            heart_position = ((dragon["rect"].x + other_dragon["rect"].x) // 2,
+                                              (dragon["rect"].y + other_dragon["rect"].y) // 2)
+                            hearts_on_board.append({"position": heart_position, "start_time": pygame.time.get_ticks()})
+                            
+                            # Compatibility test reporting
+                            char_set_1 = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
+                            char_set_2 = set([other_dragon["primary_characteristic"]] + other_dragon["secondary_characteristics"])
 
-                        if dragon["holding_fruit"]:
-                            fruit_char_1 = get_unique_fruit_characteristic(dragon, fruit_personality_keywords[dragon["holding_fruit"]])
-                            if fruit_char_1:
-                                char_set_1.add(fruit_char_1)
-                        if other_dragon["holding_fruit"]:
-                            fruit_char_2 = get_unique_fruit_characteristic(other_dragon, fruit_personality_keywords[other_dragon["holding_fruit"]])
-                            if fruit_char_2:
-                                char_set_2.add(fruit_char_2)
+                            if dragon["holding_fruit"]:
+                                fruit_char_1 = get_unique_fruit_characteristic(dragon, fruit_personality_keywords[dragon["holding_fruit"]])
+                                if fruit_char_1:
+                                    char_set_1.add(fruit_char_1)
+                            if other_dragon["holding_fruit"]:
+                                fruit_char_2 = get_unique_fruit_characteristic(other_dragon, fruit_personality_keywords[other_dragon["holding_fruit"]])
+                                if fruit_char_2:
+                                    char_set_2.add(fruit_char_2)
 
-                        print(f"Dragon {dragon['name']} characteristics: {char_set_1}")
-                        print(f"Dragon {other_dragon['name']} characteristics: {char_set_2}")
+                            print(f"Dragon {dragon['name']} characteristics: {char_set_1}")
+                            print(f"Dragon {other_dragon['name']} characteristics: {char_set_2}")
 
-                        compatible = compatibility_test(dragon, other_dragon, fruit_personality_keywords)
-                        print(f"Compatibility test between {dragon['name']} and {other_dragon['name']}: {'Compatible' if compatible else 'Not compatible'}")
+                            compatible = compatibility_test(dragon, other_dragon, fruit_personality_keywords)
+                            print(f"Compatibility test between {dragon['name']} and {other_dragon['name']}: {'Compatible' if compatible else 'Not compatible'}")
 
-                        if compatible:
-                            # Logic when dragons are compatible
-                            pass
-                        else:
-                            # Assign unique repulsor tag
-                            repulsor_tag = f"repulsor_{repulsor_counter}"
-                            repulsor_counter += 1
-                            dragon["repulsor_tag"] = repulsor_tag
-                            other_dragon["repulsor_tag"] = repulsor_tag
+                            if compatible:
+                                # Logic when dragons are compatible
+                                pass
+                            else:
+                                # Assign unique repulsor tag
+                                repulsor_tag = f"repulsor_{repulsor_counter}"
+                                repulsor_counter += 1
+                                dragon["repulsor_tag"] = repulsor_tag
+                                other_dragon["repulsor_tag"] = repulsor_tag
 
-                        dragon["target"] = None
-                        other_dragon["target"] = None
-                        collision_occurred = True
-                        break
+                            dragon["target"] = None
+                            other_dragon["target"] = None
+                            collision_occurred = True
+                            break
 
                 if not collision_occurred:
                     dragon["rect"].x = new_x
