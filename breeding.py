@@ -1,13 +1,15 @@
 import pygame
 import sqlite3
-from tkinter import Tk, filedialog
 import os
+from tkinter import Tk, filedialog
 
 # Constants
 WIDTH, HEIGHT = 800, 600
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
+BACKGROUND_IMAGE = "breedingbackground.png"
+DRAGON_IMAGE = "dragon.png"  # Placeholder image for dragons
 
 # Initialize Pygame
 pygame.init()
@@ -15,6 +17,10 @@ pygame.font.init()  # Initialize the font module
 
 # Define font
 small_font = pygame.font.Font(None, 24)
+
+# Load background image
+background = pygame.image.load(BACKGROUND_IMAGE)
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 
 # Fruit images
 ethereal_pear = pygame.image.load("etherealpear.png")
@@ -33,20 +39,66 @@ fruit_images_dict = dict(zip(fruit_names, fruit_images))
 default_fruit_counts = {"gleamberry": 5, "flamefruit": 5, "shimmeringapple": 5, "etherealpear": 5, "moonbeammelon": 5}
 fruit_counts = default_fruit_counts.copy()
 
-save_file = "/mnt/data/save.db"
-if os.path.exists(save_file):
-    try:
-        conn = sqlite3.connect(save_file)
+save_file = os.path.join(os.getcwd(), "save.db")
+if not os.path.exists(save_file):
+    def select_or_create_file():
+        root = Tk()
+        root.withdraw()  # Hide the main tkinter window
+        file_path = filedialog.asksaveasfilename(defaultextension=".db",
+                                                 filetypes=[("SQLite database", "*.db"), ("JSON file", "*.json")],
+                                                 title="Select or Create File")
+        return file_path
+
+    save_file = select_or_create_file()
+    if not save_file:
+        save_file = os.path.join(os.getcwd(), "save.db")
+    
+    def initialize_file(file_path):
+        conn = sqlite3.connect(file_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT fruit, count FROM inventory")
-        rows = cursor.fetchall()
-        for row in rows:
-            fruit, count = row
-            fruit_counts[fruit] = count
+        
+        # Create elixirs table
+        cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs (
+                            id INTEGER PRIMARY KEY,
+                            rgb TEXT,
+                            title TEXT,
+                            primary_trait TEXT,
+                            secondary_traits TEXT,
+                            image_file TEXT,
+                            position INTEGER
+                          )''')
+        
+        # Create inventory table with fruit as UNIQUE
+        cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
+                            id INTEGER PRIMARY KEY,
+                            fruit TEXT UNIQUE,
+                            count INTEGER
+                          )''')
+        
+        # Insert default fruit counts
+        for fruit, count in default_fruit_counts.items():
+            cursor.execute("INSERT INTO inventory (fruit, count) VALUES (?, ?)", (fruit, count))
+        
+        conn.commit()
         conn.close()
-    except Exception as e:
-        print(f"Error loading save file: {e}")
-        fruit_counts = default_fruit_counts.copy()
+    
+    initialize_file(save_file)
+
+try:
+    conn = sqlite3.connect(save_file)
+    cursor = conn.cursor()
+    cursor.execute("SELECT fruit, count FROM inventory")
+    rows = cursor.fetchall()
+    for row in rows:
+        fruit, count = row
+        fruit_counts[fruit] = count
+    conn.close()
+except Exception as e:
+    print(f"Error loading save file: {e}")
+    fruit_counts = default_fruit_counts.copy()
+
+# Placeholder for dragons
+dragons = []
 
 def draw_text(surface, text, font, color, rect):
     text_surface = font.render(text, True, color)
@@ -85,53 +137,49 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
         draw_text(surface, str(inventory[fruit]), small_font, WHITE, pygame.Rect(x_offset + 20, y_offset + 45, 30, 30))
         x_offset += 60  # Move right for the next fruit
 
-def select_or_create_file():
-    root = Tk()
-    root.withdraw()  # Hide the main tkinter window
-    file_path = filedialog.asksaveasfilename(defaultextension=".db",
-                                             filetypes=[("SQLite database", "*.db"), ("JSON file", "*.json")],
-                                             title="Select or Create File")
-    return file_path
+# Function to draw dragons
+def draw_dragons(surface):
+    for dragon in dragons:
+        surface.blit(dragon["image"], dragon["position"])
 
-def initialize_file(file_path):
-    conn = sqlite3.connect(file_path)
-    cursor = conn.cursor()
-    
-    # Create elixirs table
-    cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs (
-                        id INTEGER PRIMARY KEY,
-                        rgb TEXT,
-                        title TEXT,
-                        primary_trait TEXT,
-                        secondary_traits TEXT,
-                        image_file TEXT,
-                        position INTEGER
-                      )''')
-    
-    # Create inventory table with fruit as UNIQUE
-    cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
-                        id INTEGER PRIMARY KEY,
-                        fruit TEXT UNIQUE,
-                        count INTEGER
-                      )''')
-    
-    conn.commit()
-    conn.close()
+# Function to draw fruits on the game board
+fruits_on_board = []
+def draw_fruits_on_board(surface):
+    for fruit in fruits_on_board:
+        surface.blit(fruit_images_dict[fruit["type"]], fruit["position"])
 
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
 
+# Main game loop with interactivity
 def main():
     running = True
     selected_inventory_slot = None
+    selected_fruit = None
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                x, y = mouse_pos
+                # Check if clicking on a fruit in the inventory
+                if y > HEIGHT - 100:
+                    slot_index = (x - 10) // 60
+                    if 0 <= slot_index < len(fruit_names):
+                        selected_fruit = fruit_names[slot_index]
+                # Place fruit on board
+                elif selected_fruit and fruit_counts[selected_fruit] > 0:
+                    fruits_on_board.append({"type": selected_fruit, "position": (x - 25, y - 25)})
+                    fruit_counts[selected_fruit] -= 1
+                    selected_fruit = None
 
         screen.fill((0, 0, 0))  # Clear the screen with black
+        screen.blit(background, (0, 0))  # Draw background image
         draw_inventory(screen, fruit_counts, selected_inventory_slot)
+        draw_dragons(screen)
+        draw_fruits_on_board(screen)
         pygame.display.flip()  # Update the display
 
     pygame.quit()
