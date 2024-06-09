@@ -1,6 +1,7 @@
 import pygame
 import sqlite3
 import os
+import random
 from tkinter import Tk, filedialog
 
 # Constants
@@ -9,7 +10,7 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 BACKGROUND_IMAGE = "breedingbackground.png"
-DRAGON_IMAGE = "dragon.png"  # Placeholder image for dragons
+DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
 
 # Initialize Pygame
 pygame.init()
@@ -97,8 +98,70 @@ except Exception as e:
     print(f"Error loading save file: {e}")
     fruit_counts = default_fruit_counts.copy()
 
+# Load dragons from the database
+conn = sqlite3.connect("dragonbreeding.db")
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM dragons")
+all_dragons = cursor.fetchall()
+conn.close()
+
+# Randomly select 10 unique dragons ensuring a mix of genders
+selected_dragons = random.sample(all_dragons, 10)
+male_dragons = [d for d in selected_dragons if d[-1] == "Male"]
+female_dragons = [d for d in selected_dragons if d[-1] == "Female"]
+
+# Ensure there are both genders
+if len(male_dragons) == 0 or len(female_dragons) == 0:
+    print("Not enough dragons of both genders in the selection, please check the database.")
+    exit()
+
 # Placeholder for dragons
 dragons = []
+
+# Generate positions for dragons (ensure at least 10 positions)
+positions = [(x * WIDTH // 4, y * HEIGHT // 4) for x in range(1, 4) for y in range(1, 4)]
+while len(positions) < 9:
+    positions.append((random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150)))  # Add random positions if not enough
+positions = positions[:9]  # Ensure exactly 9 positions
+positions.append((WIDTH // 2, 0))  # Position the 10th dragon at the top center
+random.shuffle(positions)
+
+def is_aspect_ratio_16_9(width, height):
+    return abs((width / height) - (16 / 9)) < 0.01  # Allowing a small margin for floating point comparisons
+
+# Create dragon dictionary
+for i, dragon_data in enumerate(selected_dragons):
+    dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, dragon_data[1])
+    dragon_image = pygame.image.load(dragon_image_path)
+    
+    width, height = dragon_image.get_size()
+    if is_aspect_ratio_16_9(width, height):
+        scale_factor = 50 / min(width, height)
+        new_size = (int(width * scale_factor), int(height * scale_factor))
+    else:
+        # Scale to fit within a 50x50 box while preserving aspect ratio
+        if width > height:
+            new_size = (50, int(50 * (height / width)))
+        else:
+            new_size = (int(50 * (width / height)), 50)
+    
+    dragon_image = pygame.transform.scale(dragon_image, new_size)
+    
+    dragon = {
+        "id": dragon_data[0],
+        "name": dragon_data[3],
+        "type": dragon_data[2],
+        "primary_characteristic": dragon_data[4],
+        "secondary_characteristics": dragon_data[5].split(','),
+        "special_abilities": dragon_data[6],
+        "description": dragon_data[7],
+        "rgb_value_range": dragon_data[8],
+        "nurture": dragon_data[9],
+        "gender": dragon_data[10],
+        "image": dragon_image,
+        "position": positions[i]
+    }
+    dragons.append(dragon)
 
 def draw_text(surface, text, font, color, rect):
     text_surface = font.render(text, True, color)
