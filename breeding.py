@@ -315,6 +315,16 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
 
 # Main game loop with interactivity
+def place_fruit(x, y, selected_fruit):
+    if selected_fruit and fruit_counts[selected_fruit] > 0:
+        fruits_on_board.append({"type": selected_fruit, "position": (x - 25, y - 25)})
+        fruit_counts[selected_fruit] -= 1
+        for dragon in dragons:
+            if not dragon["holding_fruit"]:
+                dragon["target"] = determine_target(dragon)
+        print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
+
+# Main game loop with interactivity
 def main():
     running = True
     selected_inventory_slot = None
@@ -334,9 +344,8 @@ def main():
                     if 0 <= slot_index < len(fruit_names):
                         selected_fruit = fruit_names[slot_index]
                 # Place fruit on board
-                elif selected_fruit and fruit_counts[selected_fruit] > 0:
-                    fruits_on_board.append({"type": selected_fruit, "position": (x - 25, y - 25)})
-                    fruit_counts[selected_fruit] -= 1
+                else:
+                    place_fruit(x, y, selected_fruit)
                     selected_fruit = None
 
         move_dragons()  # Update dragon positions
