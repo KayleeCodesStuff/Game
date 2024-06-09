@@ -273,15 +273,52 @@ for dragon in dragons:
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, position)
+def handle_egg_collection(mouse_pos, egg_counts):
+    for egg in eggs_on_board:
+        if egg["rect"].collidepoint(mouse_pos):
+            egg_counts[egg["phenotype"]] += 1
+            eggs_on_board.remove(egg)
+            save_inventory_to_db(egg_counts)
+            break
+
+def save_inventory_to_db(egg_counts):
+    try:
+        conn = sqlite3.connect(save_file)
+        cursor = conn.cursor()
+        for fruit, count in fruit_counts.items():
+            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
+        for egg, count in egg_counts.items():
+            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, egg))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving inventory to database: {e}")
 
 # Function to draw inventory
-def draw_inventory(surface, inventory, selected_inventory_slot=None):
+def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
 
-    # Example inventory slots for potions (assuming inventory_slots is defined elsewhere)
-    inventory_slots = [None] * 5  # Placeholder for actual inventory slot data
-    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
-    y_offset = HEIGHT - 90
+    y_offset = HEIGHT - 90  # Define y_offset for consistency
+
+    # Draw the fruits in the first section
+    x_offset = 10
+    for fruit, image in fruit_images_dict.items():
+        surface.blit(image, (x_offset, y_offset))
+        draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
+        x_offset += 60
+
+    # Draw a separator line
+    pygame.draw.line(surface, WHITE, (x_offset, HEIGHT - 100), (x_offset, HEIGHT))
+
+    # Draw the eggs in the second section
+    x_offset += 10  # Add some padding after the separator
+    for egg_type, count in eggs.items():
+        egg_image = egg_images_dict[egg_type]
+        surface.blit(egg_image, (x_offset, y_offset))
+        draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
+        x_offset += 60
+
+    # Draw the elixirs in the third section
     for i, slot in enumerate(inventory_slots):
         box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
         if i == selected_inventory_slot:
@@ -295,18 +332,11 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
             image = pygame.image.load(image_filename)
             image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
             surface.blit(image, (x_offset, y_offset))
-        x_offset += 60  # Move ``left for the next slot
+        x_offset += 60  # Move right for the next slot
 
         # Draw outline if this slot is selected
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
-
-    # Draw the fruits in the remaining space
-    x_offset = 10  # Reset x_offset for fruit images
-    for fruit, image in fruit_images_dict.items():
-        surface.blit(image, (x_offset, y_offset))
-        draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
-        x_offset += 60  # Move right for the next fruit
 
 # Function to draw dragons
 def draw_dragons(surface):
@@ -506,6 +536,18 @@ def place_fruit(x, y, selected_fruit):
             if not dragon["holding_fruit"]:
                 dragon["target"] = determine_target(dragon)
         print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
+def save_inventory_to_db(egg_counts):
+    try:
+        conn = sqlite3.connect(save_file)
+        cursor = conn.cursor()
+        for fruit, count in fruit_counts.items():
+            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
+        for egg, count in egg_counts.items():
+            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, egg))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving inventory to database: {e}")
 
 # Main game loop with interactivity
 def main():
@@ -514,6 +556,13 @@ def main():
     selected_fruit = None
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
+
+    # Initialize egg counts
+    egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+
+    # Initialize inventory slots for elixirs
+    inventory_slots = [None] * 5  # Placeholder for actual inventory slot data
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -531,11 +580,14 @@ def main():
                     place_fruit(x, y, selected_fruit)
                     selected_fruit = None
 
+                # Handle egg collection
+                handle_egg_collection(mouse_pos, egg_counts)
+
         move_dragons()  # Update dragon positions
 
         screen.fill((0, 0, 0))  # Clear the screen with black
         screen.blit(background, (0, 0))  # Draw background image
-        draw_inventory(screen, fruit_counts, selected_inventory_slot)
+        draw_inventory(screen, fruit_counts, egg_counts, inventory_slots, selected_inventory_slot)
         draw_dragons(screen)
         draw_fruits_on_board(screen)
         draw_eggs_on_board(screen)  # Draw eggs on the board
@@ -548,3 +600,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
