@@ -135,6 +135,14 @@ random.shuffle(positions)
 def is_aspect_ratio_16_9(width, height):
     return abs((width / height) - (16 / 9)) < 0.01  # Allowing a small margin for floating point comparisons
 
+# Function to outline image
+def outline_image(image, color, thickness=3):
+    mask = pygame.mask.from_surface(image)
+    outline = mask.outline()
+    outline_surface = image.copy()
+    pygame.draw.lines(outline_surface, color, True, outline, thickness)
+    return outline_surface
+
 # Create dragon dictionary
 for i, dragon_data in enumerate(selected_dragons):
     dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, dragon_data[1])
@@ -152,8 +160,10 @@ for i, dragon_data in enumerate(selected_dragons):
             new_size = (int(50 * (width / height)), 50)
     
     dragon_image = pygame.transform.scale(dragon_image, new_size)
+    outline_color = BLUE if dragon_data[10] == "Male" else RED
+    dragon_image = outline_image(dragon_image, outline_color)
     
-    initial_speed = 0.5 + (0.2 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
+    initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
     
     dragon = {
         "id": dragon_data[0],
@@ -167,7 +177,7 @@ for i, dragon_data in enumerate(selected_dragons):
         "nurture": dragon_data[9],
         "gender": dragon_data[10],
         "image": dragon_image,
-        "position": list(positions[i]),  # Convert tuple to list for mutability
+        "rect": dragon_image.get_rect(topleft=positions[i]),
         "speed": initial_speed,
         "target": None,
         "holding_fruit": None
@@ -216,12 +226,10 @@ def draw_inventory(surface, inventory, selected_inventory_slot=None):
 # Function to draw dragons
 def draw_dragons(surface):
     for dragon in dragons:
-        surface.blit(dragon["image"], dragon["position"])
-        gender_symbol = "♂" if dragon["gender"] == "Male" else "♀"
-        draw_text(surface, gender_symbol, large_font, RED, (dragon["position"][0], dragon["position"][1] - 30))
+        surface.blit(dragon["image"], dragon["rect"].topleft)
         if dragon["holding_fruit"]:
             fruit_image = fruit_images_dict[dragon["holding_fruit"]]
-            surface.blit(fruit_image, (dragon["position"][0] + 25, dragon["position"][1] + 25))
+            surface.blit(fruit_image, (dragon["rect"].x + 25, dragon["rect"].y + 25))
 
 # Function to draw fruits on the game board
 fruits_on_board = []
@@ -232,7 +240,7 @@ def spawn_fruits():
         while True:
             x, y = random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150)
             # Ensure fruits do not spawn on top of dragons
-            if all(calculate_distance((x, y), dragon["position"]) > 50 for dragon in dragons):
+            if all(calculate_distance((x, y), (dragon["rect"].x, dragon["rect"].y)) > 50 for dragon in dragons):
                 fruits_on_board.append({"type": fruit_type, "position": (x, y)})
                 break
 
@@ -246,26 +254,21 @@ def calculate_distance(pos1, pos2):
 
 # Function to determine target for a dragon
 def determine_target(dragon):
-    if dragon["holding_fruit"] == "flamefruit":
-        targets = [d for d in dragons if d["holding_fruit"] == "flamefruit" and d["id"] != dragon["id"]]
-        if targets:
-            targets.sort(key=lambda d: calculate_distance(dragon["position"], d["position"]))
-            return targets[0]["position"]
-    elif dragon["holding_fruit"]:
+    if dragon["holding_fruit"]:
         targets = [d for d in dragons if d["gender"] != dragon["gender"]]
         if targets:
-            targets.sort(key=lambda d: calculate_distance(dragon["position"], d["position"]))
-            return targets[0]["position"]
+            targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
+            return targets[0]["rect"].topleft
     else:
         if fruits_on_board:
-            fruits_on_board.sort(key=lambda f: calculate_distance(dragon["position"], f["position"]))
+            fruits_on_board.sort(key=lambda f: calculate_distance(dragon["rect"].topleft, f["position"]))
             return fruits_on_board[0]["position"]
         else:
             # No fruits, target the nearest opposite-gender dragon
             opposite_gender_targets = [d for d in dragons if d["gender"] != dragon["gender"]]
             if opposite_gender_targets:
-                opposite_gender_targets.sort(key=lambda d: calculate_distance(dragon["position"], d["position"]))
-                return opposite_gender_targets[0]["position"]
+                opposite_gender_targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
+                return opposite_gender_targets[0]["rect"].topleft
     return None
 
 # Function to move dragons
@@ -275,15 +278,35 @@ def move_dragons():
             dragon["target"] = determine_target(dragon)
             print(f"Dragon {dragon['name']} targeting {dragon['target']}")
         if dragon["target"]:
-            dx, dy = dragon["target"][0] - dragon["position"][0], dragon["target"][1] - dragon["position"][1]
+            dx, dy = dragon["target"][0] - dragon["rect"].x, dragon["target"][1] - dragon["rect"].y
             distance = math.sqrt(dx**2 + dy**2)
             if distance > 0:
                 dx, dy = dx / distance, dy / distance  # Normalize
                 speed_modifier = FRUIT_SPEED_MODIFIERS.get(dragon["holding_fruit"], 0)
-                dragon["speed"] = 0.5 + speed_modifier  # Ensure speed is recalculated correctly
-                dragon["position"][0] += dx * dragon["speed"]
-                dragon["position"][1] += dy * dragon["speed"]
-                print(f"Dragon {dragon['name']} moving to {dragon['position']}")
+                speed = dragon["speed"] + speed_modifier  # Ensure speed is recalculated correctly
+                new_x = dragon["rect"].x + dx * speed
+                new_y = dragon["rect"].y + dy * speed
+
+                # Check for screen boundaries
+                if new_x < 0:
+                    new_x = 0
+                elif new_x + dragon["rect"].width > WIDTH:
+                    new_x = WIDTH - dragon["rect"].width
+
+                if new_y < 0:
+                    new_y = 0
+                elif new_y + dragon["rect"].height > HEIGHT:
+                    new_y = HEIGHT - dragon["rect"].height
+
+                # Check for collisions with other dragons
+                dragon_rect_copy = dragon["rect"].copy()
+                dragon_rect_copy.x = new_x
+                dragon_rect_copy.y = new_y
+                if not any(dragon_rect_copy.colliderect(d["rect"]) for d in dragons if d["id"] != dragon["id"]):
+                    dragon["rect"].x = new_x
+                    dragon["rect"].y = new_y
+                    print(f"Dragon {dragon['name']} moving to {dragon['rect'].topleft}")
+
             if distance < 5:  # Reached target
                 # Collect fruit if target is a fruit
                 if dragon["holding_fruit"] is None:
