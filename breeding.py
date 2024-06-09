@@ -254,21 +254,14 @@ def calculate_distance(pos1, pos2):
 
 # Function to determine target for a dragon
 def determine_target(dragon):
-    if dragon["holding_fruit"]:
+    if not dragon["holding_fruit"] and fruits_on_board:
+        fruits_on_board.sort(key=lambda f: calculate_distance(dragon["rect"].topleft, f["position"]))
+        return fruits_on_board[0]["position"]
+    else:
         targets = [d for d in dragons if d["gender"] != dragon["gender"]]
         if targets:
             targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
             return targets[0]["rect"].topleft
-    else:
-        if fruits_on_board:
-            fruits_on_board.sort(key=lambda f: calculate_distance(dragon["rect"].topleft, f["position"]))
-            return fruits_on_board[0]["position"]
-        else:
-            # No fruits, target the nearest opposite-gender dragon
-            opposite_gender_targets = [d for d in dragons if d["gender"] != dragon["gender"]]
-            if opposite_gender_targets:
-                opposite_gender_targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
-                return opposite_gender_targets[0]["rect"].topleft
     return None
 
 # Function to move dragons
@@ -317,7 +310,6 @@ def move_dragons():
                             print(f"Dragon {dragon['name']} collected {fruit['type']}")
                             break
                 dragon["target"] = determine_target(dragon)  # Reassign target
-
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
@@ -328,6 +320,7 @@ def main():
     selected_inventory_slot = None
     selected_fruit = None
     spawn_fruits()  # Spawn initial fruits on the board
+    clock = pygame.time.Clock()  # Create a clock object to manage frame rate
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -354,6 +347,8 @@ def main():
         draw_dragons(screen)
         draw_fruits_on_board(screen)
         pygame.display.flip()  # Update the display
+
+        clock.tick(10)  # Set the frame rate to 10 FPS
 
     pygame.quit()
 
