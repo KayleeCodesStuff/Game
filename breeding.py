@@ -153,7 +153,7 @@ for i, dragon_data in enumerate(selected_dragons):
     
     dragon_image = pygame.transform.scale(dragon_image, new_size)
     
-    initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
+    initial_speed = 0.5 + (0.2 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
     
     dragon = {
         "id": dragon_data[0],
@@ -260,6 +260,12 @@ def determine_target(dragon):
         if fruits_on_board:
             fruits_on_board.sort(key=lambda f: calculate_distance(dragon["position"], f["position"]))
             return fruits_on_board[0]["position"]
+        else:
+            # No fruits, target the nearest opposite-gender dragon
+            opposite_gender_targets = [d for d in dragons if d["gender"] != dragon["gender"]]
+            if opposite_gender_targets:
+                opposite_gender_targets.sort(key=lambda d: calculate_distance(dragon["position"], d["position"]))
+                return opposite_gender_targets[0]["position"]
     return None
 
 # Function to move dragons
@@ -274,13 +280,20 @@ def move_dragons():
             if distance > 0:
                 dx, dy = dx / distance, dy / distance  # Normalize
                 speed_modifier = FRUIT_SPEED_MODIFIERS.get(dragon["holding_fruit"], 0)
-                dragon["speed"] = 1.5 + speed_modifier  # Ensure speed is recalculated correctly
+                dragon["speed"] = 0.5 + speed_modifier  # Ensure speed is recalculated correctly
                 dragon["position"][0] += dx * dragon["speed"]
                 dragon["position"][1] += dy * dragon["speed"]
                 print(f"Dragon {dragon['name']} moving to {dragon['position']}")
             if distance < 5:  # Reached target
-                dragon["target"] = None
-                print(f"Dragon {dragon['name']} reached the target")
+                # Collect fruit if target is a fruit
+                if dragon["holding_fruit"] is None:
+                    for fruit in fruits_on_board:
+                        if fruit["position"] == dragon["target"]:
+                            dragon["holding_fruit"] = fruit["type"]
+                            fruits_on_board.remove(fruit)
+                            print(f"Dragon {dragon['name']} collected {fruit['type']}")
+                            break
+                dragon["target"] = determine_target(dragon)  # Reassign target
 
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
