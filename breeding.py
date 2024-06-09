@@ -41,6 +41,19 @@ fruit_images = [gleam_berry, flame_fruit, shimmering_apple, ethereal_pear, moonb
 fruit_images = [pygame.transform.scale(fruit, (50, 50)) for fruit in fruit_images]
 fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
 fruit_images_dict = dict(zip(fruit_names, fruit_images))
+# Load heart image
+heart_image = pygame.image.load("heart.png")
+heart_image = pygame.transform.scale(heart_image, (30, 30))
+hearts_on_board = []
+
+def draw_hearts(surface):
+    current_time = pygame.time.get_ticks()
+    for heart in hearts_on_board[:]:
+        if current_time - heart["start_time"] > 3000:
+            hearts_on_board.remove(heart)
+        else:
+            surface.blit(heart_image, heart["position"])
+
 
 # Load fruit counts from the save file or use default values
 default_fruit_counts = {"gleamberry": 5, "flamefruit": 5, "shimmeringapple": 5, "etherealpear": 5, "moonbeammelon": 5}
@@ -263,6 +276,12 @@ def determine_target(dragon):
             targets.sort(key=lambda d: calculate_distance(dragon["rect"].topleft, d["rect"].topleft))
             return targets[0]["rect"].topleft
     return None
+def compatibility_test(dragon1, dragon2):
+    if dragon1["gender"] == dragon2["gender"]:
+        return False
+    characteristics1 = set([dragon1["primary_characteristic"]] + dragon1["secondary_characteristics"])
+    characteristics2 = set([dragon2["primary_characteristic"]] + dragon2["secondary_characteristics"])
+    return bool(characteristics1 & characteristics2)
 
 # Function to move dragons
 def move_dragons():
@@ -295,7 +314,21 @@ def move_dragons():
                 dragon_rect_copy = dragon["rect"].copy()
                 dragon_rect_copy.x = new_x
                 dragon_rect_copy.y = new_y
-                if not any(dragon_rect_copy.colliderect(d["rect"]) for d in dragons if d["id"] != dragon["id"]):
+                collision_occurred = False
+                for other_dragon in dragons:
+                    if other_dragon["id"] != dragon["id"] and dragon_rect_copy.colliderect(other_dragon["rect"]):
+                        heart_position = ((dragon["rect"].x + other_dragon["rect"].x) // 2,
+                                          (dragon["rect"].y + other_dragon["rect"].y) // 2)
+                        hearts_on_board.append({"position": heart_position, "start_time": pygame.time.get_ticks()})
+                        if compatibility_test(dragon, other_dragon):
+                            # Logic when dragons are compatible
+                            pass
+                        dragon["target"] = None
+                        other_dragon["target"] = None
+                        collision_occurred = True
+                        break
+
+                if not collision_occurred:
                     dragon["rect"].x = new_x
                     dragon["rect"].y = new_y
                     print(f"Dragon {dragon['name']} moving to {dragon['rect'].topleft}")
@@ -310,6 +343,7 @@ def move_dragons():
                             print(f"Dragon {dragon['name']} collected {fruit['type']}")
                             break
                 dragon["target"] = determine_target(dragon)  # Reassign target
+
 # Example usage
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
@@ -324,6 +358,7 @@ def place_fruit(x, y, selected_fruit):
                 dragon["target"] = determine_target(dragon)
         print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
 
+# Main game loop with interactivity
 # Main game loop with interactivity
 def main():
     running = True
@@ -355,6 +390,7 @@ def main():
         draw_inventory(screen, fruit_counts, selected_inventory_slot)
         draw_dragons(screen)
         draw_fruits_on_board(screen)
+        draw_hearts(screen)  # Draw hearts on the board
         pygame.display.flip()  # Update the display
 
         clock.tick(10)  # Set the frame rate to 10 FPS
