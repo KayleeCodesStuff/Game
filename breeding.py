@@ -50,6 +50,9 @@ heart_image = pygame.image.load("heart.png")
 heart_image = pygame.transform.scale(heart_image, (30, 30))
 hearts_on_board = []
 
+# Initialize egg counts 
+egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+
 # Load and resize egg images
 black_egg = pygame.image.load("black_egg.png")
 black_egg = pygame.transform.scale(black_egg, (50, 50))
@@ -174,17 +177,25 @@ else:
 
 
 try:
-    conn = sqlite3.connect(save_file)
-    cursor = conn.cursor()
-    cursor.execute("SELECT fruit, count FROM inventory")
-    rows = cursor.fetchall()
-    for row in rows:
-        fruit, count = row
-        fruit_counts[fruit] = count
-    conn.close()
+    with sqlite3.connect(save_file) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT fruit, count FROM inventory")
+        rows = cursor.fetchall()
+        for row in rows:
+            fruit, count = row
+            fruit_counts[fruit] = count
+
+        # Load egg counts from the correct table
+        cursor.execute("SELECT phenotype, count FROM egg_inventory")
+        rows = cursor.fetchall()
+        for row in rows:
+            phenotype, count = row
+            egg_counts[phenotype] = count
+
 except Exception as e:
     print(f"Error loading save file: {e}")
     fruit_counts = default_fruit_counts.copy()
+
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
     egg_phenotype = determine_phenotype(egg_genotype)
@@ -192,30 +203,6 @@ def create_egg(dragon1, dragon2, position):
     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position}")
 
     egg_exists = False
-
-    # Check if the egg already exists in the database
-    conn = sqlite3.connect(save_file)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, count FROM eggs WHERE genotype=? AND phenotype=? AND image_file=?", (str(egg_genotype), egg_phenotype, egg_image))
-    row = cursor.fetchone()
-    if row:
-        egg_exists = True
-        egg_id, egg_count = row
-        egg_count += 1
-        cursor.execute("UPDATE eggs SET count=? WHERE id=?", (egg_count, egg_id))
-    else:
-        cursor.execute("INSERT INTO eggs (genotype, phenotype, image_file, count) VALUES (?, ?, ?, ?)", (str(egg_genotype), egg_phenotype, egg_image, 1))
-
-    conn.commit()
-    conn.close()
-
-    if not egg_exists:
-        eggs_on_board.append({
-            "genotype": egg_genotype,
-            "phenotype": egg_phenotype,
-            "image": egg_image,
-            "rect": egg_image.get_rect(topleft=position)
-        })
 
 # Load dragons from the database
 conn = sqlite3.connect("dragonbreeding.db")
@@ -269,16 +256,6 @@ def outline_image(image, color, thickness=3):
     outline_surface = image.copy()
     pygame.draw.lines(outline_surface, color, True, outline, thickness)
     return outline_surface
-def initialize_eggs_table(conn):
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS eggs (
-                        id INTEGER PRIMARY KEY,
-                        genotype TEXT,
-                        phenotype TEXT,
-                        image_file TEXT,
-                        count INTEGER
-                      )''')
-    conn.commit()
 
 def draw_button(surface, text, font, color, rect, border_color, border_width):
     pygame.draw.rect(surface, border_color, rect, border_width)
@@ -410,13 +387,6 @@ for dragon in dragons:
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, position)
-def handle_egg_collection(mouse_pos, egg_counts):
-    for egg in eggs_on_board:
-        if egg["rect"].collidepoint(mouse_pos):
-            egg_counts[egg["phenotype"]] += 1
-            eggs_on_board.remove(egg)
-            save_inventory_to_db(egg_counts)
-            break
 
 def save_inventory_to_db(egg_counts):
     try:
@@ -425,11 +395,19 @@ def save_inventory_to_db(egg_counts):
         for fruit, count in fruit_counts.items():
             cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
         for egg, count in egg_counts.items():
-            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, egg))
+            cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"Error saving inventory to database: {e}")
+
+def handle_egg_collection(mouse_pos, egg_counts):
+    for egg in eggs_on_board:
+        if egg["rect"].collidepoint(mouse_pos):
+            egg_counts[egg["phenotype"]] += 1
+            eggs_on_board.remove(egg)
+            save_inventory_to_db(egg_counts)
+            break
 
 # Function to draw inventory
 def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
@@ -474,27 +452,6 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         # Draw outline if this slot is selected
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
-
-try:
-    conn = sqlite3.connect(save_file)
-    cursor = conn.cursor()
-    cursor.execute("SELECT fruit, count FROM inventory")
-    rows = cursor.fetchall()
-    for row in rows:
-        fruit, count = row
-        fruit_counts[fruit] = count
-
-    cursor.execute("SELECT genotype, phenotype, image_file, count FROM eggs")
-    rows = cursor.fetchall()
-    for row in rows:
-        genotype, phenotype, image_file, count = row
-        egg_counts[phenotype] = count
-        egg_images_dict[phenotype] = pygame.image.load(image_file)
-    
-    conn.close()
-except Exception as e:
-    print(f"Error loading save file: {e}")
-    fruit_counts = default_fruit_counts.copy()
 
 # Function to draw dragons
 def draw_dragons(surface):
@@ -592,6 +549,7 @@ def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
     egg_phenotype = determine_phenotype(egg_genotype)
     egg_image = egg_images_dict[egg_phenotype]
+    egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position}")
 
     eggs_on_board.append({
@@ -600,6 +558,26 @@ def create_egg(dragon1, dragon2, position):
         "image": egg_image,
         "rect": egg_image.get_rect(topleft=position)
     })
+
+    # Database operations
+    with sqlite3.connect(save_file) as conn:
+        cursor = conn.cursor()
+
+        # Insert a new row into the eggs table for the picked up egg
+        cursor.execute("INSERT INTO eggs (genotype, phenotype, image_file) VALUES (?, ?, ?)", (str(egg_genotype), egg_phenotype, egg_image_path))
+
+        # Check if the phenotype already exists in egg_inventory
+        cursor.execute("SELECT count FROM egg_inventory WHERE phenotype=?", (egg_phenotype,))
+        row = cursor.fetchone()
+        if row:
+            # If it exists, increment the count
+            egg_count = row[0] + 1
+            cursor.execute("UPDATE egg_inventory SET count=? WHERE phenotype=?", (egg_count, egg_phenotype))
+        else:
+            # If it does not exist, insert a new row with count 1
+            cursor.execute("INSERT INTO egg_inventory (phenotype, count) VALUES (?, ?)", (egg_phenotype, 1))
+
+        conn.commit()
 
 # Function to draw eggs on the game board
 eggs_on_board = []
@@ -705,19 +683,6 @@ def place_fruit(x, y, selected_fruit):
             if not dragon["holding_fruit"]:
                 dragon["target"] = determine_target(dragon)
         print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
-def save_inventory_to_db(egg_counts):
-    try:
-        conn = sqlite3.connect(save_file)
-        cursor = conn.cursor()
-        for fruit, count in fruit_counts.items():
-            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
-        for egg, count in egg_counts.items():
-            cursor.execute("UPDATE eggs SET count = ? WHERE phenotype = ?", (count, egg))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error saving inventory to database: {e}")
-
 
 # Main game loop with interactivity
 def main():
@@ -781,5 +746,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
