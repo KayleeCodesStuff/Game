@@ -26,6 +26,55 @@ egg_image = pygame.transform.scale(egg_image, (80, 80))
 egg_positions = []
 egg_colors = [WHITE] * 10  # Initialize each egg's color to WHITE
 
+# Load and resize egg images
+black_egg = pygame.image.load("black_egg.png")
+black_egg = pygame.transform.scale(black_egg, (50, 50))
+
+white_egg = pygame.image.load("white_egg.png")
+white_egg = pygame.transform.scale(white_egg, (50, 50))
+
+rainbow_egg = pygame.image.load("rainbow_egg.png")
+rainbow_egg = pygame.transform.scale(rainbow_egg, (50, 50))
+
+metallic_egg = pygame.image.load("metallic_egg.png")
+metallic_egg = pygame.transform.scale(metallic_egg, (50, 50))
+
+# Create a dictionary for egg images
+egg_images_dict = {
+    "Black": black_egg,
+    "White": white_egg,
+    "Rainbow": rainbow_egg,
+    "Metallic": metallic_egg
+}
+
+# Define inventory and egg counts (extracted from breeding.py)
+fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
+fruit_images_dict = {  # Make sure to load the corresponding images
+    "gleamberry": pygame.image.load("gleamberry.png"),
+    "flamefruit": pygame.image.load("flamefruit.png"),
+    "shimmeringapple": pygame.image.load("shimmeringapple.png"),
+    "etherealpear": pygame.image.load("etherealpear.png"),
+    "moonbeammelon": pygame.image.load("moonbeammelon.png")
+}
+
+# Resize fruit images
+fruit_images_dict = {
+    "gleamberry": pygame.transform.scale(pygame.image.load("gleamberry.png"), (50, 50)),
+    "flamefruit": pygame.transform.scale(pygame.image.load("flamefruit.png"), (50, 50)),
+    "shimmeringapple": pygame.transform.scale(pygame.image.load("shimmeringapple.png"), (50, 50)),
+    "etherealpear": pygame.transform.scale(pygame.image.load("etherealpear.png"), (50, 50)),
+    "moonbeammelon": pygame.transform.scale(pygame.image.load("moonbeammelon.png"), (50, 50))
+}
+
+# Initialize inventory and egg counts
+inventory = {fruit: 5 for fruit in fruit_names}
+egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+
+# Add these lines before the main function
+def draw_text(surface, text, font, color, position):
+    text_surface = font.render(text, True, color)
+    surface.blit(text_surface, position)
+
 # Adjust padding between eggs
 EGG_PADDING = 200
 
@@ -47,7 +96,8 @@ while len(egg_positions) < 10:
 inventory_slots = [None] * 10
 
 # Create inventory slots
-inventory_boxes = [pygame.Rect(20 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
+inventory_boxes = [pygame.Rect(WIDTH - (60 * (i + 1)), HEIGHT - 100, 50, 50) for i in range(10)]
+
 
 # Create font
 font = pygame.font.Font(None, 36)
@@ -81,18 +131,49 @@ def generate_random_elixir():
     return primary_trait, secondary_traits, rgb_value
 
 # Function to draw the inventory
-def draw_inventory(surface, inventory):
-    pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))
+def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
+    pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
 
+    y_offset = HEIGHT - 90  # Define y_offset for consistency
+
+    # Draw the fruits in the first section
+    x_offset = 10
+    for fruit, image in fruit_images_dict.items():
+        surface.blit(image, (x_offset, y_offset))
+        draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
+        x_offset += 60
+
+    # Draw a separator line
+    pygame.draw.line(surface, WHITE, (x_offset, HEIGHT - 100), (x_offset, HEIGHT))
+
+    # Draw the eggs in the second section
+    x_offset += 10  # Add some padding after the separator
+    for egg_type, count in eggs.items():
+        egg_image = egg_images_dict[egg_type]
+        surface.blit(egg_image, (x_offset, y_offset))
+        draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
+        x_offset += 60
+
+    # Draw the elixirs in the third section
+    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
     for i, slot in enumerate(inventory_slots):
+        box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
+        if i == selected_inventory_slot:
+            pygame.draw.rect(surface, RED, box_rect, 3)  # Highlight selected slot
         if slot is None:
-            pygame.draw.rect(surface, BLACK, inventory_boxes[i])
+            # Draw empty slot with ?
+            draw_text(surface, "?", small_font, WHITE, (x_offset + 15, y_offset + 15))
         else:
             color, image_filename = slot
-            pygame.draw.rect(surface, color, inventory_boxes[i])
+            pygame.draw.rect(surface, color, box_rect)
             image = pygame.image.load(image_filename)
-            image = pygame.transform.scale(image, (50, 50))
-            surface.blit(image, (inventory_boxes[i].x, inventory_boxes[i].y))
+            image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
+            surface.blit(image, (x_offset, y_offset))
+        x_offset += 60  # Move left for the next slot
+
+        # Draw outline if this slot is selected
+        if i == selected_inventory_slot:
+            pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
 
 def draw_screen(selected_egg_index):
     screen.fill(BLACK)
@@ -104,7 +185,7 @@ def draw_screen(selected_egg_index):
         pygame.draw.rect(screen, egg_colors[i], rect)  # Draw the egg with its current color
         screen.blit(egg_image, rect.topleft)
 
-    draw_inventory(screen, inventory_slots)
+    draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     pygame.display.flip()
 
