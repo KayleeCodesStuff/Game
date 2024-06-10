@@ -99,6 +99,18 @@ phenotype_to_genotypes = {
     'Rainbow': [('R', 'R'), ('R', 'M')],
     'Metallic': [('M', 'M')]
 }
+def load_elixirs_from_db():
+    elixirs = []
+    try:
+        with sqlite3.connect(save_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT rgb, image_file, position FROM elixirs ORDER BY position ASC")
+            elixirs = cursor.fetchall()
+            print(f"Loaded elixirs from database: {elixirs}")
+    except Exception as e:
+        print(f"Error loading elixirs from database: {e}")
+    return elixirs
+
 def initialize_eggs_table(conn):
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS eggs (
@@ -437,6 +449,7 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         x_offset += 60
 
     # Draw the elixirs in the third section
+    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
     for i, slot in enumerate(inventory_slots):
         box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
         if i == selected_inventory_slot:
@@ -450,7 +463,7 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
             image = pygame.image.load(image_filename)
             image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
             surface.blit(image, (x_offset, y_offset))
-        x_offset += 60  # Move right for the next slot
+        x_offset += 60  # Move left for the next slot
 
         # Draw outline if this slot is selected
         if i == selected_inventory_slot:
@@ -695,8 +708,13 @@ def main():
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
 
-    # Initialize inventory slots for elixirs
-    inventory_slots = [None] * 5  # Placeholder for actual inventory slot data
+    # Load elixirs from the database
+    elixirs = load_elixirs_from_db()
+    inventory_slots = [(tuple(map(int, elixir[0].strip('()').split(','))), elixir[1]) for elixir in elixirs]
+    
+    # Pad with None if less than 5 elixirs
+    while len(inventory_slots) < 5:
+        inventory_slots.append(None)
 
     # Button properties
     button_font = pygame.font.Font(None, 36)
@@ -740,9 +758,10 @@ def main():
         draw_button(screen, "Invite Dragon", button_font, WHITE, button_rect, BLUE, 2)  # Draw the button
         pygame.display.flip()  # Update the display
 
-        clock.tick(20)  # Set the frame rate to 20 FPS
+        clock.tick(30)  # Set the frame rate to 20 FPS
 
     pygame.quit()
 
 if __name__ == "__main__":
     main()
+
