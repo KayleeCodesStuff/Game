@@ -5,6 +5,7 @@ import random
 import math
 from tkinter import Tk, filedialog
 
+
 # Constants
 WIDTH, HEIGHT = 1200, 900
 BLUE = (0, 0, 255)

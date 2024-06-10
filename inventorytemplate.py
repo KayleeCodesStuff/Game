@@ -18,6 +18,10 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
 # Load images
+background = pygame.image.load("background.png").convert_alpha()
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
+
+# Load images
 fruit_images_dict = {
     "gleamberry": pygame.transform.scale(pygame.image.load("gleamberry.png"), (50, 50)),
     "flamefruit": pygame.transform.scale(pygame.image.load("flamefruit.png"), (50, 50)),
@@ -38,11 +42,35 @@ fruit_names = list(fruit_images_dict.keys())
 inventory = {fruit: 5 for fruit in fruit_names}
 egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
 
+# Initialize egg positions and colors
+egg_positions = []
+egg_colors = [WHITE] * 10  # Initialize each egg's color to WHITE
+
+# Adjust padding between eggs
+EGG_PADDING = 200
+
+# Function to check for overlapping rectangles
+# Function to check for overlapping rectangles
+def is_overlapping(new_rect, rect_list):
+    for rect in rect_list:
+        if new_rect.colliderect(rect):  # Use colliderect instead of collidepoint
+            return True
+    return False
+
+
+# Create non-overlapping egg positions with increased padding
+while len(egg_positions) < 10:
+    pos = (random.randint(EGG_PADDING, WIDTH - EGG_PADDING - 80), random.randint(EGG_PADDING, HEIGHT - EGG_PADDING - 80))
+    new_rect = pygame.Rect(pos, (80, 80))
+    if not is_overlapping(new_rect, egg_positions):
+        egg_positions.append(new_rect)
+
 # Inventory slots
 inventory_slots = [None] * 10
 
 # Create inventory slots
-inventory_boxes = [pygame.Rect(WIDTH - (60 * (i + 1)), HEIGHT - 100, 50, 50) for i in range(10)]
+inventory_boxes = [pygame.Rect(WIDTH - 600 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
+
 
 # Create font
 font = pygame.font.Font(None, 36)
@@ -95,18 +123,17 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
 
 def draw_screen(selected_egg_index):
     screen.fill(BLACK)
-
-    # Example background, replace as necessary
-    # screen.blit(background, (0, 0))
+    screen.blit(background, (0, 0))  # Ensure the background is being drawn
 
     for i, rect in enumerate(egg_positions):
         if i == selected_egg_index:
-            pygame.draw.rect(screen, RED, rect.inflate(4, 4), 2)
-        pygame.draw.rect(screen, egg_colors[i], rect)
-        screen.blit(egg_image, rect.topleft)
+            pygame.draw.rect(screen, RED, rect.inflate(4, 4), 2)  # Draw red outline
+        pygame.draw.rect(screen, egg_colors[i], rect)  # Draw the egg with its current color
+        egg_type = list(egg_images_dict.keys())[i % len(egg_images_dict)]  # Example to cycle through egg types
+        screen.blit(egg_images_dict[egg_type], rect.topleft)
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
-    pygame.display.flip()
+    pygame.display.flip()  # Ensure the screen updates correctly
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
@@ -220,11 +247,17 @@ def main():
                         break
 
                 if not egg_selected:
+                    # Print inventory box positions for debugging
+                    for i, rect in enumerate(inventory_boxes):
+                        print(f"Inventory box {i}: {rect.topleft}")
+
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
+                            print(f"Clicked on inventory slot {i} at {rect.topleft}")
                             selected_elixir = inventory_slots[i]
                             elixir_color = selected_elixir[0]
                             if selected_egg_index is not None:
+                                print(f"Applying elixir to egg {selected_egg_index}")
                                 egg_colors[selected_egg_index] = elixir_color
                                 inventory_slots[i] = None
                                 elixir_color = None
@@ -239,3 +272,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
