@@ -177,6 +177,23 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         # Draw outline if this slot is selected
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
+def save_elixir_data(file_path, elixir_data, inventory):
+    try:
+        with sqlite3.connect(file_path) as conn:
+            cursor = conn.cursor()
+            # Insert elixir data
+            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
+                              VALUES (?, ?, ?, ?, ?, ?)''',
+                           (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
+                            ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
+            # Update fruit counts
+            for fruit, count in inventory.items():
+                cursor.execute('''INSERT INTO inventory (fruit, count)
+                                  VALUES (?, ?)
+                                  ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
+            conn.commit()
+    except Exception as e:
+        print(f"Error saving elixir data: {e}")
 
 def draw_screen(selected_egg_index):
     screen.fill(BLACK)
@@ -240,6 +257,10 @@ def generate_and_add_random_elixir():
             }
             save_elixir_data('save.db', elixir_data, inventory)
             break
+
+# Check if the inventory is empty and generate a random elixir if necessary
+if all(slot is None for slot in inventory_slots):
+    generate_and_add_random_elixir()
 
 # Define the function to save inventory data to the database
 def save_inventory_data():
