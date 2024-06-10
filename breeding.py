@@ -106,7 +106,7 @@ def load_elixirs_from_db():
             cursor = conn.cursor()
             cursor.execute("SELECT rgb, image_file, position FROM elixirs ORDER BY position ASC")
             elixirs = cursor.fetchall()
-            print(f"Loaded elixirs from database: {elixirs}")
+           
     except Exception as e:
         print(f"Error loading elixirs from database: {e}")
     return elixirs

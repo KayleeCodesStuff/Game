@@ -5,7 +5,7 @@ import sys
 pygame.init()
 
 # Screen dimensions
-WIDTH, HEIGHT = 1000, 700
+WIDTH, HEIGHT = 1200, 900
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Hatchery")
 
@@ -26,6 +26,9 @@ egg_image = pygame.transform.scale(egg_image, (80, 80))
 egg_positions = []
 egg_colors = [WHITE] * 10  # Initialize each egg's color to WHITE
 
+# Adjust padding between eggs
+EGG_PADDING = 200
+
 # Function to check for overlapping rectangles
 def is_overlapping(new_rect, rect_list):
     for rect in rect_list:
@@ -35,7 +38,7 @@ def is_overlapping(new_rect, rect_list):
 
 # Create non-overlapping egg positions with increased padding
 while len(egg_positions) < 10:
-    pos = (random.randint(50, WIDTH - 300), random.randint(50, HEIGHT - 500))
+    pos = (random.randint(EGG_PADDING, WIDTH - EGG_PADDING - 80), random.randint(EGG_PADDING, HEIGHT - EGG_PADDING - 80))
     new_rect = pygame.Rect(pos, (80, 80))
     if not is_overlapping(new_rect, egg_positions):
         egg_positions.append(new_rect)
