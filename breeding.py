@@ -175,6 +175,7 @@ else:
     conn = sqlite3.connect(save_file)
     initialize_eggs_table(conn)
 
+egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
 
 try:
     with sqlite3.connect(save_file) as conn:
@@ -184,6 +185,7 @@ try:
         for row in rows:
             fruit, count = row
             fruit_counts[fruit] = count
+        print(f"Loaded fruit counts from database: {fruit_counts}")
 
         # Load egg counts from the correct table
         cursor.execute("SELECT phenotype, count FROM egg_inventory")
@@ -191,6 +193,7 @@ try:
         for row in rows:
             phenotype, count = row
             egg_counts[phenotype] = count
+        print(f"Loaded egg counts from database: {egg_counts}")
 
 except Exception as e:
     print(f"Error loading save file: {e}")
@@ -691,9 +694,6 @@ def main():
     selected_fruit = None
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
-
-    # Initialize egg counts
-    egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
 
     # Initialize inventory slots for elixirs
     inventory_slots = [None] * 5  # Placeholder for actual inventory slot data
