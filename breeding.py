@@ -6,7 +6,7 @@ import math
 from tkinter import Tk, filedialog
 
 # Constants
-WIDTH, HEIGHT = 1200, 900
+WIDTH, HEIGHT = 1200, 900  # Updated dimensions
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
@@ -107,6 +107,9 @@ repulsor_counter = 0
 default_fruit_counts = {"gleamberry": 5, "flamefruit": 5, "shimmeringapple": 5, "etherealpear": 5, "moonbeammelon": 5}
 fruit_counts = default_fruit_counts.copy()
 
+default_egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+egg_counts = default_egg_counts.copy()
+
 save_file = os.path.join(os.getcwd(), "save.db")
 if not os.path.exists(save_file):
     def select_or_create_file():
@@ -136,16 +139,20 @@ if not os.path.exists(save_file):
                             position INTEGER
                           )''')
         
-        # Create inventory table with fruit as UNIQUE
+        # Create inventory table with fruit and eggs as UNIQUE
         cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
                             id INTEGER PRIMARY KEY,
-                            fruit TEXT UNIQUE,
+                            item TEXT UNIQUE,
                             count INTEGER
                           )''')
         
         # Insert default fruit counts
         for fruit, count in default_fruit_counts.items():
-            cursor.execute("INSERT INTO inventory (fruit, count) VALUES (?, ?)", (fruit, count))
+            cursor.execute("INSERT INTO inventory (item, count) VALUES (?, ?)", (fruit, count))
+
+        # Insert default egg counts
+        for egg, count in default_egg_counts.items():
+            cursor.execute("INSERT INTO inventory (item, count) VALUES (?, ?)", (egg, count))
         
         conn.commit()
         conn.close()
@@ -155,15 +162,19 @@ if not os.path.exists(save_file):
 try:
     conn = sqlite3.connect(save_file)
     cursor = conn.cursor()
-    cursor.execute("SELECT fruit, count FROM inventory")
+    cursor.execute("SELECT item, count FROM inventory")
     rows = cursor.fetchall()
     for row in rows:
-        fruit, count = row
-        fruit_counts[fruit] = count
+        item, count = row
+        if item in fruit_counts:
+            fruit_counts[item] = count
+        elif item in egg_counts:
+            egg_counts[item] = count
     conn.close()
 except Exception as e:
     print(f"Error loading save file: {e}")
     fruit_counts = default_fruit_counts.copy()
+    egg_counts = default_egg_counts.copy()
 
 # Load dragons from the database
 conn = sqlite3.connect("dragonbreeding.db")
@@ -273,26 +284,6 @@ for dragon in dragons:
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, position)
-def handle_egg_collection(mouse_pos, egg_counts):
-    for egg in eggs_on_board:
-        if egg["rect"].collidepoint(mouse_pos):
-            egg_counts[egg["phenotype"]] += 1
-            eggs_on_board.remove(egg)
-            save_inventory_to_db(egg_counts)
-            break
-
-def save_inventory_to_db(egg_counts):
-    try:
-        conn = sqlite3.connect(save_file)
-        cursor = conn.cursor()
-        for fruit, count in fruit_counts.items():
-            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
-        for egg, count in egg_counts.items():
-            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, egg))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error saving inventory to database: {e}")
 
 # Function to draw inventory
 def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
@@ -318,7 +309,8 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
         x_offset += 60
 
-    # Draw the elixirs in the third section
+    # Draw the elixir slots in the third section
+    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
     for i, slot in enumerate(inventory_slots):
         box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
         if i == selected_inventory_slot:
@@ -444,6 +436,27 @@ def draw_eggs_on_board(surface):
     for egg in eggs_on_board:
         surface.blit(egg["image"], egg["rect"].topleft)
 
+def save_inventory_to_db():
+    try:
+        conn = sqlite3.connect(save_file)
+        cursor = conn.cursor()
+        for fruit, count in fruit_counts.items():
+            cursor.execute("UPDATE inventory SET count = ? WHERE item = ?", (count, fruit))
+        for egg, count in egg_counts.items():
+            cursor.execute("UPDATE inventory SET count = ? WHERE item = ?", (count, egg))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error saving inventory to database: {e}")
+
+def handle_egg_collection(mouse_pos):
+    for egg in eggs_on_board:
+        if egg["rect"].collidepoint(mouse_pos):
+            egg_counts[egg["phenotype"]] += 1
+            eggs_on_board.remove(egg)
+            save_inventory_to_db()
+            break
+
 for dragon in dragons:
     if "genotype" not in dragon:
         assign_genotype(dragon)
@@ -536,18 +549,7 @@ def place_fruit(x, y, selected_fruit):
             if not dragon["holding_fruit"]:
                 dragon["target"] = determine_target(dragon)
         print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
-def save_inventory_to_db(egg_counts):
-    try:
-        conn = sqlite3.connect(save_file)
-        cursor = conn.cursor()
-        for fruit, count in fruit_counts.items():
-            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
-        for egg, count in egg_counts.items():
-            cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, egg))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"Error saving inventory to database: {e}")
+        save_inventory_to_db()
 
 # Main game loop with interactivity
 def main():
@@ -557,11 +559,22 @@ def main():
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
 
-    # Initialize egg counts
-    egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
-
-    # Initialize inventory slots for elixirs
-    inventory_slots = [None] * 5  # Placeholder for actual inventory slot data
+    # Load elixirs from the database
+    try:
+        conn = sqlite3.connect(save_file)
+        cursor = conn.cursor()
+        cursor.execute("SELECT rgb, image_file FROM elixirs")
+        rows = cursor.fetchall()
+        inventory_slots = [None] * 5
+        for i, row in enumerate(rows):
+            if i < len(inventory_slots):
+                rgb, image_file = row
+                color = tuple(map(int, rgb.strip("()").split(",")))
+                inventory_slots[i] = (color, image_file)
+        conn.close()
+    except Exception as e:
+        print(f"Error loading elixirs from save file: {e}")
+        inventory_slots = [None] * 5
 
     while running:
         for event in pygame.event.get():
@@ -580,8 +593,7 @@ def main():
                     place_fruit(x, y, selected_fruit)
                     selected_fruit = None
 
-                # Handle egg collection
-                handle_egg_collection(mouse_pos, egg_counts)
+                handle_egg_collection(mouse_pos)
 
         move_dragons()  # Update dragon positions
 
@@ -600,4 +612,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
