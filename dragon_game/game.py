@@ -1,9 +1,18 @@
 import pygame
 import random
-import sys
 import sqlite3
 
-pygame.init()
+def initialize_pygame():
+    pygame.init()
+
+def initialize_fonts():
+    global font, small_font
+    font = pygame.font.Font(None, 36)
+    small_font = pygame.font.Font(None, 28)
+
+# Call initialization functions
+initialize_pygame()
+initialize_fonts()
 
 # Screen dimensions
 WIDTH, HEIGHT = 1200, 900
@@ -30,9 +39,17 @@ fruit_images_dict = {
     "moonbeammelon": pygame.transform.scale(pygame.image.load("moonbeammelon.png"), (50, 50))
 }
 
-# Initialize inventory
+egg_images_dict = {
+    "Black": pygame.transform.scale(pygame.image.load("black_egg.png"), (50, 50)),
+    "White": pygame.transform.scale(pygame.image.load("white_egg.png"), (50, 50)),
+    "Rainbow": pygame.transform.scale(pygame.image.load("rainbow_egg.png"), (50, 50)),
+    "Metallic": pygame.transform.scale(pygame.image.load("metallic_egg.png"), (50, 50))
+}
+
+# Initialize inventory and egg counts
 fruit_names = list(fruit_images_dict.keys())
 inventory = {fruit: 5 for fruit in fruit_names}
+egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
 
 # Inventory slots
 inventory_slots = [None] * 10
@@ -40,15 +57,27 @@ inventory_slots = [None] * 10
 # Create inventory slots
 inventory_boxes = [pygame.Rect(WIDTH - 600 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
 
-# Create font
-font = pygame.font.Font(None, 36)
-small_font = pygame.font.Font(None, 28)
+# Define traits lists
+primary_traits = [
+    "Curious", "Playful", "Adventurous", "Resourceful", "Sociable",
+    "Thoughtful", "Confident", "Generous", "Reflective", "Strategic",
+    "Cheerful", "Demonic", "Mystical", "Flamboyant", "Awkward",
+    "Weird", "Gross", "Gorgeous", "Ethereal", "Blessed"
+]
+
+secondary_traits_list = [
+    "Dark", "Brooding", "Responsible", "Common",
+    "Distraction", "Fierce", "Fiery", "Showy",
+    "Speed", "Flightiness", "Drive", "Ambition",
+    "Earthy", "Pragmatic", "Stout", "Loyal",
+    "Angelic", "Unique", "Pure", "Self-righteous"
+]
 
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, position)
 
-def draw_inventory(surface, inventory, inventory_slots, selected_inventory_slot=None):
+def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))
 
     y_offset = HEIGHT - 90
@@ -63,7 +92,15 @@ def draw_inventory(surface, inventory, inventory_slots, selected_inventory_slot=
     # Draw a separator line
     pygame.draw.line(surface, WHITE, (x_offset, HEIGHT - 100), (x_offset, HEIGHT))
 
-    # Draw the elixirs in the second section
+    # Draw the eggs in the second section, even if they might not be used
+    x_offset += 10
+    for egg_type, count in eggs.items():
+        egg_image = egg_images_dict[egg_type]
+        surface.blit(egg_image, (x_offset, y_offset))
+        draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
+        x_offset += 60
+
+    # Draw the elixirs in the third section
     x_offset = WIDTH - 60 * len(inventory_slots)
     for i, slot in enumerate(inventory_slots):
         box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
@@ -81,15 +118,10 @@ def draw_inventory(surface, inventory, inventory_slots, selected_inventory_slot=
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)
 
-def draw_screen():
-    screen.fill(BLACK)
-    screen.blit(background, (0, 0))  # Ensure the background is being drawn
-    draw_inventory(screen, inventory, inventory_slots)
-    pygame.display.flip()  # Ensure the screen updates correctly
-
 def load_inventory_data():
-    global inventory, inventory_slots
+    global inventory, egg_counts, inventory_slots
     inventory = {fruit: 0 for fruit in fruit_names}
+    egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
 
     try:
         with sqlite3.connect('save.db') as conn:
@@ -100,6 +132,12 @@ def load_inventory_data():
                 fruit, count = row
                 inventory[fruit] = count
 
+            cursor.execute("SELECT phenotype, count FROM egg_inventory")
+            rows = cursor.fetchall()
+            for row in rows:
+                phenotype, count = row
+                egg_counts[phenotype] = count
+
             cursor.execute("SELECT rgb, image_file, position FROM elixirs")
             rows = cursor.fetchall()
             for row in rows:
@@ -109,6 +147,28 @@ def load_inventory_data():
 
     except Exception as e:
         print(f"Error loading inventory data: {e}")
+
+def generate_and_add_random_elixir():
+    primary_trait = random.choice(primary_traits)
+    secondary_traits = random.sample(secondary_traits_list, 3)
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+    rgb_value = (r, g, b)
+    for i in range(len(inventory_slots)):
+        if inventory_slots[i] is None:
+            image_file = "pb1.png"
+            inventory_slots[i] = (rgb_value, image_file)
+            elixir_data = {
+                'rgb': rgb_value,
+                'title': f"{primary_trait} Elixir",
+                'primary_trait': primary_trait,
+                'secondary_traits': secondary_traits,
+                'image_file': image_file,
+                'position': i + 1
+            }
+            save_elixir_data('save.db', elixir_data, inventory)
+            break
 
 def save_elixir_data(file_path, elixir_data, fruit_counts):
     conn = sqlite3.connect(file_path)
@@ -132,6 +192,8 @@ def save_inventory_data():
             cursor = conn.cursor()
             for fruit, count in inventory.items():
                 cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
+            for egg, count in egg_counts.items():
+                cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
             cursor.execute("DELETE FROM elixirs")
             for i, slot in enumerate(inventory_slots):
                 if slot is not None:
@@ -140,32 +202,3 @@ def save_inventory_data():
             conn.commit()
     except Exception as e:
         print(f"Error saving inventory data: {e}")
-
-def run_game():
-    global elixir_color
-    elixir_color = None
-    running = True
-    selected_inventory_slot = None
-
-    load_inventory_data()
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = event.pos
-                print(f"Mouse clicked at: {event.pos}")
-
-                for i, rect in enumerate(inventory_boxes):
-                    if rect.collidepoint(x, y) and inventory_slots[i] is not None:
-                        print(f"Clicked on inventory slot {i} at {rect.topleft}")
-                        selected_elixir = inventory_slots[i]
-                        elixir_color = selected_elixir[0]
-                        break
-
-        draw_screen()
-
-    save_inventory_data()
-    pygame.quit()
-    sys.exit()
