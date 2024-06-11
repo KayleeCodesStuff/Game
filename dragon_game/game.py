@@ -1,14 +1,31 @@
 import pygame
 import random
 import sqlite3
+import logging
+
+# Configure logging
+logging.basicConfig(filename='game.log', level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def initialize_pygame():
-    pygame.init()
+    try:
+        pygame.init()
+        logging.info("Pygame initialized successfully")
+        print("Pygame initialized successfully")
+    except pygame.error as e:
+        logging.error(f"Error initializing pygame: {e}")
+        print(f"Error initializing pygame: {e}")
 
 def initialize_fonts():
-    global font, small_font
-    font = pygame.font.Font(None, 36)
-    small_font = pygame.font.Font(None, 28)
+    try:
+        global font, small_font
+        font = pygame.font.Font(None, 36)
+        small_font = pygame.font.Font(None, 28)
+        logging.info("Fonts initialized successfully")
+        print("Fonts initialized successfully")
+    except pygame.error as e:
+        logging.error(f"Error initializing fonts: {e}")
+        print(f"Error initializing fonts: {e}")
 
 # Call initialization functions
 initialize_pygame()
@@ -26,24 +43,32 @@ GREY = (200, 200, 200)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
-# Load images
-background = pygame.image.load("background.png").convert_alpha()
-background = pygame.transform.scale(background, (WIDTH, HEIGHT))
+# Load images with error handling
+def load_image(file_name, scale_to):
+    try:
+        image = pygame.image.load(file_name).convert_alpha()
+        logging.info(f"Loaded image {file_name}")
+        return pygame.transform.scale(image, scale_to)
+    except pygame.error as e:
+        logging.error(f"Error loading image {file_name}: {e}")
+        print(f"Error loading image {file_name}: {e}")
+        return pygame.Surface(scale_to)  # Return a blank surface as a placeholder
 
-# Load images
+background = load_image("background.png", (WIDTH, HEIGHT))
+
 fruit_images_dict = {
-    "gleamberry": pygame.transform.scale(pygame.image.load("gleamberry.png"), (50, 50)),
-    "flamefruit": pygame.transform.scale(pygame.image.load("flamefruit.png"), (50, 50)),
-    "shimmeringapple": pygame.transform.scale(pygame.image.load("shimmeringapple.png"), (50, 50)),
-    "etherealpear": pygame.transform.scale(pygame.image.load("etherealpear.png"), (50, 50)),
-    "moonbeammelon": pygame.transform.scale(pygame.image.load("moonbeammelon.png"), (50, 50))
+    "gleamberry": load_image("gleamberry.png", (50, 50)),
+    "flamefruit": load_image("flamefruit.png", (50, 50)),
+    "shimmeringapple": load_image("shimmeringapple.png", (50, 50)),
+    "etherealpear": load_image("etherealpear.png", (50, 50)),
+    "moonbeammelon": load_image("moonbeammelon.png", (50, 50))
 }
 
 egg_images_dict = {
-    "Black": pygame.transform.scale(pygame.image.load("black_egg.png"), (50, 50)),
-    "White": pygame.transform.scale(pygame.image.load("white_egg.png"), (50, 50)),
-    "Rainbow": pygame.transform.scale(pygame.image.load("rainbow_egg.png"), (50, 50)),
-    "Metallic": pygame.transform.scale(pygame.image.load("metallic_egg.png"), (50, 50))
+    "Black": load_image("black_egg.png", (50, 50)),
+    "White": load_image("white_egg.png", (50, 50)),
+    "Rainbow": load_image("rainbow_egg.png", (50, 50)),
+    "Metallic": load_image("metallic_egg.png", (50, 50))
 }
 
 # Initialize inventory and egg counts
@@ -111,8 +136,7 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         else:
             color, image_filename = slot
             pygame.draw.rect(surface, color, box_rect)
-            image = pygame.image.load(image_filename)
-            image = pygame.transform.scale(image, (50, 50))
+            image = load_image(image_filename, (50, 50))
             surface.blit(image, (x_offset, y_offset))
         x_offset += 60
         if i == selected_inventory_slot:
@@ -145,8 +169,12 @@ def load_inventory_data():
                 image_file, position = row[1], row[2]
                 inventory_slots[position - 1] = (rgb, image_file)
 
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error loading inventory data: {e}")
+        print(f"SQLite error loading inventory data: {e}")
     except Exception as e:
-        print(f"Error loading inventory data: {e}")
+        logging.error(f"Unexpected error loading inventory data: {e}")
+        print(f"Unexpected error loading inventory data: {e}")
 
 def generate_and_add_random_elixir():
     primary_trait = random.choice(primary_traits)
@@ -171,20 +199,28 @@ def generate_and_add_random_elixir():
             break
 
 def save_elixir_data(file_path, elixir_data, fruit_counts):
-    conn = sqlite3.connect(file_path)
-    cursor = conn.cursor()
-    cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
-                      VALUES (?, ?, ?, ?, ?, ?)''',
-                   (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                    ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
+    try:
+        with sqlite3.connect(file_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
+                              VALUES (?, ?, ?, ?, ?, ?)''',
+                           (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
+                            ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
 
-    for fruit, count in fruit_counts.items():
-        cursor.execute('''INSERT INTO inventory (fruit, count)
-                          VALUES (?, ?)
-                          ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
+            for fruit, count in fruit_counts.items():
+                cursor.execute('''INSERT INTO inventory (fruit, count)
+                                  VALUES (?, ?)
+                                  ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
 
-    conn.commit()
-    conn.close()
+            conn.commit()
+            logging.info("Elixir data saved successfully")
+            print("Elixir data saved successfully")
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error saving elixir data: {e}")
+        print(f"SQLite error saving elixir data: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error saving elixir data: {e}")
+        print(f"Unexpected error saving elixir data: {e}")
 
 def save_inventory_data():
     try:
@@ -200,5 +236,58 @@ def save_inventory_data():
                     rgb, image_file = slot
                     cursor.execute("INSERT INTO elixirs (rgb, image_file, position) VALUES (?, ?, ?)", (str(rgb), image_file, i + 1))
             conn.commit()
+            logging.info("Inventory data saved successfully")
+            print("Inventory data saved successfully")
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error saving inventory data: {e}")
+        print(f"SQLite error saving inventory data: {e}")
     except Exception as e:
-        print(f"Error saving inventory data: {e}")
+        logging.error(f"Unexpected error saving inventory data: {e}")
+        print(f"Unexpected error saving inventory data: {e}")
+
+# Example of handling errors during game loop
+def game_loop():
+    running = True
+    selected_inventory_slot = None
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+        screen.fill(GREY)
+        screen.blit(background, (0, 0))
+
+        # Draw inventory with error handling
+        try:
+            draw_inventory(screen, inventory, egg_counts, inventory_slots, selected_inventory_slot)
+        except pygame.error as e:
+            logging.error(f"Error drawing inventory: {e}")
+            print(f"Error drawing inventory: {e}")
+
+        pygame.display.flip()
+
+    pygame.quit()
+    logging.info("Game loop ended")
+    print("Game loop ended")
+
+# Call load_inventory_data with exception handling
+try:
+    load_inventory_data()
+    logging.info("Initial inventory data loaded successfully")
+    print("Initial inventory data loaded successfully")
+except Exception as e:
+    logging.error(f"Error loading initial inventory data: {e}")
+    print(f"Error loading initial inventory data: {e}")
+
+# Start the game loop
+try:
+    game_loop()
+except Exception as e:
+    logging.error(f"Error during game loop: {e}")
+    print(f"Error during game loop: {e}")
+finally:
+    save_inventory_data()
+
