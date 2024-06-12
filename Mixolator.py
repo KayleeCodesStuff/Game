@@ -50,9 +50,9 @@ fruit_rgb_ranges = {
     "etherealpear": range(153, 204),
     "moonbeammelon": range(204, 255)
 }
-egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
-load_inventory_data()
-
+#egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+#load_inventory_data()
+inventory, egg_counts, inventory_slots = load_inventory_data()
 
 # Personality keywords for each fruit
 fruit_personality_keywords = {
@@ -225,9 +225,6 @@ def main():
     file_path = None
     selected_inventory_slot = None
 
-    # Load inventory data at the start of the game
-    load_inventory_data()
-
     while running:
         # Automatically select the first empty box if no box is selected
         if selected_box is None:
@@ -281,23 +278,11 @@ def main():
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
 
                 if elixir_color and bottle_button.collidepoint(x, y):
-                    if not file_path:
-                        file_path = select_or_create_file()
-                        initialize_file(file_path)
                     for i in range(len(inventory_slots)):
                         if inventory_slots[i] is None:
                             image_file = random.choice(image_filenames)
                             inventory_slots[i] = (elixir_color, image_file)
-                            elixir_data = {
-                                'rgb': elixir_color,
-                                'title': elixir_title,
-                                'primary_trait': personality_keywords[selections[0]],
-                                'secondary_traits': elixir_personality[1:],
-                                'image_file': image_file,
-                                'position': i + 1
-                            }
-                            fruit_counts = {fruit: count for fruit, count in inventory.items()}
-                            save_elixir_data(file_path, elixir_data, fruit_counts)
+                            save_inventory_data()
                             break
 
                 # Handle elixir slot click
@@ -310,7 +295,7 @@ def main():
                 # Handle delete button press
                 if delete_button.collidepoint(x, y) and selected_inventory_slot is not None:
                     inventory_slots[selected_inventory_slot] = None
-                    delete_elixir_data(file_path, selected_inventory_slot + 1)
+                    save_inventory_data()
                     selected_inventory_slot = None
 
         draw_screen(selected_box, selected_inventory_slot)  # Pass selected_inventory_slot to draw_screen()

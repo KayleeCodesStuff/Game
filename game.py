@@ -151,6 +151,7 @@ def load_inventory_data():
     global inventory, egg_counts, inventory_slots
     inventory = {fruit: 0 for fruit in fruit_names}
     egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
+    inventory_slots = [None] * 10
 
     try:
         with sqlite3.connect('save.db') as conn:
@@ -180,6 +181,8 @@ def load_inventory_data():
     except Exception as e:
         logging.error(f"Unexpected error loading inventory data: {e}")
         print(f"Unexpected error loading inventory data: {e}")
+
+    return inventory, egg_counts, inventory_slots
 
 def save_elixir_data(file_path, elixir_data, fruit_counts):
     try:
