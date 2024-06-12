@@ -13,11 +13,14 @@ pygame.init()
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 900
 TILE_SIZE = 40
-INVENTORY_HEIGHT = SCREEN_HEIGHT // 5
+INVENTORY_HEIGHT = 100
 PLAY_AREA_HEIGHT = SCREEN_HEIGHT - INVENTORY_HEIGHT
-MAZE_WIDTH = (SCREEN_WIDTH // TILE_SIZE) - 2
-MAZE_HEIGHT = (PLAY_AREA_HEIGHT // TILE_SIZE) - 2
+MAZE_WIDTH = SCREEN_WIDTH // TILE_SIZE
+MAZE_HEIGHT = PLAY_AREA_HEIGHT // TILE_SIZE
 FPS = 60
+
+# Adjust the screen dimensions to exclude the inventory height
+SCREEN_PLAY_AREA_HEIGHT = SCREEN_HEIGHT - INVENTORY_HEIGHT
 
 def load_and_scale(image_path):
     try:
@@ -29,10 +32,11 @@ def load_and_scale(image_path):
 
 def load_image(image_path):
     try:
-        return pygame.image.load(image_path)
+        image = pygame.image.load(image_path)
+        return pygame.transform.scale(image, (SCREEN_WIDTH, SCREEN_PLAY_AREA_HEIGHT))
     except pygame.error as e:
         print(f"Error loading image {image_path}: {e}")
-        return pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))  # Return a blank surface as a placeholder
+        return pygame.Surface((SCREEN_WIDTH, SCREEN_PLAY_AREA_HEIGHT))  # Return a blank surface as a placeholder
 
 # Load images
 luminara_img = load_and_scale('luminara.png')
@@ -50,7 +54,7 @@ font = pygame.font.Font(None, 28)
 large_font = pygame.font.Font(None, 64)
 
 player_pos = [2 * TILE_SIZE, 2 * TILE_SIZE]
-player_speed = 1
+player_speed = 3
 
 start_time = time.time()
 elapsed_time = 0
@@ -118,40 +122,37 @@ def move_towards_target(pos, target, speed):
     return pos
 
 def draw_game():
-    screen.blit(background_img, (0, 0))
+    screen.blit(background_img, (0, 0))  # Ensure this covers the play area correctly
     for (x, y, img) in maze_walls:
-        if (x, y) in tree_timers:
-            timer = tree_timers[(x, y)]
-            dark_factor = int(255 * (timer['start'] - time.time()) / (3 + additional_tree_destruction_time))
-            dark_factor = max(0, min(255, dark_factor))
-            img = darken_image(img, dark_factor)
+        # Drawing walls
         screen.blit(img, ((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
     for (x, y) in outer_walls:
+        # Drawing outer walls
         screen.blit(outer_wall_img, (x * TILE_SIZE, y * TILE_SIZE))
 
-    pygame.draw.rect(screen, (0, 0, 0), (0, 0, SCREEN_WIDTH, TILE_SIZE))
-    
+    pygame.draw.rect(screen, (50, 50, 50), (0, SCREEN_HEIGHT - 100, SCREEN_WIDTH, 100))  # Draw inventory background
+    draw_inventory(screen, inventory, egg_counts, inventory_slots)
+
+    # Display ripple and fruits
     screen.blit(ripple_img, ((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE))
-    screen.blit(luminara_img, (player_pos[0], player_pos[1]))
-    if nightcrawler_pos:
-        screen.blit(nightcrawler_img, (nightcrawler_pos[0], nightcrawler_pos[1]))
-    
     for pos, (fruit_type, img) in fruit_positions.items():
         screen.blit(img, (pos[0] * TILE_SIZE, pos[1] * TILE_SIZE))
 
+    # Display player and other game elements
+    screen.blit(luminara_img, (player_pos[0], player_pos[1]))
+    if nightcrawler_pos:
+        screen.blit(nightcrawler_img, (nightcrawler_pos[0], nightcrawler_pos[1]))
+
+    # Display timer and other UI elements
     timer_text = font.render(f'Time: {elapsed_time}s', True, (255, 255, 255))
     screen.blit(timer_text, (SCREEN_WIDTH - 150, 10))
-
     instructions = font.render('Use arrow keys to move', True, (255, 255, 255))
     screen.blit(instructions, (10, SCREEN_HEIGHT - 40))
-
-    pygame.draw.rect(screen, (50, 50, 50), (0, SCREEN_HEIGHT - INVENTORY_HEIGHT, SCREEN_WIDTH, INVENTORY_HEIGHT))
-
-    draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     # Display player speed, nightcrawler speed, and blight speed in one row
     speed_text = font.render(f'Player Speed: {player_speed}  Nightcrawler Speed: {nightcrawler_speed}  Blight Speed: {additional_tree_destruction_time + 3}', True, (255, 255, 255))
     screen.blit(speed_text, (10, 10))
+
 def find_valid_nightcrawler_position():
     while True:
         x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
@@ -159,11 +160,14 @@ def find_valid_nightcrawler_position():
             return [x, y]
 
 def main():
-    global player_pos, player_speed, start_time, elapsed_time, found_ripple, lost_game, nightcrawler_pos, nightcrawler_speed, nightcrawler_target_time, nightcrawler_spawn_time, last_fruit_spawn_time, fruit_positions, additional_tree_destruction_time, tree_timers, maze_walls, ripple_pos, outer_walls
+    global player_pos, player_speed, start_time, elapsed_time, found_ripple, lost_game
+    global nightcrawler_pos, nightcrawler_speed, nightcrawler_target_time, nightcrawler_spawn_time
+    global last_fruit_spawn_time, fruit_positions, additional_tree_destruction_time, tree_timers
+    global maze_walls, ripple_pos, outer_walls
 
     # Initialize global variables
     player_pos = [2 * TILE_SIZE, 2 * TILE_SIZE]
-    player_speed = 1
+    player_speed = 3
     start_time = time.time()
     elapsed_time = 0
     found_ripple = False
@@ -294,6 +298,7 @@ def main():
 
     save_inventory_data()  # Save the inventory data before quitting
     print("Exiting the game loop")
+
 
 
 if __name__ == "__main__":
