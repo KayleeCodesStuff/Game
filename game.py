@@ -7,6 +7,7 @@ import logging
 logging.basicConfig(filename='game.log', level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Define initialization functions
 def initialize_pygame():
     try:
         pygame.init()
@@ -27,9 +28,13 @@ def initialize_fonts():
         logging.error(f"Error initializing fonts: {e}")
         print(f"Error initializing fonts: {e}")
 
-# Call initialization functions
-initialize_pygame()
-initialize_fonts()
+# Initialization function to be called on import
+def initialize():
+    initialize_pygame()
+    initialize_fonts()
+
+# Call initialization functions when the module is imported
+initialize()
 
 # Screen dimensions
 WIDTH, HEIGHT = 1200, 900
@@ -176,28 +181,6 @@ def load_inventory_data():
         logging.error(f"Unexpected error loading inventory data: {e}")
         print(f"Unexpected error loading inventory data: {e}")
 
-def generate_and_add_random_elixir():
-    primary_trait = random.choice(primary_traits)
-    secondary_traits = random.sample(secondary_traits_list, 3)
-    r = random.randint(0, 255)
-    g = random.randint(0, 255)
-    b = random.randint(0, 255)
-    rgb_value = (r, g, b)
-    for i in range(len(inventory_slots)):
-        if inventory_slots[i] is None:
-            image_file = "pb1.png"
-            inventory_slots[i] = (rgb_value, image_file)
-            elixir_data = {
-                'rgb': rgb_value,
-                'title': f"{primary_trait} Elixir",
-                'primary_trait': primary_trait,
-                'secondary_traits': secondary_traits,
-                'image_file': image_file,
-                'position': i + 1
-            }
-            save_elixir_data('save.db', elixir_data, inventory)
-            break
-
 def save_elixir_data(file_path, elixir_data, fruit_counts):
     try:
         with sqlite3.connect(file_path) as conn:
@@ -273,21 +256,28 @@ def game_loop():
     logging.info("Game loop ended")
     print("Game loop ended")
 
-# Call load_inventory_data with exception handling
-try:
-    load_inventory_data()
-    logging.info("Initial inventory data loaded successfully")
-    print("Initial inventory data loaded successfully")
-except Exception as e:
-    logging.error(f"Error loading initial inventory data: {e}")
-    print(f"Error loading initial inventory data: {e}")
+def main():
+    # Call initialization functions
+    initialize_pygame()
+    initialize_fonts()
+    
+    # Call load_inventory_data with exception handling
+    try:
+        load_inventory_data()
+        logging.info("Initial inventory data loaded successfully")
+        print("Initial inventory data loaded successfully")
+    except Exception as e:
+        logging.error(f"Error loading initial inventory data: {e}")
+        print(f"Error loading initial inventory data: {e}")
 
-# Start the game loop
-try:
-    game_loop()
-except Exception as e:
-    logging.error(f"Error during game loop: {e}")
-    print(f"Error during game loop: {e}")
-finally:
-    save_inventory_data()
+    # Start the game loop
+    try:
+        game_loop()
+    except Exception as e:
+        logging.error(f"Error during game loop: {e}")
+        print(f"Error during game loop: {e}")
+    finally:
+        save_inventory_data()
 
+if __name__ == "__main__":
+    main()

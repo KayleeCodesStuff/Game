@@ -8,13 +8,12 @@ import sqlite3
 import json
 import tkinter as tk
 from tkinter import filedialog
-
-
+from game import draw_inventory, load_inventory_data, save_inventory_data
 
 pygame.init()
 
 # Screen dimensions
-WIDTH, HEIGHT = 1000, 700
+WIDTH, HEIGHT = 1200, 900
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Elixir Game")
 
@@ -25,12 +24,12 @@ GREY = (200, 200, 200)
 HOVER_COLOR = (170, 170, 170)
 SELECTED_COLOR1 = (100, 100, 255)
 SELECTED_COLOR2 = (255, 100, 100)
-TEXT_HIGHLIGHT = (255, 0, 255)  # Highlight color for text
+TEXT_HIGHLIGHT = (255, 0, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
 # Load images
-background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()  # Load with alpha for transparency
+background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
 ethereal_pear = pygame.image.load("etherealpear.png")
 flame_fruit = pygame.image.load("flamefruit.png")
 gleam_berry = pygame.image.load("gleamberry.png")
@@ -51,6 +50,10 @@ fruit_rgb_ranges = {
     "etherealpear": range(153, 204),
     "moonbeammelon": range(204, 255)
 }
+egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+load_inventory_data()
+
+
 # Personality keywords for each fruit
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
@@ -67,6 +70,7 @@ personality_keywords = [
     "Cheerful", "Demonic", "Mystical", "Flamboyant", "Awkward",
     "Weird", "Gross", "Gorgeous", "Ethereal", "Blessed"
 ]
+
 # Define the "Bottle Elixir" button
 bottle_button = pygame.Rect(850, HEIGHT - 150, 120, 40)
 
@@ -152,120 +156,6 @@ def draw_gradient_rect(screen, rect, color1, color2):
         ]
         pygame.draw.line(screen, color, (rect.left, y), (rect.right, y))
 
-def draw_inventory(surface, inventory, selected_inventory_slot=None):
-    pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
-
-    # Draw potion inventory slots
-    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
-    y_offset = HEIGHT - 90
-    for i, slot in enumerate(inventory_slots):
-        box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
-        if i == selected_inventory_slot:
-            pygame.draw.rect(surface, RED, box_rect, 3)  # Highlight selected slot
-        if slot is None:
-            # Draw empty slot with ?
-            draw_text(surface, "?", small_font, WHITE, box_rect)
-        else:
-            color, image_filename = slot
-            pygame.draw.rect(surface, color, box_rect)
-            image = pygame.image.load(image_filename)
-            image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
-            surface.blit(image, (x_offset, y_offset))
-        x_offset += 60  # Move left for the next slot
-         # Draw outline if this slot is selected
-        if i == selected_inventory_slot:
-            pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
-
-    # Draw the fruits in the remaining space
-    x_offset = 10  # Reset x_offset for fruit images
-    for fruit, image in fruit_images_dict.items():
-        surface.blit(image, (x_offset, y_offset))
-        draw_text(surface, str(inventory[fruit]), small_font, WHITE, pygame.Rect(x_offset + 20, y_offset + 45, 30, 30))
-        if selections[1:] and list(fruit_images_dict.keys()).index(fruit) in selections[1:]:
-            pygame.draw.rect(surface, RED, (x_offset - 5, y_offset - 5, 50, 50), 2)
-        x_offset += 50  # Move right for the next fruit
-def select_or_create_file():
-    from tkinter import Tk, filedialog
-    
-    root = Tk()
-    root.withdraw()  # Hide the main tkinter window
-    file_path = filedialog.asksaveasfilename(defaultextension=".db",
-                                             filetypes=[("SQLite database", "*.db"), ("JSON file", "*.json")],
-                                             title="Select or Create File")
-    return file_path
-
-
-def initialize_file(file_path):
-    conn = sqlite3.connect(file_path)
-    cursor = conn.cursor()
-    
-    # Create elixirs table
-    cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs (
-                        id INTEGER PRIMARY KEY,
-                        rgb TEXT,
-                        title TEXT,
-                        primary_trait TEXT,
-                        secondary_traits TEXT,
-                        image_file TEXT,
-                        position INTEGER
-                      )''')
-    
-    # Create inventory table with fruit as UNIQUE
-    cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
-                        id INTEGER PRIMARY KEY,
-                        fruit TEXT UNIQUE,
-                        count INTEGER
-                      )''')
-    
-    conn.commit()
-    conn.close()
-
-    #elif file_path.endswith(".json"):
-        #with open(file_path, 'w') as f:
-            #json.dump({"elixirs": [], "fruits": {}}, f)
-
-def save_elixir_data(file_path, elixir_data, fruit_counts):
-    conn = sqlite3.connect(file_path)
-    cursor = conn.cursor()
-    
-    # Insert elixir data
-    cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
-                      VALUES (?, ?, ?, ?, ?, ?)''',
-                   (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                    ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
-
-    # Update fruit counts
-    for fruit, count in fruit_counts.items():
-        cursor.execute('''INSERT INTO inventory (fruit, count)
-                          VALUES (?, ?)
-                          ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
-
-    conn.commit()
-    conn.close()
-
-    #elif file_path.endswith(".json"):
-        #with open(file_path, 'r+') as f:
-            #data = json.load(f)
-            #data['elixirs'].append(elixir_data)
-            #data['fruits'] = fruit_counts
-            #f.seek(0)
-            #json.dump(data, f, indent=4)
-
-def delete_elixir_data(file_path, position):
-    if file_path.endswith(".db"):
-        conn = sqlite3.connect(file_path)
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM elixirs WHERE position = ?', (position,))
-        conn.commit()
-        conn.close()
-    elif file_path.endswith(".json"):
-        with open(file_path, 'r+') as f:
-            data = json.load(f)
-            data['elixirs'] = [elixir for elixir in data['elixirs'] if elixir['position'] != position]
-            f.seek(0)
-            f.truncate()
-            json.dump(data, f, indent=4)
-
 def draw_screen(selected_box, selected_inventory_slot):
     # Clear screen
     screen.fill(BLACK)
@@ -322,7 +212,8 @@ def draw_screen(selected_box, selected_inventory_slot):
         draw_beveled_button(screen, delete_button, GREY, "Delete", font)
 
     # Draw the inventory
-    draw_inventory(screen, inventory, selected_inventory_slot)
+    draw_inventory(screen, inventory, egg_counts, inventory_slots, selected_inventory_slot)
+
 
     pygame.display.flip()
 
@@ -333,6 +224,9 @@ def main():
     selected_box = None
     file_path = None
     selected_inventory_slot = None
+
+    # Load inventory data at the start of the game
+    load_inventory_data()
 
     while running:
         # Automatically select the first empty box if no box is selected
