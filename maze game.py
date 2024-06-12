@@ -4,8 +4,7 @@ import time
 import sys
 import cProfile
 import pstats
-from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
-
+from game import load_inventory_data, save_inventory_data, draw_inventory
 # Initialize Pygame
 pygame.init()
 
@@ -15,8 +14,8 @@ SCREEN_HEIGHT = 900
 TILE_SIZE = 40
 INVENTORY_HEIGHT = 100
 PLAY_AREA_HEIGHT = SCREEN_HEIGHT - INVENTORY_HEIGHT
-MAZE_WIDTH = SCREEN_WIDTH // TILE_SIZE
-MAZE_HEIGHT = PLAY_AREA_HEIGHT // TILE_SIZE
+MAZE_WIDTH = (SCREEN_WIDTH // TILE_SIZE) - 1  # Exclude left and right border walls
+MAZE_HEIGHT = (PLAY_AREA_HEIGHT // TILE_SIZE) - 2  # Exclude top and bottom border wall
 FPS = 60
 
 # Adjust the screen dimensions to exclude the inventory height
@@ -69,7 +68,7 @@ def create_maze(width, height):
     maze = [[1] * width for _ in range(height)]
 
     def carve_passages(x, y):
-        directions = [(2, 0), (-2, 0), (0, 2), (0, -2)]
+        directions = [(3, 0), (-3, 0), (0, 3), (0, -3)]
         random.shuffle(directions)
         for dx, dy in directions:
             nx, ny = x + dx, y + dy
@@ -99,7 +98,11 @@ def find_valid_position():
 
 ripple_pos = find_valid_position()
 
-outer_walls = [(x, 1) for x in range(MAZE_WIDTH + 2)] + [(x, MAZE_HEIGHT + 1) for x in range(MAZE_WIDTH + 2)] + [(0, y) for y in range(2, MAZE_HEIGHT + 2)] + [(MAZE_WIDTH + 1, y) for y in range(2, MAZE_HEIGHT + 2)]
+outer_walls = (
+    [(x, 0) for x in range(MAZE_WIDTH + 2)] +  # Top wall
+    [(x, MAZE_HEIGHT + 1) for x in range(MAZE_WIDTH + 2)] +  # Bottom wall
+    [(MAZE_WIDTH + 1, y) for y in range(1, MAZE_HEIGHT + 1)]  # Right wall
+)
 
 def darken_image(image, factor):
     dark_image = image.copy()
@@ -194,13 +197,10 @@ def main():
     running = True
     clock = pygame.time.Clock()
 
-    print("Entering the game loop")
-
     while running:
         try:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    print("Quit event detected")
                     running = False
 
             keys = pygame.key.get_pressed()
@@ -313,6 +313,5 @@ if __name__ == "__main__":
     finally:
         profiler.disable()
         stats = pstats.Stats(profiler).sort_stats('cumtime')
-        stats.print_stats(10)  # Print the top 10 functions consuming the most time
         pygame.quit()
         sys.exit()

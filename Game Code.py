@@ -7,8 +7,8 @@ pygame.init()
 
 # Screen dimensions and configuration
 config = {
-    "width": 800,
-    "height": 600,
+    "width": 1200,
+    "height": 900,
     "playable_height": 540,  # Leave space for inventory at the bottom
     "enemy_health": {"enemy": 100, "bossenemy": 500, "malakar": 5000},
     "enemy_damages": {
