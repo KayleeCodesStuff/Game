@@ -124,7 +124,11 @@ def move_towards_target(pos, target, speed):
 def draw_game():
     screen.blit(background_img, (0, 0))  # Ensure this covers the play area correctly
     for (x, y, img) in maze_walls:
-        # Drawing walls
+        if (x, y) in tree_timers:
+            timer = tree_timers[(x, y)]
+            dark_factor = int(255 * (timer['start'] - time.time()) / (3 + additional_tree_destruction_time))
+            dark_factor = max(0, min(255, dark_factor))
+            img = darken_image(img, dark_factor)
         screen.blit(img, ((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE))
     for (x, y) in outer_walls:
         # Drawing outer walls
@@ -147,7 +151,7 @@ def draw_game():
     timer_text = font.render(f'Time: {elapsed_time}s', True, (255, 255, 255))
     screen.blit(timer_text, (SCREEN_WIDTH - 150, 10))
     instructions = font.render('Use arrow keys to move', True, (255, 255, 255))
-    screen.blit(instructions, (10, SCREEN_HEIGHT - 40))
+    screen.blit(instructions, (10, SCREEN_HEIGHT - 20))
 
     # Display player speed, nightcrawler speed, and blight speed in one row
     speed_text = font.render(f'Player Speed: {player_speed}  Nightcrawler Speed: {nightcrawler_speed}  Blight Speed: {additional_tree_destruction_time + 3}', True, (255, 255, 255))
