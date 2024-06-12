@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import sqlite3
+from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
 pygame.init()
 
@@ -68,8 +69,9 @@ fruit_images_dict = {
 }
 
 # Initialize inventory and egg counts
-inventory = {fruit: 5 for fruit in fruit_names}
-egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+inventory, egg_counts, inventory_slots = load_inventory_data()
+#inventory = {fruit: 5 for fruit in fruit_names}
+#egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
 
 # Add these lines before the main function
 def draw_text(surface, text, font, color, position):
@@ -94,7 +96,7 @@ while len(egg_positions) < 10:
         egg_positions.append(new_rect)
 
 # Inventory slots
-inventory_slots = [None] * 10
+#inventory_slots = [None] * 10
 
 
 # Create inventory slots with a fixed offset from the left side of the screen
@@ -124,76 +126,76 @@ secondary_traits_list = [
 ]
 
 # Function to generate a random elixir
-def generate_random_elixir():
-    primary_trait = random.choice(primary_traits)
-    secondary_traits = random.sample(secondary_traits_list, 3)
-    r = random.randint(0, 255)
-    g = random.randint(0, 255)
-    b = random.randint(0, 255)
-    rgb_value = (r, g, b)
-    return primary_trait, secondary_traits, rgb_value
+# def generate_random_elixir():
+#     primary_trait = random.choice(primary_traits)
+#     secondary_traits = random.sample(secondary_traits_list, 3)
+#     r = random.randint(0, 255)
+#     g = random.randint(0, 255)
+#     b = random.randint(0, 255)
+#     rgb_value = (r, g, b)
+#     return primary_trait, secondary_traits, rgb_value
 
 # Function to draw the inventory
-def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
-    pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
+# def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
+#     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))  # Adjusted to fit within the screen dimensions
 
-    y_offset = HEIGHT - 90  # Define y_offset for consistency
+#     y_offset = HEIGHT - 90  # Define y_offset for consistency
 
-    # Draw the fruits in the first section
-    x_offset = 10
-    for fruit, image in fruit_images_dict.items():
-        surface.blit(image, (x_offset, y_offset))
-        draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
-        x_offset += 60
+#     # Draw the fruits in the first section
+#     x_offset = 10
+#     for fruit, image in fruit_images_dict.items():
+#         surface.blit(image, (x_offset, y_offset))
+#         draw_text(surface, str(inventory[fruit]), small_font, WHITE, (x_offset + 20, y_offset + 45))
+#         x_offset += 60
 
-    # Draw a separator line
-    pygame.draw.line(surface, WHITE, (x_offset, HEIGHT - 100), (x_offset, HEIGHT))
+#     # Draw a separator line
+#     pygame.draw.line(surface, WHITE, (x_offset, HEIGHT - 100), (x_offset, HEIGHT))
 
-    # Draw the eggs in the second section
-    x_offset += 10  # Add some padding after the separator
-    for egg_type, count in eggs.items():
-        egg_image = egg_images_dict[egg_type]
-        surface.blit(egg_image, (x_offset, y_offset))
-        draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
-        x_offset += 60
+#     # Draw the eggs in the second section
+#     x_offset += 10  # Add some padding after the separator
+#     for egg_type, count in eggs.items():
+#         egg_image = egg_images_dict[egg_type]
+#         surface.blit(egg_image, (x_offset, y_offset))
+#         draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
+#         x_offset += 60
 
-    # Draw the elixirs in the third section
-    x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
-    for i, slot in enumerate(inventory_slots):
-        box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
-        if i == selected_inventory_slot:
-            pygame.draw.rect(surface, RED, box_rect, 3)  # Highlight selected slot
-        if slot is None:
-            # Draw empty slot with ?
-            draw_text(surface, "?", small_font, WHITE, (x_offset + 15, y_offset + 15))
-        else:
-            color, image_filename = slot
-            pygame.draw.rect(surface, color, box_rect)
-            image = pygame.image.load(image_filename)
-            image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
-            surface.blit(image, (x_offset, y_offset))
-        x_offset += 60  # Move left for the next slot
+#     # Draw the elixirs in the third section
+#     x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
+#     for i, slot in enumerate(inventory_slots):
+#         box_rect = pygame.Rect(x_offset, y_offset, 50, 50)
+#         if i == selected_inventory_slot:
+#             pygame.draw.rect(surface, RED, box_rect, 3)  # Highlight selected slot
+#         if slot is None:
+#             # Draw empty slot with ?
+#             draw_text(surface, "?", small_font, WHITE, (x_offset + 15, y_offset + 15))
+#         else:
+#             color, image_filename = slot
+#             pygame.draw.rect(surface, color, box_rect)
+#             image = pygame.image.load(image_filename)
+#             image = pygame.transform.scale(image, (50, 50))  # Resize the image to fit the box
+#             surface.blit(image, (x_offset, y_offset))
+#         x_offset += 60  # Move left for the next slot
 
-        # Draw outline if this slot is selected
-        if i == selected_inventory_slot:
-            pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
-def save_elixir_data(file_path, elixir_data, inventory):
-    try:
-        with sqlite3.connect(file_path) as conn:
-            cursor = conn.cursor()
-            # Insert elixir data
-            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
-                              VALUES (?, ?, ?, ?, ?, ?)''',
-                           (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                            ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
-            # Update fruit counts
-            for fruit, count in inventory.items():
-                cursor.execute('''INSERT INTO inventory (fruit, count)
-                                  VALUES (?, ?)
-                                  ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
-            conn.commit()
-    except Exception as e:
-        print(f"Error saving elixir data: {e}")
+#         # Draw outline if this slot is selected
+#         if i == selected_inventory_slot:
+#             pygame.draw.rect(surface, RED, box_rect, 3)  # Draw the outline on top
+# def save_elixir_data(file_path, elixir_data, inventory):
+#     try:
+#         with sqlite3.connect(file_path) as conn:
+#             cursor = conn.cursor()
+#             # Insert elixir data
+#             cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
+#                               VALUES (?, ?, ?, ?, ?, ?)''',
+#                            (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
+#                             ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
+#             # Update fruit counts
+#             for fruit, count in inventory.items():
+#                 cursor.execute('''INSERT INTO inventory (fruit, count)
+#                                   VALUES (?, ?)
+#                                   ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
+#             conn.commit()
+#     except Exception as e:
+#         print(f"Error saving elixir data: {e}")
 
 def draw_screen(selected_egg_index):
     screen.fill(BLACK)
@@ -208,77 +210,78 @@ def draw_screen(selected_egg_index):
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     pygame.display.flip()
+
 # Define the function to load inventory data from the database
-def load_inventory_data():
-    global inventory, egg_counts, inventory_slots
-    inventory = {fruit: 0 for fruit in fruit_names}
-    egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+# def load_inventory_data():
+#     global inventory, egg_counts, inventory_slots
+#     inventory = {fruit: 0 for fruit in fruit_names}
+#     egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
 
-    # Load from the database
-    try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT fruit, count FROM inventory")
-            rows = cursor.fetchall()
-            for row in rows:
-                fruit, count = row
-                inventory[fruit] = count
+#     # Load from the database
+#     try:
+#         with sqlite3.connect('save.db') as conn:
+#             cursor = conn.cursor()
+#             cursor.execute("SELECT fruit, count FROM inventory")
+#             rows = cursor.fetchall()
+#             for row in rows:
+#                 fruit, count = row
+#                 inventory[fruit] = count
 
-            cursor.execute("SELECT phenotype, count FROM egg_inventory")
-            rows = cursor.fetchall()
-            for row in rows:
-                phenotype, count = row
-                egg_counts[phenotype] = count
+#             cursor.execute("SELECT phenotype, count FROM egg_inventory")
+#             rows = cursor.fetchall()
+#             for row in rows:
+#                 phenotype, count = row
+#                 egg_counts[phenotype] = count
 
-            cursor.execute("SELECT rgb, image_file, position FROM elixirs")
-            rows = cursor.fetchall()
-            for row in rows:
-                rgb = tuple(map(int, row[0][1:-1].split(', ')))
-                image_file, position = row[1], row[2]
-                inventory_slots[position - 1] = (rgb, image_file)
+#             cursor.execute("SELECT rgb, image_file, position FROM elixirs")
+#             rows = cursor.fetchall()
+#             for row in rows:
+#                 rgb = tuple(map(int, row[0][1:-1].split(', ')))
+#                 image_file, position = row[1], row[2]
+#                 inventory_slots[position - 1] = (rgb, image_file)
 
-    except Exception as e:
-        print(f"Error loading inventory data: {e}")
+#     except Exception as e:
+#         print(f"Error loading inventory data: {e}")
 
-# Define the function to generate and add a random elixir
-def generate_and_add_random_elixir():
-    primary_trait, secondary_traits, rgb_value = generate_random_elixir()
-    for i in range(len(inventory_slots)):
-        if inventory_slots[i] is None:
-            image_file = "pb1.png"  # Choose a default image file for the elixir
-            inventory_slots[i] = (rgb_value, image_file)
-            elixir_data = {
-                'rgb': rgb_value,
-                'title': f"{primary_trait} Elixir",
-                'primary_trait': primary_trait,
-                'secondary_traits': secondary_traits,
-                'image_file': image_file,
-                'position': i + 1
-            }
-            save_elixir_data('save.db', elixir_data, inventory)
-            break
+# # Define the function to generate and add a random elixir
+# def generate_and_add_random_elixir():
+#     primary_trait, secondary_traits, rgb_value = generate_random_elixir()
+#     for i in range(len(inventory_slots)):
+#         if inventory_slots[i] is None:
+#             image_file = "pb1.png"  # Choose a default image file for the elixir
+#             inventory_slots[i] = (rgb_value, image_file)
+#             elixir_data = {
+#                 'rgb': rgb_value,
+#                 'title': f"{primary_trait} Elixir",
+#                 'primary_trait': primary_trait,
+#                 'secondary_traits': secondary_traits,
+#                 'image_file': image_file,
+#                 'position': i + 1
+#             }
+#             save_elixir_data('save.db', elixir_data, inventory)
+#             break
 
-# Check if the inventory is empty and generate a random elixir if necessary
-if all(slot is None for slot in inventory_slots):
-    generate_and_add_random_elixir()
+# # Check if the inventory is empty and generate a random elixir if necessary
+# if all(slot is None for slot in inventory_slots):
+#     generate_and_add_random_elixir()
 
 # Define the function to save inventory data to the database
-def save_inventory_data():
-    try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            for fruit, count in inventory.items():
-                cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
-            for egg, count in egg_counts.items():
-                cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
-            cursor.execute("DELETE FROM elixirs")
-            for i, slot in enumerate(inventory_slots):
-                if slot is not None:
-                    rgb, image_file = slot
-                    cursor.execute("INSERT INTO elixirs (rgb, image_file, position) VALUES (?, ?, ?)", (str(rgb), image_file, i + 1))
-            conn.commit()
-    except Exception as e:
-        print(f"Error saving inventory data: {e}")
+# def save_inventory_data():
+#     try:
+#         with sqlite3.connect('save.db') as conn:
+#             cursor = conn.cursor()
+#             for fruit, count in inventory.items():
+#                 cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
+#             for egg, count in egg_counts.items():
+#                 cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
+#             cursor.execute("DELETE FROM elixirs")
+#             for i, slot in enumerate(inventory_slots):
+#                 if slot is not None:
+#                     rgb, image_file = slot
+#                     cursor.execute("INSERT INTO elixirs (rgb, image_file, position) VALUES (?, ?, ?)", (str(rgb), image_file, i + 1))
+#             conn.commit()
+#     except Exception as e:
+#         print(f"Error saving inventory data: {e}")
 def main():
     global elixir_color
     elixir_color = None  # Initialize elixir_color
@@ -288,9 +291,8 @@ def main():
     # Load inventory data at the start of the game
     load_inventory_data()
 
-    # Check if the inventory is empty and generate a random elixir if necessary
-    if all(slot is None for slot in inventory_slots):
-        generate_and_add_random_elixir()
+    # Define elixir_data
+    elixir_data = define_elixir_data()
 
     while running:
         for event in pygame.event.get():
@@ -327,6 +329,7 @@ def main():
         draw_screen(selected_egg_index)
 
     # Save inventory data before exiting
+    save_elixir_data("save.db", elixir_data, inventory)
     save_inventory_data()
     pygame.quit()
     sys.exit()

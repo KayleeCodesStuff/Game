@@ -102,6 +102,24 @@ secondary_traits_list = [
     "Earthy", "Pragmatic", "Stout", "Loyal",
     "Angelic", "Unique", "Pure", "Self-righteous"
 ]
+def define_elixir_data():
+    primary_trait = random.choice(primary_traits)
+    secondary_traits = random.sample(secondary_traits_list, 3)
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+    rgb_value = (r, g, b)
+    image_file = "pb1.png"  # Choose a default image file for the elixir
+
+    elixir_data = {
+        'rgb': rgb_value,
+        'title': f"{primary_trait} Elixir",
+        'primary_trait': primary_trait,
+        'secondary_traits': secondary_traits,
+        'image_file': image_file,
+        'position': 1  # Default position, change as necessary
+    }
+    return elixir_data
 
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
