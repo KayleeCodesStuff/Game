@@ -8,7 +8,7 @@ import sqlite3
 import json
 import tkinter as tk
 from tkinter import filedialog
-from game import draw_inventory, load_inventory_data, save_inventory_data
+from game import *
 
 pygame.init()
 
@@ -51,8 +51,9 @@ fruit_rgb_ranges = {
     "moonbeammelon": range(204, 255)
 }
 #egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
-#load_inventory_data()
+
 inventory, egg_counts, inventory_slots = load_inventory_data()
+#load_inventory_data()
 
 # Personality keywords for each fruit
 fruit_personality_keywords = {
@@ -81,7 +82,7 @@ delete_button = pygame.Rect(850, HEIGHT - 200, 120, 40)
 image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
 
 # Define inventory slots
-inventory_slots = [None] * 10  # None means empty, else it will store the color and image
+#inventory_slots = [None] * 10  # None means empty, else it will store the color and image
 
 # Create inventory slots
 inventory_boxes = [pygame.Rect(20 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
@@ -109,7 +110,7 @@ elixir_color_name = None
 elixir_title = None
 
 # Inventory
-inventory = {fruit: 5 for fruit in fruit_names}
+#inventory = {fruit: 5 for fruit in fruit_names}
 
 def closest_color(requested_color):
     min_colors = {}

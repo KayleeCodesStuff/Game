@@ -188,6 +188,7 @@ def save_elixir_data(file_path, elixir_data, fruit_counts):
     try:
         with sqlite3.connect(file_path) as conn:
             cursor = conn.cursor()
+            logging.debug(f"Saving elixir data: {elixir_data}")
             cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
                               VALUES (?, ?, ?, ?, ?, ?)''',
                            (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
