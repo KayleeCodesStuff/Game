@@ -162,20 +162,22 @@ def draw_game():
     speed_text = font.render(f'Player Speed: {player_speed}  Nightcrawler Speed: {nightcrawler_speed}  Blight Speed: {additional_tree_destruction_time + 3}', True, (255, 255, 255))
     screen.blit(speed_text, (10, 10))
 
+
 def find_valid_nightcrawler_position():
     while True:
         x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
         if maze[y][x] == 0 and (x, y) not in [(x, y) for x, y, _ in maze_walls] and (x, y) not in outer_walls:
             return [x, y]
 def apply_fruit_effect(fruit_type):
-    global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time
+    global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time, ripple_pos
 
     if inventory.get(fruit_type, 0) > 0:
         inventory[fruit_type] -= 1
 
         if fruit_type == "gleamberry":
             player_speed += 2
-            print("Gleaming Berry used! Player speed increased.")
+            ripple_pos = find_valid_position()  # Change ripple position
+            print("Gleaming Berry used! Player speed increased. Ripple moved to a new position.")
         elif fruit_type == "shimmeringapple":
             player_speed += 1
             print("Shimmering Apple used! Player speed increased.")
@@ -189,7 +191,6 @@ def apply_fruit_effect(fruit_type):
         elif fruit_type == "moonbeammelon":
             additional_tree_destruction_time += 1
             print("Moonbeam Melon used! Blight effect increased.")
-
 
 def main():
     global player_pos, player_speed, start_time, elapsed_time, found_ripple, lost_game
