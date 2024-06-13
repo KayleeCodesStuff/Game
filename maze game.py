@@ -108,8 +108,6 @@ def find_valid_position():
 
 ripple_pos = find_valid_position()
 
-
-
 def darken_image(image, factor):
     dark_image = image.copy()
     dark_image.fill((0, 0, 0, factor), special_flags=pygame.BLEND_RGBA_MULT)
@@ -176,17 +174,12 @@ def apply_fruit_effect(fruit_type):
     global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time, ripple_pos
 def apply_fruit_effect(fruit_type, current_time):
     global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time, ripple_pos
-    global gleamberry_cooldown_end_time
+    global moonbeam_cooldown_end_time
 
     if inventory.get(fruit_type, 0) > 0:
         if fruit_type == "gleamberry":
-            if current_time < gleamberry_cooldown_end_time:
-                print("Gleaming Berry is on cooldown.")
-                return
-            gleamberry_cooldown_end_time = current_time + 30  # 30 seconds cooldown
-            player_speed += 2
-            ripple_pos = find_valid_position()  # Change ripple position
-            print("Gleaming Berry used! Player speed increased. Ripple moved to a new position.")
+            additional_tree_destruction_time += 1
+            print("Gleaming Berry used! Blight effect increased.")           
         elif fruit_type == "shimmeringapple":
             player_speed += 1
             print("Shimmering Apple used! Player speed increased.")
@@ -198,8 +191,12 @@ def apply_fruit_effect(fruit_type, current_time):
             flamefruit_effect_end_time = current_time + 5
             print("Flame Fruit used! Nightcrawler lured to Luminara's position for 5 seconds.")
         elif fruit_type == "moonbeammelon":
-            additional_tree_destruction_time += 1
-            print("Moonbeam Melon used! Blight effect increased.")
+            moonbeam_cooldown_end_time = current_time + 30  # 30 seconds cooldown
+            ripple_pos = find_valid_position()  # Change ripple position
+            print("Moonbeam Melon used! Ripple moved to a new position.")
+            if current_time < moonbeam_cooldown_end_time:
+                print("Moonbeam Melon is on cooldown.")
+                return
         inventory[fruit_type] -= 1
 
 
