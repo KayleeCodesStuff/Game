@@ -50,6 +50,8 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Maze Game')
 
 flamefruit_effect_end_time = 0
+gleamberry_cooldown_end_time = 0
+gleamberry_remaining_cooldown = 0
 
 font = pygame.font.Font(None, 28)
 large_font = pygame.font.Font(None, 64)
@@ -92,19 +94,21 @@ def generate_maze():
 maze, maze_walls = generate_maze()
 maze[1][1] = 0
 
-def find_valid_position():
-    while True:
-        x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
-        if maze[y][x] == 0:
-            return [x, y]
-
-ripple_pos = find_valid_position()
-
 outer_walls = (
     [(x, 0) for x in range(MAZE_WIDTH + 2)] +  # Top wall
     [(x, MAZE_HEIGHT + 1) for x in range(MAZE_WIDTH + 2)] +  # Bottom wall
     [(MAZE_WIDTH + 1, y) for y in range(1, MAZE_HEIGHT + 1)]  # Right wall
 )
+
+def find_valid_position():
+    while True:
+        x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
+        if maze[y][x] == 0 and (x, y) not in outer_walls:
+            return [x, y]
+
+ripple_pos = find_valid_position()
+
+
 
 def darken_image(image, factor):
     dark_image = image.copy()
@@ -170,11 +174,16 @@ def find_valid_nightcrawler_position():
             return [x, y]
 def apply_fruit_effect(fruit_type):
     global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time, ripple_pos
+def apply_fruit_effect(fruit_type, current_time):
+    global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time, ripple_pos
+    global gleamberry_cooldown_end_time
 
     if inventory.get(fruit_type, 0) > 0:
-        inventory[fruit_type] -= 1
-
         if fruit_type == "gleamberry":
+            if current_time < gleamberry_cooldown_end_time:
+                print("Gleaming Berry is on cooldown.")
+                return
+            gleamberry_cooldown_end_time = current_time + 30  # 30 seconds cooldown
             player_speed += 2
             ripple_pos = find_valid_position()  # Change ripple position
             print("Gleaming Berry used! Player speed increased. Ripple moved to a new position.")
@@ -186,11 +195,13 @@ def apply_fruit_effect(fruit_type):
             print("Ethereal Pear used! Nightcrawler speed decreased.")
         elif fruit_type == "flamefruit":
             nightcrawler_target = player_pos.copy()  # Target Luminara's position at the moment
-            flamefruit_effect_end_time = time.time() + 5
+            flamefruit_effect_end_time = current_time + 5
             print("Flame Fruit used! Nightcrawler lured to Luminara's position for 5 seconds.")
         elif fruit_type == "moonbeammelon":
             additional_tree_destruction_time += 1
             print("Moonbeam Melon used! Blight effect increased.")
+        inventory[fruit_type] -= 1
+
 
 def main():
     global player_pos, player_speed, start_time, elapsed_time, found_ripple, lost_game
@@ -242,15 +253,15 @@ def main():
             if keys[pygame.K_DOWN]:
                 next_pos[1] += player_speed
             if keys[pygame.K_1]:
-                apply_fruit_effect("gleamberry")
+                apply_fruit_effect("gleamberry", current_time)
             if keys[pygame.K_2]:
-                apply_fruit_effect("flamefruit")
+                apply_fruit_effect("flamefruit", current_time)
             if keys[pygame.K_3]:
-                apply_fruit_effect("shimmeringapple")
+                apply_fruit_effect("shimmeringapple", current_time)
             if keys[pygame.K_4]:
-                apply_fruit_effect("etherealpear")
+                apply_fruit_effect("etherealpear", current_time)
             if keys[pygame.K_5]:
-                apply_fruit_effect("moonbeammelon")
+                apply_fruit_effect("moonbeammelon", current_time)
 
             if not (found_ripple or lost_game):
                 if 0 <= next_pos[0] < SCREEN_WIDTH and TILE_SIZE <= next_pos[1] < PLAY_AREA_HEIGHT and not is_colliding_with_walls(next_pos):
@@ -305,16 +316,6 @@ def main():
                     inventory[fruit_type] += 1
                     del fruit_positions[pos]
 
-                    if fruit_type == "shimmeringapple":
-                        player_speed += 1
-                    elif fruit_type == "flamefruit":
-                        nightcrawler_target = [pos[0] * TILE_SIZE, pos[1] * TILE_SIZE]
-                        nightcrawler_target_time = current_time + 3
-                    elif fruit_type == "etherealpear":
-                        nightcrawler_speed = max(1, nightcrawler_speed - 0.5)
-                    elif fruit_type == "moonbeammelon":
-                        additional_tree_destruction_time += 1
-
             to_remove = []
             for (x, y) in tree_timers:
                 if current_time >= tree_timers[(x, y)]['start']:
@@ -342,6 +343,7 @@ def main():
 
     save_inventory_data()  # Save the inventory data before quitting
     print("Exiting the game loop")
+
 
 if __name__ == "__main__":
     profiler = cProfile.Profile()
