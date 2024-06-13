@@ -1,6 +1,7 @@
 import pygame
 import random
 import sys
+import os
 import sqlite3
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
@@ -132,6 +133,90 @@ def draw_screen(selected_egg_index):
 
     pygame.display.flip()
 
+# Database connections
+current_dir = os.path.dirname(os.path.abspath(__file__))
+dragons_db_path = os.path.join(current_dir, 'dragonsedit.db')
+try:
+    dragons_conn = sqlite3.connect(dragons_db_path)
+    dragons_cursor = dragons_conn.cursor()
+    dragons_cursor.execute("SELECT * FROM dragons;")
+    dragons = dragons_cursor.fetchall()
+    dragons_conn.close()
+except sqlite3.OperationalError as e:
+    print(f"Error opening dragons database: {e}")
+
+
+save_db_path = os.path.join(current_dir, 'save.db')
+try:
+    save_conn = sqlite3.connect(save_db_path)
+    save_cursor = save_conn.cursor()
+    save_cursor.execute("SELECT * FROM elixirs;")
+    elixirs = save_cursor.fetchall()
+    save_cursor.execute("SELECT * FROM eggs;")
+    eggs = save_cursor.fetchall()
+    save_conn.close()
+except sqlite3.OperationalError as e:
+    print(f"Error opening save database: {e}")
+
+def get_statistical_pool(elixir, nurture_trait, dragons):
+    pool = []
+
+    elixir_primary = elixir[3]
+    elixir_secondaries = elixir[4].split(',')
+
+    for dragon in dragons:
+        chances = 0
+
+        # Check for shared primary trait
+        if dragon[4] == elixir_primary:
+            chances += 1
+
+        # Check for shared secondary traits
+        dragon_secondaries = dragon[5].split(',')
+        for secondary in elixir_secondaries:
+            if secondary in dragon_secondaries:
+                chances += 1
+
+        # Check for shared nurture trait
+        if dragon[10] == nurture_trait:
+            chances += 1
+
+        if chances > 0:
+            pool.extend([dragon] * chances)
+
+    return pool
+
+def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
+    filtered_pool = []
+
+    egg_phenotype = egg[2]
+    elixir_rgb_value = eval(elixir_rgb)  # Convert string representation of RGB to tuple
+
+    for dragon in pool:
+        dragon_phenotype = dragon[2]
+        dragon_rgb_range = eval(dragon[9])  # Convert string representation of RGB range to tuple
+
+        # Check phenotype
+        if egg_phenotype in ["Metallic", "Gold", "Silver"] and dragon_phenotype != "Metallic":
+            continue
+        elif egg_phenotype != dragon_phenotype:
+            continue
+
+        # Check RGB range
+        if not (dragon_rgb_range[0] <= elixir_rgb_value[0] <= dragon_rgb_range[1] and
+                dragon_rgb_range[0] <= elixir_rgb_value[1] <= dragon_rgb_range[1] and
+                dragon_rgb_range[0] <= elixir_rgb_value[2] <= dragon_rgb_range[1]):
+            continue
+
+        filtered_pool.append(dragon)
+
+    return filtered_pool
+
+def select_dragon_from_pool(filtered_pool):
+    if not filtered_pool:
+        return None
+    return random.choice(filtered_pool)
+
 def main():
     global elixir_color
     elixir_color = None  # Initialize elixir_color
@@ -139,7 +224,7 @@ def main():
     selected_egg_index = None
 
     # Load inventory data at the start of the game
-    load_inventory_data()
+    inventory, egg_counts, inventory_slots = load_inventory_data()
 
     # Define elixir_data
     elixir_data = define_elixir_data()
