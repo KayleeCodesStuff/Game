@@ -49,6 +49,8 @@ fruit_images = {name: pygame.transform.scale(load_image(f"{name}.png"), (45, 45)
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Maze Game')
 
+flamefruit_effect_end_time = 0
+
 font = pygame.font.Font(None, 28)
 large_font = pygame.font.Font(None, 64)
 
@@ -68,7 +70,7 @@ def create_maze(width, height):
     maze = [[1] * width for _ in range(height)]
 
     def carve_passages(x, y):
-        directions = [(3, 0), (-3, 0), (0, 3), (0, -3)]
+        directions = [(2, 0), (-2, 0), (0, 2), (0, -2)]
         random.shuffle(directions)
         for dx, dy in directions:
             nx, ny = x + dx, y + dy
@@ -165,12 +167,35 @@ def find_valid_nightcrawler_position():
         x, y = random.randint(1, MAZE_WIDTH - 2), random.randint(1, MAZE_HEIGHT - 2)
         if maze[y][x] == 0 and (x, y) not in [(x, y) for x, y, _ in maze_walls] and (x, y) not in outer_walls:
             return [x, y]
+def apply_fruit_effect(fruit_type):
+    global player_speed, nightcrawler_target, nightcrawler_speed, additional_tree_destruction_time, flamefruit_effect_end_time
+
+    if inventory.get(fruit_type, 0) > 0:
+        inventory[fruit_type] -= 1
+
+        if fruit_type == "gleamberry":
+            player_speed += 2
+            print("Gleaming Berry used! Player speed increased.")
+        elif fruit_type == "shimmeringapple":
+            player_speed += 1
+            print("Shimmering Apple used! Player speed increased.")
+        elif fruit_type == "etherealpear":
+            nightcrawler_speed = max(1, nightcrawler_speed - 0.5)
+            print("Ethereal Pear used! Nightcrawler speed decreased.")
+        elif fruit_type == "flamefruit":
+            nightcrawler_target = player_pos.copy()  # Target Luminara's position at the moment
+            flamefruit_effect_end_time = time.time() + 5
+            print("Flame Fruit used! Nightcrawler lured to Luminara's position for 5 seconds.")
+        elif fruit_type == "moonbeammelon":
+            additional_tree_destruction_time += 1
+            print("Moonbeam Melon used! Blight effect increased.")
+
 
 def main():
     global player_pos, player_speed, start_time, elapsed_time, found_ripple, lost_game
     global nightcrawler_pos, nightcrawler_speed, nightcrawler_target_time, nightcrawler_spawn_time
     global last_fruit_spawn_time, fruit_positions, additional_tree_destruction_time, tree_timers
-    global maze_walls, ripple_pos, outer_walls
+    global maze_walls, ripple_pos, outer_walls, flamefruit_effect_end_time, nightcrawler_target
 
     # Initialize global variables
     player_pos = [2 * TILE_SIZE, 2 * TILE_SIZE]
@@ -199,6 +224,8 @@ def main():
 
     while running:
         try:
+            current_time = time.time()  # Update current time at the beginning of each loop iteration
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -213,10 +240,24 @@ def main():
                 next_pos[1] -= player_speed
             if keys[pygame.K_DOWN]:
                 next_pos[1] += player_speed
+            if keys[pygame.K_1]:
+                apply_fruit_effect("gleamberry")
+            if keys[pygame.K_2]:
+                apply_fruit_effect("flamefruit")
+            if keys[pygame.K_3]:
+                apply_fruit_effect("shimmeringapple")
+            if keys[pygame.K_4]:
+                apply_fruit_effect("etherealpear")
+            if keys[pygame.K_5]:
+                apply_fruit_effect("moonbeammelon")
 
             if not (found_ripple or lost_game):
                 if 0 <= next_pos[0] < SCREEN_WIDTH and TILE_SIZE <= next_pos[1] < PLAY_AREA_HEIGHT and not is_colliding_with_walls(next_pos):
                     player_pos = next_pos
+
+            # Update nightcrawler target based on flamefruit effect
+            if current_time > flamefruit_effect_end_time:
+                nightcrawler_target = [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE]
 
             player_rect = pygame.Rect(player_pos[0], player_pos[1], TILE_SIZE, TILE_SIZE)
             ripple_rect = pygame.Rect((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
@@ -224,27 +265,25 @@ def main():
                 print("Ripple found")
                 found_ripple = True
 
-            if not nightcrawler_pos and time.time() >= nightcrawler_spawn_time:
+            if not nightcrawler_pos and current_time >= nightcrawler_spawn_time:
                 nightcrawler_pos = [coord * TILE_SIZE for coord in find_valid_nightcrawler_position()]
                 nightcrawler_target = [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE]
-
             if nightcrawler_pos and not found_ripple and not lost_game:
-                nightcrawler_target = nightcrawler_target if time.time() < nightcrawler_target_time else [(ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE]
                 nightcrawler_pos = move_towards_target(nightcrawler_pos, nightcrawler_target, nightcrawler_speed)
                 nightcrawler_rect = pygame.Rect(nightcrawler_pos[0], nightcrawler_pos[1], TILE_SIZE, TILE_SIZE)
 
+                # Check for collision with walls or other elements as needed
                 for (x, y, img) in maze_walls:
                     wall_rect = pygame.Rect((x + 1) * TILE_SIZE, (y + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)
                     if nightcrawler_rect.colliderect(wall_rect):
                         if (x, y) not in tree_timers:
-                            tree_timers[(x, y)] = {'start': time.time() + 3 + additional_tree_destruction_time, 'img': img}
+                            tree_timers[(x, y)] = {'start': current_time + 3 + additional_tree_destruction_time, 'img': img}
                         break
 
-                if nightcrawler_rect.colliderect(ripple_rect):
+                if nightcrawler_rect.colliderect(pygame.Rect((ripple_pos[0] + 1) * TILE_SIZE, (ripple_pos[1] + 1) * TILE_SIZE, TILE_SIZE, TILE_SIZE)):
                     print("Nightcrawler reached the ripple")
                     lost_game = True
 
-            current_time = time.time()
             if not (found_ripple or lost_game):
                 elapsed_time = int(current_time - start_time)
 
@@ -269,7 +308,7 @@ def main():
                         player_speed += 1
                     elif fruit_type == "flamefruit":
                         nightcrawler_target = [pos[0] * TILE_SIZE, pos[1] * TILE_SIZE]
-                        nightcrawler_target_time = time.time() + 3
+                        nightcrawler_target_time = current_time + 3
                     elif fruit_type == "etherealpear":
                         nightcrawler_speed = max(1, nightcrawler_speed - 0.5)
                     elif fruit_type == "moonbeammelon":
@@ -302,8 +341,6 @@ def main():
 
     save_inventory_data()  # Save the inventory data before quitting
     print("Exiting the game loop")
-
-
 
 if __name__ == "__main__":
     profiler = cProfile.Profile()
