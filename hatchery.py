@@ -1,8 +1,8 @@
 import pygame
 import random
 import sys
-import os
 import sqlite3
+import os
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
 pygame.init()
@@ -22,12 +22,13 @@ RED = (255, 0, 0)
 # Load images
 background = pygame.image.load("hatchery.png").convert_alpha()
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-egg_image = pygame.image.load("unhatched.png").convert_alpha()
+unhatched_egg_image = pygame.image.load("unhatched.png").convert_alpha()
 
 # Resize egg images and create egg rectangles with increased spacing
-egg_image = pygame.transform.scale(egg_image, (80, 80))
+unhatched_egg_image = pygame.transform.scale(unhatched_egg_image, (80, 80))
 egg_positions = []
 egg_colors = [WHITE] * 10  # Initialize each egg's color to WHITE
+egg_images = [unhatched_egg_image] * 10  # Initialize each egg's image to unhatched
 
 # Load and resize egg images
 black_egg = pygame.image.load("black_egg.png")
@@ -127,7 +128,7 @@ def draw_screen(selected_egg_index):
         if i == selected_egg_index:
             pygame.draw.rect(screen, RED, rect.inflate(4, 4), 2)  # Draw red outline
         pygame.draw.rect(screen, egg_colors[i], rect)  # Draw the egg with its current color
-        screen.blit(egg_image, rect.topleft)
+        screen.blit(egg_images[i], rect.topleft)  # Draw the correct egg image
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
@@ -136,6 +137,8 @@ def draw_screen(selected_egg_index):
 # Database connections
 current_dir = os.path.dirname(os.path.abspath(__file__))
 dragons_db_path = os.path.join(current_dir, 'dragonsedit.db')
+save_db_path = os.path.join(current_dir, 'save.db')
+
 try:
     dragons_conn = sqlite3.connect(dragons_db_path)
     dragons_cursor = dragons_conn.cursor()
@@ -145,8 +148,6 @@ try:
 except sqlite3.OperationalError as e:
     print(f"Error opening dragons database: {e}")
 
-
-save_db_path = os.path.join(current_dir, 'save.db')
 try:
     save_conn = sqlite3.connect(save_db_path)
     save_cursor = save_conn.cursor()
@@ -157,6 +158,54 @@ try:
     save_conn.close()
 except sqlite3.OperationalError as e:
     print(f"Error opening save database: {e}")
+
+def display_egg_menu(selected_egg_index):
+    running = True
+    menu_font = pygame.font.Font(None, 28)
+    menu_rects = []
+    
+    while running:
+        screen.fill(GREY)
+        menu_rects.clear()  # Clear the list to avoid duplication
+
+        for i, egg in enumerate(eggs):
+            item_text = f"ID: {egg[0]}, Phenotype: {egg[2]}, Parents: {egg[4]} & {egg[5]}"  # Assuming egg[0] is the ID, egg[2] is the phenotype, egg[4] is parent 1, and egg[5] is parent 2
+            text_surf = menu_font.render(item_text, True, BLACK)
+            text_rect = text_surf.get_rect(center=(WIDTH // 2, 50 + i * 30))
+            screen.blit(text_surf, text_rect)
+            menu_rects.append((text_rect, i))
+        
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = event.pos
+                for rect, index in menu_rects:
+                    if rect.collidepoint(x, y):
+                        selected_egg = eggs[index]
+                        phenotype = selected_egg[2]
+                        
+                        # Update the egg image based on the phenotype
+                        if phenotype in egg_images_dict:
+                            egg_images[selected_egg_index] = egg_images_dict[phenotype]
+                        else:
+                            egg_images[selected_egg_index] = unhatched_egg_image  # Default image if phenotype not found
+
+                        # Update egg color to match the selected phenotype
+                        if phenotype == "Black":
+                            egg_colors[selected_egg_index] = BLACK
+                        elif phenotype == "White":
+                            egg_colors[selected_egg_index] = WHITE
+                        elif phenotype == "Rainbow":
+                            egg_colors[selected_egg_index] = (255, 105, 180)  # Example color for rainbow, adjust as needed
+                        elif phenotype == "Metallic":
+                            egg_colors[selected_egg_index] = GREY
+
+                        print(f"Selected egg: {selected_egg}")
+                        running = False
+                        break
 
 def get_statistical_pool(elixir, nurture_trait, dragons):
     pool = []
@@ -217,6 +266,7 @@ def select_dragon_from_pool(filtered_pool):
         return None
     return random.choice(filtered_pool)
 
+# Update the main function call to display the egg menu correctly
 def main():
     global elixir_color
     elixir_color = None  # Initialize elixir_color
@@ -244,6 +294,7 @@ def main():
                         selected_egg_index = j
                         egg_selected = True
                         print(f"Egg {j} selected at position {egg_rect.topleft}")
+                        display_egg_menu(selected_egg_index)  # Display egg selection menu
                         break
 
                 if not egg_selected:
