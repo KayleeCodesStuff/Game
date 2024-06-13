@@ -3,6 +3,7 @@ import random
 import sys
 import sqlite3
 import os
+import threading
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
 pygame.init()
@@ -30,6 +31,7 @@ unhatched_egg_image = pygame.transform.scale(unhatched_egg_image, egg_size)
 egg_positions = []
 egg_colors = [WHITE] * 10  # Initialize each egg's color to WHITE
 egg_images = [unhatched_egg_image] * 10  # Initialize each egg's image to unhatched
+egg_selected_from_db = [False] * 10  # Track if eggs have been selected from the database
 
 # Load and resize egg images
 black_egg = pygame.image.load("black_egg.png")
@@ -83,13 +85,11 @@ def draw_text(surface, text, font, color, position):
 EGG_PADDING = 200
 
 # Function to check for overlapping rectangles
-# Function to check for overlapping rectangles
 def is_overlapping(new_rect, rect_list):
     for rect in rect_list:
         if new_rect.colliderect(rect):
             return True
     return False
-
 
 # Create non-overlapping egg positions with increased padding
 while len(egg_positions) < 10:
@@ -196,9 +196,90 @@ def display_egg_menu(selected_egg_index):
                         else:
                             egg_images[selected_egg_index] = unhatched_egg_image  # Default image if phenotype not found
 
+                        egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
                         print(f"Selected egg: {selected_egg}")
                         running = False
                         break
+import random
+
+def fetch_random_nurture_options():
+    try:
+        conn = sqlite3.connect('option dragonsedit.db')
+        cursor = conn.cursor()
+        
+        options = {}
+        for option in ['A', 'B', 'C', 'D']:
+            cursor.execute(f"SELECT text, trait FROM nurture WHERE option = '{option}' ORDER BY RANDOM() LIMIT 1;")
+            options[option] = cursor.fetchone()
+        
+        conn.close()
+        return options
+    except Exception as e:
+        print(f"Error fetching nurture options: {e}")
+        return None
+def display_nurture_options():
+    options = fetch_random_nurture_options()
+    if not options:
+        return None
+
+    running = True
+    selected_trait = None
+    
+    while running:
+        screen.fill(GREY)
+        
+        for i, (option_key, option_value) in enumerate(options.items()):
+            text_surf = font.render(option_value[0], True, BLACK)
+            text_rect = text_surf.get_rect(center=(WIDTH // 2, 100 + i * 50))
+            screen.blit(text_surf, text_rect)
+            
+            if text_rect.collidepoint(pygame.mouse.get_pos()):
+                pygame.draw.rect(screen, RED, text_rect.inflate(10, 10), 2)
+                if pygame.mouse.get_pressed()[0]:
+                    selected_trait = option_value[1]
+                    running = False
+        
+        pygame.display.flip()
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+    
+    return selected_trait
+
+def start_timer(duration, egg_position, selected_egg_index, default_trait="independent"):
+    start_ticks = pygame.time.get_ticks()
+    selected_trait = None
+    running = True
+
+    def run_timer():
+        nonlocal selected_trait, running
+        while running:
+            seconds = (pygame.time.get_ticks() - start_ticks) / 1000
+            countdown = duration - int(seconds)
+
+            if countdown <= 0:
+                running = False
+                selected_trait = default_trait
+
+            screen.fill(BLACK)
+            screen.blit(background, (0, 0))
+            draw_screen(selected_egg_index)
+
+            timer_text = font.render(str(countdown), True, (57, 255, 20))  # Neon green color
+            screen.blit(timer_text, egg_position)
+
+            pygame.display.flip()
+
+            if not running:
+                user_trait = display_nurture_options()
+                if user_trait:
+                    selected_trait = user_trait
+
+    timer_thread = threading.Thread(target=run_timer)
+    timer_thread.start()
+
+    return timer_thread
 
 def get_statistical_pool(elixir, nurture_trait, dragons):
     pool = []
@@ -295,16 +376,25 @@ def main():
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
                             selected_elixir = inventory_slots[i]
+                            print(f"Selected elixir: {selected_elixir}")  # Debug print
                             elixir_color = selected_elixir[0]
-                            if selected_egg_index is not None:
-                                # Apply the elixir to the selected egg
+                            if selected_egg_index is not None and egg_selected_from_db[selected_egg_index]:
+                                # Apply the elixir to the selected egg if it has been selected from the database
                                 egg_colors[selected_egg_index] = elixir_color
                                 # Remove the elixir from the inventory
                                 inventory_slots[i] = None
                                 elixir_color = None
-                                selected_egg_index = None  # Reset the selected egg index
-                            break
-
+                                
+                                # Start the timer and display nurture options
+                                egg_position = egg_positions[selected_egg_index].topleft
+                                selected_trait = start_timer(60, egg_position, selected_egg_index)
+                                
+                                # Use selected_trait in the get_statistical_pool function
+                                if selected_trait:
+                                    statistical_pool = get_statistical_pool(selected_elixir, selected_trait, dragons)
+                                selected_egg_index = None  # Reset the selected egg index after processing
+                                break
+                            
         draw_screen(selected_egg_index)
 
     # Save inventory data before exiting
