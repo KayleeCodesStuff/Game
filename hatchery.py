@@ -3,7 +3,6 @@ import random
 import sys
 import sqlite3
 import os
-import threading
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
 pygame.init()
@@ -123,7 +122,7 @@ secondary_traits_list = [
     "Angelic", "Unique", "Pure", "Self-righteous"
 ]
 
-def draw_screen(selected_egg_index):
+def draw_screen(selected_egg_index, active_timers):
     screen.fill(BLACK)
     screen.blit(background, (0, 0))
 
@@ -134,6 +133,10 @@ def draw_screen(selected_egg_index):
         screen.blit(egg_images[i], rect.topleft)  # Draw the correct egg image
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
+
+    # Draw all active timers
+    for egg_timer in active_timers:
+        egg_timer.display()
 
     pygame.display.flip()
 
@@ -200,7 +203,6 @@ def display_egg_menu(selected_egg_index):
                         print(f"Selected egg: {selected_egg}")
                         running = False
                         break
-import random
 
 def fetch_random_nurture_options():
     try:
@@ -217,6 +219,7 @@ def fetch_random_nurture_options():
     except Exception as e:
         print(f"Error fetching nurture options: {e}")
         return None
+
 def display_nurture_options():
     options = fetch_random_nurture_options()
     if not options:
@@ -247,39 +250,36 @@ def display_nurture_options():
     
     return selected_trait
 
-def start_timer(duration, egg_position, selected_egg_index, default_trait="independent"):
-    start_ticks = pygame.time.get_ticks()
-    selected_trait = None
-    running = True
+class EggTimer:
+    def __init__(self, egg_index, egg_position, duration=60, default_trait="independent"):
+        self.egg_index = egg_index  # Initialize egg_index with the value passed to the constructor
+        self.egg_position = egg_position
+        self.duration = duration
+        self.default_trait = default_trait
+        self.start_ticks = pygame.time.get_ticks()
+        self.selected_trait = None
+        self.running = True
+        print(f"EggTimer created for egg {egg_index} at position {egg_position}")
 
-    def run_timer():
-        nonlocal selected_trait, running
-        while running:
-            seconds = (pygame.time.get_ticks() - start_ticks) / 1000
-            countdown = duration - int(seconds)
+    def update(self):
+        seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
+        countdown = self.duration - int(seconds)
 
-            if countdown <= 0:
-                running = False
-                selected_trait = default_trait
+        if countdown <= 0:
+            self.running = False
+            self.selected_trait = self.default_trait
+            print(f"Timer ended for egg {self.egg_index}")
 
-            screen.fill(BLACK)
-            screen.blit(background, (0, 0))
-            draw_screen(selected_egg_index)
+        print(f"Timer update for egg {self.egg_index}: {countdown} seconds left")
+        return countdown
 
+    def display(self):
+        countdown = self.update()
+        if self.running:
             timer_text = font.render(str(countdown), True, (57, 255, 20))  # Neon green color
-            screen.blit(timer_text, egg_position)
-
-            pygame.display.flip()
-
-            if not running:
-                user_trait = display_nurture_options()
-                if user_trait:
-                    selected_trait = user_trait
-
-    timer_thread = threading.Thread(target=run_timer)
-    timer_thread.start()
-
-    return timer_thread
+            screen.blit(timer_text, (self.egg_position[0], self.egg_position[1] - 30))  # Adjust position as needed
+            print(f"Displaying timer for egg {self.egg_index}: {countdown} seconds left")
+        return self.selected_trait if not self.running else None
 
 def get_statistical_pool(elixir, nurture_trait, dragons):
     pool = []
@@ -346,6 +346,7 @@ def main():
     elixir_color = None  # Initialize elixir_color
     running = True
     selected_egg_index = None
+    active_timers = []
 
     # Load inventory data at the start of the game
     inventory, egg_counts, inventory_slots = load_inventory_data()
@@ -384,18 +385,27 @@ def main():
                                 # Remove the elixir from the inventory
                                 inventory_slots[i] = None
                                 elixir_color = None
-                                
+
                                 # Start the timer and display nurture options
                                 egg_position = egg_positions[selected_egg_index].topleft
-                                selected_trait = start_timer(60, egg_position, selected_egg_index)
-                                
-                                # Use selected_trait in the get_statistical_pool function
-                                if selected_trait:
-                                    statistical_pool = get_statistical_pool(selected_elixir, selected_trait, dragons)
-                                selected_egg_index = None  # Reset the selected egg index after processing
+                                new_timer = EggTimer(selected_egg_index, egg_position)
+                                print(f"Created new timer for egg {selected_egg_index}")
+                                active_timers.append(new_timer)
+                                display_nurture_options()  # Display nurture options when the timer starts
                                 break
-                            
-        draw_screen(selected_egg_index)
+        
+        # Update and display all active timers
+        for egg_timer in active_timers[:]:
+            selected_trait = egg_timer.display()
+            if selected_trait is not None:
+                # Use selected_trait in the get_statistical_pool function
+                selected_elixir = elixirs[egg_timer.egg_index] if egg_timer.egg_index < len(elixirs) else None
+                print(f"Selected trait: {selected_trait}, Selected elixir: {selected_elixir}")
+                if selected_trait and selected_elixir:
+                    statistical_pool = get_statistical_pool(selected_elixir, selected_trait, dragons)
+                active_timers.remove(egg_timer)
+        
+        draw_screen(selected_egg_index, active_timers)
 
     # Save inventory data before exiting
     save_elixir_data("save.db", elixir_data, inventory)
@@ -405,3 +415,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
