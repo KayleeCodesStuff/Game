@@ -25,23 +25,24 @@ background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 unhatched_egg_image = pygame.image.load("unhatched.png").convert_alpha()
 
 # Resize egg images and create egg rectangles with increased spacing
-unhatched_egg_image = pygame.transform.scale(unhatched_egg_image, (80, 80))
+egg_size = (80, 80)
+unhatched_egg_image = pygame.transform.scale(unhatched_egg_image, egg_size)
 egg_positions = []
 egg_colors = [WHITE] * 10  # Initialize each egg's color to WHITE
 egg_images = [unhatched_egg_image] * 10  # Initialize each egg's image to unhatched
 
 # Load and resize egg images
 black_egg = pygame.image.load("black_egg.png")
-black_egg = pygame.transform.scale(black_egg, (50, 50))
+black_egg = pygame.transform.scale(black_egg, egg_size)
 
 white_egg = pygame.image.load("white_egg.png")
-white_egg = pygame.transform.scale(white_egg, (50, 50))
+white_egg = pygame.transform.scale(white_egg, egg_size)
 
 rainbow_egg = pygame.image.load("rainbow_egg.png")
-rainbow_egg = pygame.transform.scale(rainbow_egg, (50, 50))
+rainbow_egg = pygame.transform.scale(rainbow_egg, egg_size)
 
 metallic_egg = pygame.image.load("metallic_egg.png")
-metallic_egg = pygame.transform.scale(metallic_egg, (50, 50))
+metallic_egg = pygame.transform.scale(metallic_egg, egg_size)
 
 # Create a dictionary for egg images
 egg_images_dict = {
@@ -82,16 +83,18 @@ def draw_text(surface, text, font, color, position):
 EGG_PADDING = 200
 
 # Function to check for overlapping rectangles
+# Function to check for overlapping rectangles
 def is_overlapping(new_rect, rect_list):
     for rect in rect_list:
         if new_rect.colliderect(rect):
             return True
     return False
 
+
 # Create non-overlapping egg positions with increased padding
 while len(egg_positions) < 10:
     pos = (random.randint(EGG_PADDING, WIDTH - EGG_PADDING - 80), random.randint(EGG_PADDING, HEIGHT - EGG_PADDING - 80))
-    new_rect = pygame.Rect(pos, (80, 80))
+    new_rect = pygame.Rect(pos, egg_size)
     if not is_overlapping(new_rect, egg_positions):
         egg_positions.append(new_rect)
 
@@ -192,16 +195,6 @@ def display_egg_menu(selected_egg_index):
                             egg_images[selected_egg_index] = egg_images_dict[phenotype]
                         else:
                             egg_images[selected_egg_index] = unhatched_egg_image  # Default image if phenotype not found
-
-                        # Update egg color to match the selected phenotype
-                        if phenotype == "Black":
-                            egg_colors[selected_egg_index] = BLACK
-                        elif phenotype == "White":
-                            egg_colors[selected_egg_index] = WHITE
-                        elif phenotype == "Rainbow":
-                            egg_colors[selected_egg_index] = (255, 105, 180)  # Example color for rainbow, adjust as needed
-                        elif phenotype == "Metallic":
-                            egg_colors[selected_egg_index] = GREY
 
                         print(f"Selected egg: {selected_egg}")
                         running = False
