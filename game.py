@@ -174,18 +174,22 @@ def load_inventory_data():
     try:
         with sqlite3.connect('save.db') as conn:
             cursor = conn.cursor()
+
+            # Load fruits inventory
             cursor.execute("SELECT fruit, count FROM inventory")
             rows = cursor.fetchall()
             for row in rows:
                 fruit, count = row
                 inventory[fruit] = count
 
-            cursor.execute("SELECT phenotype, count FROM egg_inventory")
+            # Load egg counts from eggs table
+            cursor.execute("SELECT phenotype, COUNT(*) FROM eggs GROUP BY phenotype")
             rows = cursor.fetchall()
             for row in rows:
                 phenotype, count = row
                 egg_counts[phenotype] = count
 
+            # Load elixirs into inventory slots
             cursor.execute("SELECT rgb, image_file, position FROM elixirs")
             rows = cursor.fetchall()
             for row in rows:
@@ -201,6 +205,36 @@ def load_inventory_data():
         print(f"Unexpected error loading inventory data: {e}")
 
     return inventory, egg_counts, inventory_slots
+
+
+def create_egg(dragon1, dragon2, position):
+    egg_genotype = get_egg_genotype(dragon1, dragon2)
+    egg_phenotype = determine_phenotype(egg_genotype)
+    egg_image = egg_images_dict[egg_phenotype]
+    egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
+    parent1_name = dragon1["name"]
+    parent2_name = dragon2["name"]
+    print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
+
+    eggs_on_board.append({
+        "genotype": egg_genotype,
+        "phenotype": egg_phenotype,
+        "image": egg_image,
+        "rect": egg_image.get_rect(topleft=position)
+    })
+
+    # Database operations
+    with sqlite3.connect(save_file) as conn:
+        cursor = conn.cursor()
+
+        # Insert a new row into the eggs table for the picked up egg
+        cursor.execute("""
+            INSERT INTO eggs (genotype, phenotype, image_file, parent1_name, parent2_name)
+            VALUES (?, ?, ?, ?, ?)
+        """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
+
+        conn.commit()
+
 
 def save_elixir_data(file_path, elixir_data, fruit_counts):
     try:
