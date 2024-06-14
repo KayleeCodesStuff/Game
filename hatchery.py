@@ -249,11 +249,23 @@ def display_nurture_options():
                 running = False
     
     return selected_trait
+def delete_egg_from_db(egg_id):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM eggs WHERE id = ?", (egg_id,))
+            conn.commit()
+            print(f"Deleted egg with ID {egg_id} from the database")
+    except sqlite3.Error as e:
+        print(f"SQLite error deleting egg: {e}")
+    except Exception as e:
+        print(f"Unexpected error deleting egg: {e}")
 
 class EggTimer:
-    def __init__(self, egg_index, egg_position, duration=60, default_trait="independent"):
-        self.egg_index = egg_index  # Initialize egg_index with the value passed to the constructor
+    def __init__(self, egg_index, egg_position, egg_id, duration=60, default_trait="independent"):
+        self.egg_index = egg_index
         self.egg_position = egg_position
+        self.egg_id = egg_id  # Store egg ID
         self.duration = duration
         self.default_trait = default_trait
         self.start_ticks = pygame.time.get_ticks()
@@ -268,9 +280,9 @@ class EggTimer:
         if countdown <= 0:
             self.running = False
             self.selected_trait = self.default_trait
+            delete_egg_from_db(self.egg_id)  # Delete the egg from the database when the timer ends
             print(f"Timer ended for egg {self.egg_index}")
 
-        print(f"Timer update for egg {self.egg_index}: {countdown} seconds left")
         return countdown
 
     def display(self):
@@ -278,7 +290,6 @@ class EggTimer:
         if self.running:
             timer_text = font.render(str(countdown), True, (57, 255, 20))  # Neon green color
             screen.blit(timer_text, (self.egg_position[0], self.egg_position[1] - 30))  # Adjust position as needed
-            print(f"Displaying timer for egg {self.egg_index}: {countdown} seconds left")
         return self.selected_trait if not self.running else None
 
 def get_statistical_pool(elixir, nurture_trait, dragons):
@@ -343,15 +354,12 @@ def select_dragon_from_pool(filtered_pool):
 # Update the main function call to display the egg menu correctly
 def main():
     global elixir_color
-    elixir_color = None  # Initialize elixir_color
+    elixir_color = None
     running = True
     selected_egg_index = None
     active_timers = []
 
-    # Load inventory data at the start of the game
     inventory, egg_counts, inventory_slots = load_inventory_data()
-
-    # Define elixir_data
     elixir_data = define_elixir_data()
 
     while running:
@@ -360,58 +368,46 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                print(f"Mouse clicked at: {event.pos}")
-                # Check if an egg was clicked
                 egg_selected = False
                 for j, egg_rect in enumerate(egg_positions):
                     if egg_rect.collidepoint(x, y):
-                        # Select the clicked egg
                         selected_egg_index = j
                         egg_selected = True
-                        print(f"Egg {j} selected at position {egg_rect.topleft}")
-                        display_egg_menu(selected_egg_index)  # Display egg selection menu
+                        selected_egg_id = display_egg_menu(selected_egg_index)
                         break
 
                 if not egg_selected:
-                    # Check if an inventory slot was clicked
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
                             selected_elixir = inventory_slots[i]
-                            print(f"Selected elixir: {selected_elixir}")  # Debug print
                             elixir_color = selected_elixir[0]
                             if selected_egg_index is not None and egg_selected_from_db[selected_egg_index]:
-                                # Apply the elixir to the selected egg if it has been selected from the database
                                 egg_colors[selected_egg_index] = elixir_color
-                                # Remove the elixir from the inventory
                                 inventory_slots[i] = None
                                 elixir_color = None
-
-                                # Start the timer and display nurture options
                                 egg_position = egg_positions[selected_egg_index].topleft
-                                new_timer = EggTimer(selected_egg_index, egg_position)
-                                print(f"Created new timer for egg {selected_egg_index}")
+                                new_timer = EggTimer(selected_egg_index, egg_position, selected_egg_id)
                                 active_timers.append(new_timer)
-                                display_nurture_options()  # Display nurture options when the timer starts
+                                display_nurture_options()
                                 break
         
-        # Update and display all active timers
         for egg_timer in active_timers[:]:
             selected_trait = egg_timer.display()
             if selected_trait is not None:
-                # Use selected_trait in the get_statistical_pool function
                 selected_elixir = elixirs[egg_timer.egg_index] if egg_timer.egg_index < len(elixirs) else None
-                print(f"Selected trait: {selected_trait}, Selected elixir: {selected_elixir}")
                 if selected_trait and selected_elixir:
                     statistical_pool = get_statistical_pool(selected_elixir, selected_trait, dragons)
                 active_timers.remove(egg_timer)
+                egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
+                egg_images[egg_timer.egg_index] = unhatched_egg_image
         
         draw_screen(selected_egg_index, active_timers)
 
-    # Save inventory data before exiting
     save_elixir_data("save.db", elixir_data, inventory)
     save_inventory_data()
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()
