@@ -162,6 +162,13 @@ def draw_gradient_rect(screen, rect, color1, color2):
             for i in range(3)
         ]
         pygame.draw.line(screen, color, (rect.left, y), (rect.right, y))
+def draw_beveled_box(screen, rect, border_color, fill_color=WHITE, outline_thickness=12):
+    pygame.draw.rect(screen, fill_color, rect)
+    pygame.draw.line(screen, border_color, rect.topleft, (rect.right, rect.top), outline_thickness)
+    pygame.draw.line(screen, border_color, rect.topleft, (rect.left, rect.bottom), outline_thickness)
+    pygame.draw.line(screen, border_color, rect.bottomleft, (rect.right, rect.bottom), outline_thickness)
+    pygame.draw.line(screen, border_color, rect.topright, (rect.right, rect.bottom), outline_thickness)
+
 
 def draw_screen(selected_box, selected_inventory_slot):
     # Clear screen
@@ -172,6 +179,11 @@ def draw_screen(selected_box, selected_inventory_slot):
     
     screen.blit(background, (0, -100))  # Adjust the y-coordinate to move the background up
 
+    # Draw a beveled box behind the primary trait selection list
+    beveled_box_rect = pygame.Rect(5, 5, 150, 620)  # Adjust dimensions and position as needed
+    border_color = elixir_color if elixir_color else GREY  # Default to GREY if elixir_color is not set
+    draw_beveled_box(screen, beveled_box_rect, border_color)
+    
     # Draw the selection boxes
     for i, box in enumerate(selection_boxes):
         if i == selected_box:  # Highlight the selected box
@@ -189,7 +201,7 @@ def draw_screen(selected_box, selected_inventory_slot):
     for i, keyword in enumerate(personality_keywords):
         color = HOVER_COLOR if pygame.Rect(10, 10 + 30 * i, 200, 30).collidepoint(pygame.mouse.get_pos()) else BLACK
         text = small_font.render(keyword, True, color)
-        screen.blit(text, (10, 10 + 30 * i))
+        screen.blit(text, (20, 20 + 30 * i))
 
     # Draw mixalate button with rainbow gradient and beveled edges
     gradient_rect = pygame.Rect(mixalate_button.x - 5, mixalate_button.y - 5, mixalate_button.width + 10, mixalate_button.height + 10)
@@ -201,7 +213,7 @@ def draw_screen(selected_box, selected_inventory_slot):
         # Draw the elixir result title with an x offset
         x_offset = 50  # Adjust the offset as needed
         title_text = fancy_font.render(elixir_title, True, BLACK)
-        text_rect = pygame.Rect((WIDTH//2 - title_text.get_width()//2) + x_offset, 150, title_text.get_width(), title_text.get_height())
+        text_rect = pygame.Rect((WIDTH//2 - title_text.get_width()//2) + x_offset, 250, title_text.get_width(), title_text.get_height())
         draw_text(screen, elixir_title, fancy_font, BLACK, text_rect, highlight=elixir_color_name)
 
         # Draw the trait words in two columns of two under the Mixalate button
@@ -228,7 +240,7 @@ def draw_screen(selected_box, selected_inventory_slot):
 def main():
     global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path, selected_inventory_slot
     running = True
-    selected_box = 0
+    selected_box = 0  # Start with the primary trait selection box selected
     file_path = 'save.db'  # Define the file_path variable
     selected_inventory_slot = None
 
@@ -238,28 +250,28 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
+                # Handle selection box clicks
                 for i, box in enumerate(selection_boxes):
                     if box.collidepoint(x, y):
                         selected_box = i
+
+                # Handle primary trait selection
                 for i in range(len(personality_keywords)):
                     if pygame.Rect(10, 10 + 30 * i, 200, 30).collidepoint((x, y)):
                         if selected_box == 0:
                             selections[selected_box] = i
-                            selected_box = 1
+                            selected_box = 1  # Automatically move to the next selection box
+
+                # Handle fruit selection
                 x_offset = 10
                 for i, fruit in enumerate(fruit_names):
                     if pygame.Rect(x_offset, HEIGHT - 90, 50, 50).collidepoint(x, y):
                         if selected_box is not None and selected_box > 0:
                             selections[selected_box] = i
-                            selected_box += 1  # Move to the next box
+                            selected_box += 1  # Move to the next selection box
                             if selected_box >= len(selection_boxes):
-                                selected_box = None  # Stop auto-selecting if all boxes are filled
+                                selected_box = None  # Deselect if all boxes are filled
                     x_offset += 60
-                for i in range(len(personality_keywords)):
-                    if pygame.Rect(10, 100 + 30 * i, 200, 30).collidepoint(x, y):
-                        if selected_box == 0:
-                            selections[selected_box] = i
-                            selected_box = None
 
                 if mixalate_button.collidepoint(x, y) and None not in selections:
                     # Create dragon elixir
@@ -327,12 +339,12 @@ def main():
                     inventory_slots[selected_inventory_slot] = None
                     save_inventory_data()
                     selected_inventory_slot = None
-                    
 
         draw_screen(selected_box, selected_inventory_slot)  # Pass selected_inventory_slot to draw_screen()
 
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()
