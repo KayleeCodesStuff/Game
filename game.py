@@ -103,23 +103,44 @@ secondary_traits_list = [
     "Angelic", "Unique", "Pure", "Self-righteous"
 ]
 def define_elixir_data():
+    primary_traits = [
+        "Curious", "Playful", "Adventurous", "Resourceful", "Sociable",
+        "Thoughtful", "Confident", "Generous", "Reflective", "Strategic",
+        "Cheerful", "Demonic", "Mystical", "Flamboyant", "Awkward",
+        "Weird", "Gross", "Gorgeous", "Ethereal", "Blessed"
+    ]
+
+    secondary_traits_list = [
+        "Dark", "Brooding", "Responsible", "Common",
+        "Distraction", "Fierce", "Fiery", "Showy",
+        "Speed", "Flightiness", "Drive", "Ambition",
+        "Earthy", "Pragmatic", "Stout", "Loyal",
+        "Angelic", "Unique", "Pure", "Self-righteous"
+    ]
+
+    image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
+
     primary_trait = random.choice(primary_traits)
     secondary_traits = random.sample(secondary_traits_list, 3)
     r = random.randint(0, 255)
     g = random.randint(0, 255)
     b = random.randint(0, 255)
     rgb_value = (r, g, b)
-    image_file = "pb1.png"  # Choose a default image file for the elixir
+    image_file = random.choice(image_filenames)  # Choose a random image file for the elixir
 
     elixir_data = {
         'rgb': rgb_value,
         'title': f"{primary_trait} Elixir",
         'primary_trait': primary_trait,
-        'secondary_traits': secondary_traits,
+        'secondary_trait1': secondary_traits[0],  # First secondary trait
+        'secondary_trait2': secondary_traits[1],  # Second secondary trait
+        'secondary_trait3': secondary_traits[2],  # Third secondary trait
         'image_file': image_file,
         'position': 1  # Default position, change as necessary
     }
     return elixir_data
+
+
 
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
@@ -245,21 +266,19 @@ def create_egg(dragon1, dragon2, position):
 
         conn.commit()
 
-def save_elixir_data(elixir_data, fruit_counts):
+import sqlite3
+import logging
+
+def save_elixir_data(elixir_data):
     try:
         with sqlite3.connect(file_path) as conn:
             cursor = conn.cursor()
             logging.debug(f"Saving elixir data: {elixir_data}")
-            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
-                              VALUES (?, ?, ?, ?, ?, ?)''',
+            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                            (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                            ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
-
-            for fruit, count in fruit_counts.items():
-                cursor.execute('''INSERT INTO inventory (fruit, count)
-                                  VALUES (?, ?)
-                                  ON CONFLICT(fruit) DO UPDATE SET count = excluded.count''', (fruit, count))
-
+                            elixir_data['secondary_trait1'], elixir_data['secondary_trait2'], elixir_data['secondary_trait3'],
+                            elixir_data['image_file'], elixir_data['position']))
             conn.commit()
             logging.info("Elixir data saved successfully")
             print("Elixir data saved successfully")
@@ -269,6 +288,7 @@ def save_elixir_data(elixir_data, fruit_counts):
     except Exception as e:
         logging.error(f"Unexpected error saving elixir data: {e}")
         print(f"Unexpected error saving elixir data: {e}")
+
 
 def save_inventory_data():
     try:
@@ -293,6 +313,7 @@ def save_inventory_data():
         logging.error(f"Unexpected error saving inventory data: {e}")
         print(f"Unexpected error saving inventory data: {e}")
 
+        
 # Example of handling errors during game loop
 def game_loop():
     running = True

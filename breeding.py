@@ -165,11 +165,13 @@ if not os.path.exists(save_file):
                             rgb TEXT,
                             title TEXT,
                             primary_trait TEXT,
-                            secondary_traits TEXT,
+                            secondary_trait1 TEXT,
+                            secondary_trait2 TEXT,
+                            secondary_trait3 TEXT,
                             image_file TEXT,
                             position INTEGER
                         )''')
-        
+            
         # Create inventory table with fruit as UNIQUE
         cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
                             id INTEGER PRIMARY KEY,
@@ -220,9 +222,9 @@ def create_egg(dragon1, dragon2, position):
         conn.commit()
 
 # Load dragons from the database
-conn = sqlite3.connect("dragonbreeding.db")
+conn = sqlite3.connect("option dragonsedit.db")
 cursor = conn.cursor()
-cursor.execute("SELECT * FROM dragons")
+cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
 all_dragons = cursor.fetchall()
 conn.close()
 
@@ -289,9 +291,9 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     inventory["moonbeammelon"] -= 10
 
     # Load dragons from the database
-    conn = sqlite3.connect("dragonbreeding.db")
+    conn = sqlite3.connect("option dragonsedit.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM dragons")
+    cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
     all_dragons = cursor.fetchall()
     conn.close()
 
@@ -313,10 +315,10 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     scale_factor = 50 / min(width, height)  # Match the initial size (50x50)
     new_size = (int(width * scale_factor), int(height * scale_factor))
     dragon_image = pygame.transform.scale(dragon_image, new_size)
-    outline_color = BLUE if new_dragon_data[10] == "Male" else RED
+    outline_color = BLUE if new_dragon_data[12] == "Male" else RED
     dragon_image = outline_image(dragon_image, outline_color)
 
-    initial_speed = 1.5 + (0.5 if "speed" in new_dragon_data[4].lower() or "Flightspeed" in new_dragon_data[6] else 0)
+    initial_speed = 1.5 + (0.5 if "speed" in new_dragon_data[4].lower() or "Flightspeed" in new_dragon_data[8] else 0)
 
     phenotype = new_dragon_data[2]
     if phenotype in ["Gold", "Silver", "Metal"]:
@@ -328,12 +330,12 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
         "name": new_dragon_data[3],
         "type": new_dragon_data[2],
         "primary_characteristic": new_dragon_data[4],
-        "secondary_characteristics": new_dragon_data[5].split(','),
-        "special_abilities": new_dragon_data[6],
-        "description": new_dragon_data[7],
-        "rgb_value_range": new_dragon_data[8],
-        "nurture": new_dragon_data[9],
-        "gender": new_dragon_data[10],
+        "secondary_traits": [new_dragon_data[5], new_dragon_data[6], new_dragon_data[7]],
+        "special_abilities": new_dragon_data[8],
+        "description": new_dragon_data[9],
+        "rgb_value_range": new_dragon_data[10],
+        "nurture": new_dragon_data[11],
+        "gender": new_dragon_data[12],
         "image": dragon_image,
         "rect": dragon_image.get_rect(topleft=(random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150))),
         "speed": initial_speed,
@@ -363,10 +365,10 @@ for i, dragon_data in enumerate(selected_dragons):
             new_size = (int(100 * (width / height)), 100)
     
     dragon_image = pygame.transform.scale(dragon_image, new_size)
-    outline_color = BLUE if dragon_data[10] == "Male" else RED
+    outline_color = BLUE if dragon_data[12] == "Male" else RED
     dragon_image = outline_image(dragon_image, outline_color)
     
-    initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[6] else 0)
+    initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[8] else 0)
 
     phenotype = dragon_data[2]
     if phenotype in ["Gold", "Silver", "Metal"]:
@@ -378,12 +380,12 @@ for i, dragon_data in enumerate(selected_dragons):
         "name": dragon_data[3],
         "type": dragon_data[2],
         "primary_characteristic": dragon_data[4],
-        "secondary_characteristics": dragon_data[5].split(','),
-        "special_abilities": dragon_data[6],
-        "description": dragon_data[7],
-        "rgb_value_range": dragon_data[8],
-        "nurture": dragon_data[9],
-        "gender": dragon_data[10],
+        "secondary_traits": [dragon_data[5], dragon_data[6], dragon_data[7]],
+        "special_abilities": dragon_data[8],
+        "description": dragon_data[9],
+        "rgb_value_range": dragon_data[10],
+        "nurture": dragon_data[11],
+        "gender": dragon_data[12],
         "image": dragon_image,
         "rect": dragon_image.get_rect(topleft=positions[i]),
         "speed": initial_speed,
@@ -462,7 +464,7 @@ def determine_target(dragon):
     return None
 
 def get_unique_fruit_characteristic(dragon, fruit_characteristics):
-    current_characteristics = set([dragon["primary_characteristic"]] + dragon["secondary_characteristics"])
+    current_characteristics = set([dragon["primary_characteristic"]] + dragon["secondary_traits"])
     possible_characteristics = [char for char in fruit_characteristics if char not in current_characteristics]
     if possible_characteristics:
         return random.choice(possible_characteristics)
@@ -472,8 +474,8 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
     if dragon1["gender"] == dragon2["gender"]:
         return False
     
-    characteristics1 = set([dragon1["primary_characteristic"]] + dragon1["secondary_characteristics"])
-    characteristics2 = set([dragon2["primary_characteristic"]] + dragon2["secondary_characteristics"])
+    characteristics1 = set([dragon1["primary_characteristic"], dragon1["secondary_trait1"], dragon1["secondary_trait2"], dragon1["secondary_trait3"]])
+    characteristics2 = set([dragon2["primary_characteristic"], dragon2["secondary_trait1"], dragon2["secondary_trait2"], dragon2["secondary_trait3"]])
 
     # Add unique fruit characteristic for dragon1
     if dragon1["holding_fruit"]:
@@ -490,6 +492,7 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
             characteristics2.add(unique_fruit_char2)
     
     return bool(characteristics1 & characteristics2)
+
 
 def get_egg_genotype(parent1, parent2):
     allele1 = random.choice(parent1["genotype"])
@@ -697,7 +700,7 @@ def main():
         draw_button(screen, "Invite Dragon", button_font, WHITE, button_rect, BLUE, 2)  # Draw the button
         pygame.display.flip()  # Update the display
 
-        clock.tick(30)  # Set the frame rate to 20 FPS
+        clock.tick(50)  # Set the frame rate to 20 FPS
 
     pygame.quit()
 

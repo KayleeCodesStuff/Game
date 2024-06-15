@@ -223,10 +223,17 @@ def main():
     global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path, selected_inventory_slot
     running = True
     selected_box = None
-    file_path = 'save.db'  # Define the file_path variable
+    file_path = None
     selected_inventory_slot = None
 
     while running:
+        # Automatically select the first empty box if no box is selected
+        if selected_box is None:
+            for i, selection in enumerate(selections):
+                if selection is None:
+                    selected_box = i
+                    break
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -252,7 +259,6 @@ def main():
                         if selected_box == 0:
                             selections[selected_box] = i
                             selected_box = None
-
                 if mixalate_button.collidepoint(x, y) and None not in selections:
                     # Create dragon elixir
                     r = random.choice(fruit_rgb_ranges[fruit_names[selections[1]]])
@@ -268,26 +274,6 @@ def main():
                     # Remove used fruits from inventory
                     for i in range(1, 4):
                         inventory[fruit_names[selections[i]]] -= 1
-
-                    # Assign primary trait and secondary traits separately
-                    primary_trait = personality_keywords[selections[0]]
-                    secondary_traits = elixir_personality[1:]  # Exclude the primary trait
-
-                    # Save the elixir data with separate secondary traits
-                    elixir_data = {
-                        'rgb': elixir_color,
-                        'title': elixir_title,
-                        'primary_trait': primary_trait,
-                        'secondary_trait1': secondary_traits[0],  # First secondary trait
-                        'secondary_trait2': secondary_traits[1],  # Second secondary trait
-                        'secondary_trait3': secondary_traits[2],  # Third secondary trait
-                        'image_file': random.choice(image_filenames),
-                        'position': next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
-                    }
-
-                    logging.debug(f"Elixir data to save: {elixir_data}")
-                    save_elixir_data(elixir_data)
-                    save_inventory_data()
 
                     # Draw color swatch behind the background
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
