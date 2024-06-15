@@ -95,9 +95,13 @@ small_font = pygame.font.Font(None, 28)
 fancy_font = pygame.font.Font(pygame.font.match_font('georgia', bold=True), 32)
 fancy_small_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 28)
 
-# Create boxes for selections, adjusted lower and wider for the first box
-selection_boxes = [pygame.Rect(10, 640, 200, 65), pygame.Rect(10, 720, 80, 65),
-                   pygame.Rect(100, 720, 80, 65), pygame.Rect(190, 720, 80, 65)]
+# Create boxes for selections,
+selection_boxes = [
+    pygame.Rect(10, 640, 200, 65),  # Primary trait selection box
+    pygame.Rect(10, 720, 80, 65),   # First fruit selection box
+    pygame.Rect(100, 720, 80, 65),  # Second fruit selection box
+    pygame.Rect(190, 720, 80, 65)   # Third fruit selection box
+]
 
 # Create mixalate button
 mixalate_button = pygame.Rect(540, 530, 120, 40)
@@ -205,8 +209,8 @@ def draw_screen(selected_box, selected_inventory_slot):
             text = fancy_small_font.render(word, True, WHITE)
             col = i % 2  # Column 0 or 1
             row = i // 2  # Row 0 or 1
-            x_pos = 330 + col * 180  # Base x-coordinate for columns
-            screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 420 + row * 40))  # Adjusted position
+            x_pos = 430 + col * 180  # Base x-coordinate for columns
+            screen.blit(text, (x_pos + (150 - text.get_width()) // 2, 585 + row * 40))  # Adjusted position
 
         # Draw "Bottle" button
         gradient_rect = pygame.Rect(bottle_button.x - 5, bottle_button.y - 5, bottle_button.width + 10, bottle_button.height + 10)
@@ -224,7 +228,7 @@ def draw_screen(selected_box, selected_inventory_slot):
 def main():
     global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path, selected_inventory_slot
     running = True
-    selected_box = None
+    selected_box = 0
     file_path = 'save.db'  # Define the file_path variable
     selected_inventory_slot = None
 
@@ -241,14 +245,16 @@ def main():
                     if pygame.Rect(10, 10 + 30 * i, 200, 30).collidepoint((x, y)):
                         if selected_box == 0:
                             selections[selected_box] = i
-                            selected_box = None
+                            selected_box = 1
                 x_offset = 10
                 for i, fruit in enumerate(fruit_names):
                     if pygame.Rect(x_offset, HEIGHT - 90, 50, 50).collidepoint(x, y):
                         if selected_box is not None and selected_box > 0:
                             selections[selected_box] = i
-                            selected_box = None
-                    x_offset += 50
+                            selected_box += 1  # Move to the next box
+                            if selected_box >= len(selection_boxes):
+                                selected_box = None  # Stop auto-selecting if all boxes are filled
+                    x_offset += 60
                 for i in range(len(personality_keywords)):
                     if pygame.Rect(10, 100 + 30 * i, 200, 30).collidepoint(x, y):
                         if selected_box == 0:
