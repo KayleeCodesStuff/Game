@@ -209,7 +209,6 @@ def delete_elixir_from_db(elixir_id):
             cursor = conn.cursor()
             cursor.execute("DELETE FROM elixirs WHERE id = ?", (elixir_id,))
             conn.commit()
-            print(f"Deleted elixir with ID {elixir_id} from the database")
     except sqlite3.Error as e:
         print(f"SQLite error deleting elixir: {e}")
     except Exception as e:
@@ -266,7 +265,6 @@ def delete_egg_from_db(egg_id):
             cursor = conn.cursor()
             cursor.execute("DELETE FROM eggs WHERE id = ?", (egg_id,))
             conn.commit()
-            print(f"Deleted egg with ID {egg_id} from the database")
     except sqlite3.Error as e:
         print(f"SQLite error deleting egg: {e}")
     except Exception as e:
@@ -282,8 +280,7 @@ class EggTimer:
         self.start_ticks = pygame.time.get_ticks()
         self.selected_trait = None
         self.running = True
-        print(f"EggTimer created for egg {egg_index} at position {egg_position}")
-
+        
     def update(self):
         seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
         countdown = self.duration - int(seconds)
@@ -292,7 +289,7 @@ class EggTimer:
             self.running = False
             self.selected_trait = self.default_trait
             delete_egg_from_db(self.egg_id)  # Delete the egg from the database when the timer ends
-            print(f"Timer ended for egg {self.egg_index}")
+            #print(f"Timer ended for egg {self.egg_index}")
 
         return countdown
 
@@ -365,6 +362,8 @@ def select_dragon_from_pool(filtered_pool):
         return None
     return random.choice(filtered_pool)
 
+active_timers_dict = {}
+
 # Update the main function call to display the egg menu correctly
 def main():
     global elixir_color
@@ -393,13 +392,10 @@ def main():
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
                             selected_elixir = inventory_slots[i]
-                            print(f"Selected elixir: {selected_elixir}")  # Debugging statement
-
-                            elixir_color = selected_elixir[0]  # Use the correct field for the color
-                            elixir_image_file = selected_elixir[1]  # Assuming image file is at index 1
+                            elixir_color = selected_elixir[0]
+                            elixir_image_file = selected_elixir[1]
                             elixir_id = None
 
-                            # Find the elixir ID from the elixirs list
                             for elixir in elixirs:
                                 if elixir[1] == str(elixir_color) and elixir[7] == elixir_image_file:
                                     elixir_id = elixir[0]
@@ -414,19 +410,21 @@ def main():
 
                                 # Remove elixir from inventory
                                 inventory_slots[i] = None
-                                print(f"Inventory slot {i} set to None")  # Debugging statement
                                 elixir_color = None
 
                                 # Delete elixir from database
-                                print(f"Elixir ID to delete: {elixir_id}")  # Debugging statement
                                 delete_elixir_from_db(elixir_id)
 
                                 # Ensure correct egg ID is passed to EggTimer
                                 egg_position = egg_positions[selected_egg_index].topleft
-                                egg_id = eggs[selected_egg_index][0]  # Assuming egg ID is the first field
-                                print(f"Creating EggTimer for egg with ID: {egg_id}")  # Debugging statement
-                                new_timer = EggTimer(selected_egg_index, egg_position, egg_id)
-                                active_timers.append(new_timer)
+                                egg_id = eggs[selected_egg_index][0]
+
+                                # Check if timer already exists for this egg
+                                if selected_egg_index not in active_timers_dict:
+                                    new_timer = EggTimer(selected_egg_index, egg_position, egg_id)
+                                    active_timers.append(new_timer)
+                                    active_timers_dict[selected_egg_index] = new_timer
+
                                 display_nurture_options()
                                 break
 
@@ -437,6 +435,7 @@ def main():
                 if selected_trait and selected_elixir:
                     statistical_pool = get_statistical_pool(selected_elixir, selected_trait, dragons)
                 active_timers.remove(egg_timer)
+                del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
                 egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
                 egg_images[egg_timer.egg_index] = unhatched_egg_image
 
