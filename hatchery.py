@@ -23,6 +23,7 @@ RED = (255, 0, 0)
 background = pygame.image.load("hatchery.png").convert_alpha()
 background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 unhatched_egg_image = pygame.image.load("unhatched.png").convert_alpha()
+DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
 
 # Resize egg images and create egg rectangles with increased spacing
 egg_size = (80, 80)
@@ -135,10 +136,29 @@ def draw_screen(selected_egg_index, active_timers):
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     # Draw all active timers
-    for egg_timer in active_timers:
-        egg_timer.display()
+    for egg_timer in active_timers[:]:
+        selected_trait = egg_timer.display()
+        if selected_trait is not None:
+            elixir = get_elixir_details(egg_timer.egg_index + 1)
+            if selected_trait and elixir:
+                print(f"Selected trait: {selected_trait}, Elixir: {elixir}")
+                statistical_pool = get_statistical_pool(elixir, dragons)
+                adjusted_pool = adjust_chances_with_nurture(statistical_pool, selected_trait)  # Adjust chances based on nurture trait
+                filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], elixir[1])
+                selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
+                if selected_dragon:
+                    print(f"Selected dragon: {selected_dragon[0]}")
+                else:
+                    print("No dragon selected")
+            active_timers.remove(egg_timer)
+            del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
+            egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
+            egg_images[egg_timer.egg_index] = unhatched_egg_image  # Reset to unhatched if no dragon is selected
 
     pygame.display.flip()
+
+
+dragons = []
 
 # Database connections
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -148,9 +168,11 @@ save_db_path = os.path.join(current_dir, 'save.db')
 try:
     dragons_conn = sqlite3.connect(dragons_db_path)
     dragons_cursor = dragons_conn.cursor()
-    dragons_cursor.execute("SELECT * FROM dragons;")
+    dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3 FROM dragons;")
     dragons = dragons_cursor.fetchall()
-    dragons_conn.close()
+    print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
+    for dragon in dragons:
+        dragons_conn.close()
 except sqlite3.OperationalError as e:
     print(f"Error opening dragons database: {e}")
 
@@ -164,6 +186,8 @@ try:
     save_conn.close()
 except sqlite3.OperationalError as e:
     print(f"Error opening save database: {e}")
+
+
 
 def display_egg_menu(selected_egg_index):
     running = True
@@ -265,10 +289,12 @@ def delete_egg_from_db(egg_id):
             cursor = conn.cursor()
             cursor.execute("DELETE FROM eggs WHERE id = ?", (egg_id,))
             conn.commit()
+            print(f"Egg with ID {egg_id} deleted from database")
     except sqlite3.Error as e:
         print(f"SQLite error deleting egg: {e}")
     except Exception as e:
         print(f"Unexpected error deleting egg: {e}")
+
 
 class EggTimer:
     def __init__(self, egg_index, egg_position, egg_id, duration=60, default_trait="independent"):
@@ -288,8 +314,8 @@ class EggTimer:
         if countdown <= 0:
             self.running = False
             self.selected_trait = self.default_trait
+            print(f"Timer ended for egg {self.egg_index}, deleting egg with ID {self.egg_id}")
             delete_egg_from_db(self.egg_id)  # Delete the egg from the database when the timer ends
-            #print(f"Timer ended for egg {self.egg_index}")
 
         return countdown
 
@@ -301,35 +327,67 @@ class EggTimer:
         return self.selected_trait if not self.running else None
 
 
-def get_statistical_pool(elixir, nurture_trait, dragons):
+elixir_data = None
+
+def get_elixir_details(position):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM elixirs WHERE position = ?", (position,))
+            elixir = cursor.fetchone()
+           
+            return elixir
+    except sqlite3.Error as e:
+        print(f"SQLite error retrieving elixir details: {e}")
+        return None
+
+
+def get_statistical_pool(current_elixir_details, dragons):
     pool = []
 
-    elixir_primary = elixir[3] if elixir[3] is not None else ""
-    elixir_secondaries = [elixir[4], elixir[5], elixir[6]]
+    elixir_primary = current_elixir_details[3] if current_elixir_details[3] is not None else ""
+    elixir_secondaries = [current_elixir_details[4], current_elixir_details[5], current_elixir_details[6]]
     elixir_secondaries = [trait for trait in elixir_secondaries if trait is not None]  # Remove None values
+
+    print(f"Elixir Primary: {elixir_primary}")
+    print(f"Elixir Secondaries: {elixir_secondaries}")
 
     for dragon in dragons:
         chances = 0
 
         # Check for shared primary trait
         if dragon[4] == elixir_primary:
+            print(f"Dragon {dragon[0]} matches primary trait: {elixir_primary}")
             chances += 1
 
         # Check for shared secondary traits
-        dragon_secondaries = dragon[5].split(',')  # Assuming dragon secondaries are still stored as a comma-separated string
         for secondary in elixir_secondaries:
-            if secondary in dragon_secondaries:
+            if secondary in (dragon[9], dragon[10], dragon[11]):  # Adjusted indices
+                print(f"Dragon {dragon[0]} matches secondary trait: {secondary}")
                 chances += 1
 
-        # Check for shared nurture trait
-        if dragon[10] == nurture_trait:
-            chances += 1
+        print(f"Dragon ID: {dragon[0]} - Chances: {chances}")
 
         if chances > 0:
             pool.extend([dragon] * chances)
 
+    print("Statistical pool:", [dragon[0] for dragon in pool])  # Print dragon IDs in the statistical pool
     return pool
 
+
+def adjust_chances_with_nurture(pool, nurture_trait):
+    adjusted_pool = []
+
+    print(f"Applying nurture trait: {nurture_trait} to statistical pool")
+    for dragon in pool:
+        chances = 1  # Each dragon initially has one chance
+        if dragon[7] == nurture_trait:  # If the dragon's nurture trait matches the selected nurture trait
+            print(f"Dragon {dragon[0]} matches nurture trait: {nurture_trait}")
+            chances += 1  # Increase the chances by one
+
+        adjusted_pool.extend([dragon] * chances)
+
+    return adjusted_pool
 
 def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     filtered_pool = []
@@ -339,7 +397,12 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
 
     for dragon in pool:
         dragon_phenotype = dragon[2]
-        dragon_rgb_range = eval(dragon[9])  # Convert string representation of RGB range to tuple
+        rgb_ranges = dragon[6].strip('()').split(', ')  # Adjusted index
+        try:
+            dragon_rgb_range = [(int(r.split('-')[0]), int(r.split('-')[1])) for r in rgb_ranges]
+        except ValueError as e:
+            print(f"Error parsing RGB range for dragon {dragon[0]}: {e}")
+            continue
 
         # Check phenotype
         if egg_phenotype in ["Metallic", "Gold", "Silver"] and dragon_phenotype != "Metallic":
@@ -348,19 +411,64 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
             continue
 
         # Check RGB range
-        if not (dragon_rgb_range[0] <= elixir_rgb_value[0] <= dragon_rgb_range[1] and
-                dragon_rgb_range[0] <= elixir_rgb_value[1] <= dragon_rgb_range[1] and
-                dragon_rgb_range[0] <= elixir_rgb_value[2] <= dragon_rgb_range[1]):
+        if not (dragon_rgb_range[0][0] <= elixir_rgb_value[0] <= dragon_rgb_range[0][1] and
+                dragon_rgb_range[1][0] <= elixir_rgb_value[1] <= dragon_rgb_range[1][1] and
+                dragon_rgb_range[2][0] <= elixir_rgb_value[2] <= dragon_rgb_range[2][1]):
             continue
 
         filtered_pool.append(dragon)
 
     return filtered_pool
 
-def select_dragon_from_pool(filtered_pool):
+def load_dragon_image(dragon_filename):
+    # Adjust the path to point to the correct folder
+    # Use the base directory and the correct relative path
+    base_directory = os.path.dirname(__file__)
+    dragon_image_path = os.path.join(base_directory, "dragons", dragon_filename)
+    print(f"Loading image from path: {dragon_image_path}")
+    
+    # Check if file exists
+    if not os.path.exists(dragon_image_path):
+        print(f"File not found: {dragon_image_path}")
+        return unhatched_egg_image  # Return a default image if file not found
+
+    try:
+        dragon_image = pygame.image.load(dragon_image_path).convert_alpha()
+        width, height = dragon_image.get_size()
+        scale_factor = 80 / min(width, height)  # Adjust the scale to fit the egg size
+        new_size = (int(width * scale_factor), int(height * scale_factor))
+        dragon_image = pygame.transform.scale(dragon_image, new_size)
+        return dragon_image
+    except pygame.error as e:
+        print(f"Error loading image {dragon_filename}: {e}")
+        return unhatched_egg_image  # Return a default image if loading fails
+
+
+def get_dragon_image(dragon_id):
+    conn = sqlite3.connect('dragonsedit.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT filename FROM dragons WHERE id = ?", (dragon_id,))
+    dragon_filename = cursor.fetchone()
+    conn.close()
+    if dragon_filename:
+        print(f"Loading image for dragon {dragon_id}: {dragon_filename[0]}")
+        return load_dragon_image(dragon_filename[0])
+    return unhatched_egg_image
+
+
+# Function to select a dragon from the pool
+def select_dragon_from_pool(filtered_pool, egg_position):
     if not filtered_pool:
         return None
-    return random.choice(filtered_pool)
+    selected_dragon = random.choice(filtered_pool)
+    dragon_image = get_dragon_image(selected_dragon[0])  # Use the dragon ID
+    egg_index = egg_positions.index(egg_position)  # Find the index of the egg position
+    egg_images[egg_index] = dragon_image  # Update the egg image with the dragon image
+    return selected_dragon
+
+current_elixir_details = None  # Go-between variable to store elixir details
+def get_elixir_details_from_variable():
+    return current_elixir_details
 
 active_timers_dict = {}
 
@@ -371,8 +479,8 @@ def main():
     running = True
     selected_egg_index = None
     active_timers = []
-
-    elixir_data = define_elixir_data()
+    elixir_data = None  # Initialize elixir_data
+    current_elixir_details = None  # Go-between variable to store elixir details
 
     while running:
         for event in pygame.event.get():
@@ -394,26 +502,18 @@ def main():
                             selected_elixir = inventory_slots[i]
                             elixir_color = selected_elixir[0]
                             elixir_image_file = selected_elixir[1]
-                            elixir_id = None
 
-                            for elixir in elixirs:
-                                if elixir[1] == str(elixir_color) and elixir[7] == elixir_image_file:
-                                    elixir_id = elixir[0]
-                                    break
-
-                            if elixir_id is None:
-                                print("Could not find elixir ID")
+                            # Get elixir details based on position before removing it from inventory
+                            elixir = get_elixir_details(i + 1)  
+                            if not elixir:
+                                print(f"Could not find elixir details for position {i + 1}")
                                 continue
+
+                            current_elixir_details = elixir  # Store elixir details in the go-between variable
+                            print(f"Current Elixir details for position {i + 1}: {current_elixir_details}")
 
                             if selected_egg_index is not None and egg_selected_from_db[selected_egg_index]:
                                 egg_colors[selected_egg_index] = elixir_color
-
-                                # Remove elixir from inventory
-                                inventory_slots[i] = None
-                                elixir_color = None
-
-                                # Delete elixir from database
-                                delete_elixir_from_db(elixir_id)
 
                                 # Ensure correct egg ID is passed to EggTimer
                                 egg_position = egg_positions[selected_egg_index].topleft
@@ -425,28 +525,40 @@ def main():
                                     active_timers.append(new_timer)
                                     active_timers_dict[selected_egg_index] = new_timer
 
-                                display_nurture_options()
+                                # Remove elixir from inventory and delete from database
+                                inventory_slots[i] = None
+                                elixir_color = None
+                                delete_elixir_from_db(elixir[0])
                                 break
 
         for egg_timer in active_timers[:]:
             selected_trait = egg_timer.display()
             if selected_trait is not None:
-                selected_elixir = elixirs[egg_timer.egg_index] if egg_timer.egg_index < len(elixirs) else None
-                if selected_trait and selected_elixir:
-                    statistical_pool = get_statistical_pool(selected_elixir, selected_trait, dragons)
+                elixir = get_elixir_details_from_variable()  # Use the new function to get elixir details from the go-between variable
+                if selected_trait and elixir:
+                    print(f"Selected trait: {selected_trait}, Elixir: {elixir}")
+                    statistical_pool = get_statistical_pool(elixir, dragons)
+                    adjusted_pool = adjust_chances_with_nurture(statistical_pool, selected_trait)  # Adjust chances based on nurture trait
+                    print(f"Adjusted Pool Before Filtering: {[dragon[0] for dragon in adjusted_pool]}")
+                    filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], elixir[1])
+                    print(f"Filtered Pool: {[dragon[0] for dragon in filtered_pool]}")
+                    selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
+                    if selected_dragon:
+                        print(f"Selected dragon: {selected_dragon[0]}")
+                    else:
+                        print("No dragon selected")
                 active_timers.remove(egg_timer)
                 del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
                 egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
-                egg_images[egg_timer.egg_index] = unhatched_egg_image
+                egg_images[egg_timer.egg_index] = unhatched_egg_image  # Reset to unhatched if no dragon is selected
 
         draw_screen(selected_egg_index, active_timers)
         pygame.display.flip()  # Force a screen redraw
 
-    save_elixir_data("save.db", elixir_data)
+    save_elixir_data(elixir_data)  # Pass the elixir_data variable
     save_inventory_data()
     pygame.quit()
     sys.exit()
-
 
 if __name__ == "__main__":
     main()

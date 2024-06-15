@@ -12,7 +12,7 @@ def initialize_pygame():
     try:
         pygame.init()
         logging.info("Pygame initialized successfully")
-        print("Pygame initialized successfully")
+        
     except pygame.error as e:
         logging.error(f"Error initializing pygame: {e}")
         print(f"Error initializing pygame: {e}")
@@ -23,7 +23,7 @@ def initialize_fonts():
         font = pygame.font.Font(None, 36)
         small_font = pygame.font.Font(None, 28)
         logging.info("Fonts initialized successfully")
-        print("Fonts initialized successfully")
+        
     except pygame.error as e:
         logging.error(f"Error initializing fonts: {e}")
         print(f"Error initializing fonts: {e}")
