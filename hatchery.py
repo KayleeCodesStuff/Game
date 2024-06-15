@@ -373,7 +373,6 @@ def main():
     selected_egg_index = None
     active_timers = []
 
-    inventory, egg_counts, inventory_slots = load_inventory_data()
     elixir_data = define_elixir_data()
 
     while running:
@@ -415,6 +414,7 @@ def main():
 
                                 # Remove elixir from inventory
                                 inventory_slots[i] = None
+                                print(f"Inventory slot {i} set to None")  # Debugging statement
                                 elixir_color = None
 
                                 # Delete elixir from database
@@ -429,7 +429,7 @@ def main():
                                 active_timers.append(new_timer)
                                 display_nurture_options()
                                 break
-        
+
         for egg_timer in active_timers[:]:
             selected_trait = egg_timer.display()
             if selected_trait is not None:
@@ -439,13 +439,15 @@ def main():
                 active_timers.remove(egg_timer)
                 egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
                 egg_images[egg_timer.egg_index] = unhatched_egg_image
-        
+
         draw_screen(selected_egg_index, active_timers)
+        pygame.display.flip()  # Force a screen redraw
 
     save_elixir_data("save.db", elixir_data)
     save_inventory_data()
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()

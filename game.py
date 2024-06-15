@@ -182,7 +182,7 @@ def load_inventory_data():
                 fruit, count = row
                 inventory[fruit] = count
 
-            # Load egg counts from eggs table
+            # Load eggs counts from eggs table
             cursor.execute("SELECT phenotype, COUNT(*) FROM eggs GROUP BY phenotype")
             rows = cursor.fetchall()
             for row in rows:
@@ -205,7 +205,6 @@ def load_inventory_data():
         print(f"Unexpected error loading inventory data: {e}")
 
     return inventory, egg_counts, inventory_slots
-
 
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
@@ -233,18 +232,28 @@ def create_egg(dragon1, dragon2, position):
             VALUES (?, ?, ?, ?, ?)
         """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
 
-        conn.commit()
+        # Check if the phenotype already exists in egg_inventory
+        cursor.execute("SELECT count FROM egg_inventory WHERE phenotype=?", (egg_phenotype,))
+        row = cursor.fetchone()
+        if row:
+            # If it exists, increment the count
+            egg_count = row[0] + 1
+            cursor.execute("UPDATE egg_inventory SET count=? WHERE phenotype=?", (egg_count, egg_phenotype))
+        else:
+            # If it does not exist, insert a new row with count 1
+            cursor.execute("INSERT INTO egg_inventory (phenotype, count) VALUES (?, ?)", (egg_phenotype, 1))
 
+        conn.commit()
 
 def save_elixir_data(elixir_data, fruit_counts):
     try:
-        with sqlite3.connect('save.db') as conn:
+        with sqlite3.connect(file_path) as conn:
             cursor = conn.cursor()
             logging.debug(f"Saving elixir data: {elixir_data}")
-            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
+                              VALUES (?, ?, ?, ?, ?, ?)''',
                            (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                            elixir_data['secondary_traits'][0], elixir_data['secondary_traits'][1], elixir_data['secondary_traits'][2], elixir_data['image_file'], elixir_data['position']))
+                            ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
 
             for fruit, count in fruit_counts.items():
                 cursor.execute('''INSERT INTO inventory (fruit, count)
@@ -260,7 +269,6 @@ def save_elixir_data(elixir_data, fruit_counts):
     except Exception as e:
         logging.error(f"Unexpected error saving elixir data: {e}")
         print(f"Unexpected error saving elixir data: {e}")
-
 
 def save_inventory_data():
     try:
