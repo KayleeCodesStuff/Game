@@ -96,8 +96,8 @@ fancy_font = pygame.font.Font(pygame.font.match_font('georgia', bold=True), 32)
 fancy_small_font = pygame.font.Font(pygame.font.match_font('timesnewroman', bold=True), 28)
 
 # Create boxes for selections, adjusted lower and wider for the first box
-selection_boxes = [pygame.Rect(150, 10, 200, 65), pygame.Rect(400, 10, 80, 65),
-                   pygame.Rect(550, 10, 80, 65), pygame.Rect(700, 10, 80, 65)]
+selection_boxes = [pygame.Rect(10, 640, 200, 65), pygame.Rect(10, 720, 80, 65),
+                   pygame.Rect(100, 720, 80, 65), pygame.Rect(190, 720, 80, 65)]
 
 # Create mixalate button
 mixalate_button = pygame.Rect(540, 530, 120, 40)
