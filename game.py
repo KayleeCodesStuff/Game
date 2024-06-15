@@ -271,9 +271,19 @@ import logging
 
 def save_elixir_data(elixir_data):
     try:
-        with sqlite3.connect(file_path) as conn:
+        with sqlite3.connect('save.db') as conn:
             cursor = conn.cursor()
-            logging.debug(f"Saving elixir data: {elixir_data}")
+            # Log each field explicitly
+            logging.debug(f"RGB: {elixir_data['rgb']}")
+            logging.debug(f"Title: {elixir_data['title']}")
+            logging.debug(f"Primary Trait: {elixir_data['primary_trait']}")
+            logging.debug(f"Secondary Trait 1: {elixir_data['secondary_trait1']}")
+            logging.debug(f"Secondary Trait 2: {elixir_data['secondary_trait2']}")
+            logging.debug(f"Secondary Trait 3: {elixir_data['secondary_trait3']}")
+            logging.debug(f"Image File: {elixir_data['image_file']}")
+            logging.debug(f"Position: {elixir_data['position']}")
+
+            # Save the elixir data
             cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                            (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
@@ -290,19 +300,29 @@ def save_elixir_data(elixir_data):
         print(f"Unexpected error saving elixir data: {e}")
 
 
+
 def save_inventory_data():
     try:
         with sqlite3.connect('save.db') as conn:
             cursor = conn.cursor()
+            # Update fruits inventory
             for fruit, count in inventory.items():
                 cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
+
+            # Update egg counts
             for egg, count in egg_counts.items():
                 cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
-            cursor.execute("DELETE FROM elixirs")
+
+            # Update elixirs
             for i, slot in enumerate(inventory_slots):
                 if slot is not None:
-                    rgb, image_file = slot
-                    cursor.execute("INSERT INTO elixirs (rgb, image_file, position) VALUES (?, ?, ?)", (str(rgb), image_file, i + 1))
+                    rgb, image_file, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3 = slot
+                    cursor.execute(
+                        '''INSERT OR REPLACE INTO elixirs (position, rgb, image_file, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                        (i + 1, str(rgb), image_file, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3)
+                    )
+
             conn.commit()
             logging.info("Inventory data saved successfully")
             print("Inventory data saved successfully")
@@ -312,6 +332,7 @@ def save_inventory_data():
     except Exception as e:
         logging.error(f"Unexpected error saving inventory data: {e}")
         print(f"Unexpected error saving inventory data: {e}")
+
 
         
 # Example of handling errors during game loop
