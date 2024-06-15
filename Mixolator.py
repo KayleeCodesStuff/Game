@@ -259,6 +259,7 @@ def main():
                         if selected_box == 0:
                             selections[selected_box] = i
                             selected_box = None
+                            
                 if mixalate_button.collidepoint(x, y) and None not in selections:
                     # Create dragon elixir
                     r = random.choice(fruit_rgb_ranges[fruit_names[selections[1]]])
@@ -274,6 +275,19 @@ def main():
                     # Remove used fruits from inventory
                     for i in range(1, 4):
                         inventory[fruit_names[selections[i]]] -= 1
+
+                    # Save the elixir data
+                    elixir_data = {
+                        'rgb': elixir_color,
+                        'title': elixir_title,
+                        'primary_trait': personality_keywords[selections[0]],
+                        'secondary_traits': elixir_personality[1:],  # Exclude the primary trait
+                        'image_file': random.choice(image_filenames),
+                        'position': next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
+                    }
+                    logging.debug(f"Elixir data to save: {elixir_data}")
+                    save_elixir_data(elixir_data, inventory)
+
 
                     # Draw color swatch behind the background
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))

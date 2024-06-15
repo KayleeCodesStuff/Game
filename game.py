@@ -236,15 +236,15 @@ def create_egg(dragon1, dragon2, position):
         conn.commit()
 
 
-def save_elixir_data(file_path, elixir_data, fruit_counts):
+def save_elixir_data(elixir_data, fruit_counts):
     try:
-        with sqlite3.connect(file_path) as conn:
+        with sqlite3.connect('save.db') as conn:
             cursor = conn.cursor()
             logging.debug(f"Saving elixir data: {elixir_data}")
-            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_traits, image_file, position)
-                              VALUES (?, ?, ?, ?, ?, ?)''',
+            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                            (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                            ', '.join(elixir_data['secondary_traits']), elixir_data['image_file'], elixir_data['position']))
+                            elixir_data['secondary_traits'][0], elixir_data['secondary_traits'][1], elixir_data['secondary_traits'][2], elixir_data['image_file'], elixir_data['position']))
 
             for fruit, count in fruit_counts.items():
                 cursor.execute('''INSERT INTO inventory (fruit, count)
@@ -260,6 +260,7 @@ def save_elixir_data(file_path, elixir_data, fruit_counts):
     except Exception as e:
         logging.error(f"Unexpected error saving elixir data: {e}")
         print(f"Unexpected error saving elixir data: {e}")
+
 
 def save_inventory_data():
     try:

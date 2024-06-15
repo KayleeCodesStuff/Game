@@ -203,6 +203,17 @@ def display_egg_menu(selected_egg_index):
                         print(f"Selected egg: {selected_egg}")
                         running = False
                         break
+def delete_elixir_from_db(elixir_id):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM elixirs WHERE id = ?", (elixir_id,))
+            conn.commit()
+            print(f"Deleted elixir with ID {elixir_id} from the database")
+    except sqlite3.Error as e:
+        print(f"SQLite error deleting elixir: {e}")
+    except Exception as e:
+        print(f"Unexpected error deleting elixir: {e}")
 
 def fetch_random_nurture_options():
     try:
@@ -265,7 +276,7 @@ class EggTimer:
     def __init__(self, egg_index, egg_position, egg_id, duration=60, default_trait="independent"):
         self.egg_index = egg_index
         self.egg_position = egg_position
-        self.egg_id = egg_id  # Store egg ID
+        self.egg_id = egg_id  # Store egg ID correctly
         self.duration = duration
         self.default_trait = default_trait
         self.start_ticks = pygame.time.get_ticks()
@@ -292,11 +303,13 @@ class EggTimer:
             screen.blit(timer_text, (self.egg_position[0], self.egg_position[1] - 30))  # Adjust position as needed
         return self.selected_trait if not self.running else None
 
+
 def get_statistical_pool(elixir, nurture_trait, dragons):
     pool = []
 
-    elixir_primary = elixir[3]
-    elixir_secondaries = elixir[4].split(',')
+    elixir_primary = elixir[3] if elixir[3] is not None else ""
+    elixir_secondaries = [elixir[4], elixir[5], elixir[6]]
+    elixir_secondaries = [trait for trait in elixir_secondaries if trait is not None]  # Remove None values
 
     for dragon in dragons:
         chances = 0
@@ -306,7 +319,7 @@ def get_statistical_pool(elixir, nurture_trait, dragons):
             chances += 1
 
         # Check for shared secondary traits
-        dragon_secondaries = dragon[5].split(',')
+        dragon_secondaries = dragon[5].split(',')  # Assuming dragon secondaries are still stored as a comma-separated string
         for secondary in elixir_secondaries:
             if secondary in dragon_secondaries:
                 chances += 1
@@ -319,6 +332,7 @@ def get_statistical_pool(elixir, nurture_trait, dragons):
             pool.extend([dragon] * chances)
 
     return pool
+
 
 def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     filtered_pool = []
@@ -380,13 +394,38 @@ def main():
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
                             selected_elixir = inventory_slots[i]
-                            elixir_color = selected_elixir[0]
+                            print(f"Selected elixir: {selected_elixir}")  # Debugging statement
+
+                            elixir_color = selected_elixir[0]  # Use the correct field for the color
+                            elixir_image_file = selected_elixir[1]  # Assuming image file is at index 1
+                            elixir_id = None
+
+                            # Find the elixir ID from the elixirs list
+                            for elixir in elixirs:
+                                if elixir[1] == str(elixir_color) and elixir[7] == elixir_image_file:
+                                    elixir_id = elixir[0]
+                                    break
+
+                            if elixir_id is None:
+                                print("Could not find elixir ID")
+                                continue
+
                             if selected_egg_index is not None and egg_selected_from_db[selected_egg_index]:
                                 egg_colors[selected_egg_index] = elixir_color
+
+                                # Remove elixir from inventory
                                 inventory_slots[i] = None
                                 elixir_color = None
+
+                                # Delete elixir from database
+                                print(f"Elixir ID to delete: {elixir_id}")  # Debugging statement
+                                delete_elixir_from_db(elixir_id)
+
+                                # Ensure correct egg ID is passed to EggTimer
                                 egg_position = egg_positions[selected_egg_index].topleft
-                                new_timer = EggTimer(selected_egg_index, egg_position, selected_egg_id)
+                                egg_id = eggs[selected_egg_index][0]  # Assuming egg ID is the first field
+                                print(f"Creating EggTimer for egg with ID: {egg_id}")  # Debugging statement
+                                new_timer = EggTimer(selected_egg_index, egg_position, egg_id)
                                 active_timers.append(new_timer)
                                 display_nurture_options()
                                 break
@@ -403,11 +442,10 @@ def main():
         
         draw_screen(selected_egg_index, active_timers)
 
-    save_elixir_data("save.db", elixir_data, inventory)
+    save_elixir_data("save.db", elixir_data)
     save_inventory_data()
     pygame.quit()
     sys.exit()
-
 
 if __name__ == "__main__":
     main()
