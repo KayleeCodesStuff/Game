@@ -313,16 +313,6 @@ def save_inventory_data():
             for egg, count in egg_counts.items():
                 cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
 
-            # Update elixirs
-            for i, slot in enumerate(inventory_slots):
-                if slot is not None:
-                    rgb, image_file, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3 = slot
-                    cursor.execute(
-                        '''INSERT OR REPLACE INTO elixirs (position, rgb, image_file, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                        (i + 1, str(rgb), image_file, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3)
-                    )
-
             conn.commit()
             logging.info("Inventory data saved successfully")
             print("Inventory data saved successfully")
@@ -333,6 +323,20 @@ def save_inventory_data():
         logging.error(f"Unexpected error saving inventory data: {e}")
         print(f"Unexpected error saving inventory data: {e}")
 
+def delete_elixir_data(position):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM elixirs WHERE position = ?", (position,))
+            conn.commit()
+            logging.info(f"Elixir data at position {position} deleted successfully")
+            print(f"Elixir data at position {position} deleted successfully")
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error deleting elixir data: {e}")
+        print(f"SQLite error deleting elixir data: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error deleting elixir data: {e}")
+        print(f"Unexpected error deleting elixir data: {e}")
 
         
 # Example of handling errors during game loop

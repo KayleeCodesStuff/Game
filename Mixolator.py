@@ -14,6 +14,7 @@ pygame.init()
 
 # Screen dimensions
 WIDTH, HEIGHT = 1200, 900
+INVENTORY_HEIGHT = 100  # Height reserved for inventory at the bottom
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Elixir Game")
 
@@ -30,6 +31,7 @@ RED = (255, 0, 0)
 
 # Load images
 background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
 ethereal_pear = pygame.image.load("etherealpear.png")
 flame_fruit = pygame.image.load("flamefruit.png")
 gleam_berry = pygame.image.load("gleamberry.png")
@@ -98,7 +100,7 @@ selection_boxes = [pygame.Rect(150, 10, 200, 65), pygame.Rect(400, 10, 80, 65),
                    pygame.Rect(550, 10, 80, 65), pygame.Rect(700, 10, 80, 65)]
 
 # Create mixalate button
-mixalate_button = pygame.Rect(430, 370, 120, 40)
+mixalate_button = pygame.Rect(540, 530, 120, 40)
 
 # Store selections
 selections = [None, None, None, None]
@@ -273,7 +275,7 @@ def main():
                     primary_trait = personality_keywords[selections[0]]
                     secondary_traits = elixir_personality[1:]  # Exclude the primary trait
 
-                    # Save the elixir data with separate secondary traits
+                    # Create the elixir data but do not save it yet
                     elixir_data = {
                         'rgb': elixir_color,
                         'title': elixir_title,
@@ -282,23 +284,29 @@ def main():
                         'secondary_trait2': secondary_traits[1],  # Second secondary trait
                         'secondary_trait3': secondary_traits[2],  # Third secondary trait
                         'image_file': random.choice(image_filenames),
-                        'position': next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
                     }
-
-                    logging.debug(f"Elixir data to save: {elixir_data}")
-                    save_elixir_data(elixir_data)
-                    save_inventory_data()
-
-                    # Draw color swatch behind the background
-                    pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
+                    logging.debug(f"Elixir data created: {elixir_data}")
 
                 if elixir_color and bottle_button.collidepoint(x, y):
-                    for i in range(len(inventory_slots)):
-                        if inventory_slots[i] is None:
-                            image_file = random.choice(image_filenames)
-                            inventory_slots[i] = (elixir_color, image_file)
-                            save_inventory_data()
-                            break
+                    try:
+                        # Save the elixir data when the "Bottle" button is clicked
+                        elixir_data['position'] = next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
+                        save_elixir_data(elixir_data)
+                        save_inventory_data()
+                        # Draw color swatch behind the background
+                        pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
+
+                        # Add the elixir to the inventory
+                        for i in range(len(inventory_slots)):
+                            if inventory_slots[i] is None:
+                                image_file = elixir_data['image_file']
+                                inventory_slots[i] = (elixir_color, image_file)
+                                save_inventory_data()
+                                break
+
+                    except StopIteration:
+                        print("Inventory is full! Cannot save more elixirs.")
+                        # Handle full inventory case, e.g., display a message to the user or take other actions
 
                 # Handle elixir slot click
                 x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
@@ -309,9 +317,11 @@ def main():
 
                 # Handle delete button press
                 if delete_button.collidepoint(x, y) and selected_inventory_slot is not None:
+                    delete_elixir_data(selected_inventory_slot + 1)
                     inventory_slots[selected_inventory_slot] = None
                     save_inventory_data()
                     selected_inventory_slot = None
+                    
 
         draw_screen(selected_box, selected_inventory_slot)  # Pass selected_inventory_slot to draw_screen()
 
