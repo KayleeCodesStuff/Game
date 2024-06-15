@@ -8,8 +8,7 @@ import sqlite3
 import json
 import tkinter as tk
 from tkinter import filedialog
-from game import load_inventory_data, save_elixir_data, save_inventory_data, draw_inventory
-import logging
+from game import *
 
 pygame.init()
 
@@ -272,40 +271,23 @@ def main():
 
                     # Assign primary trait and secondary traits separately
                     primary_trait = personality_keywords[selections[0]]
-                    secondary_trait1 = random.choice(fruit_personality_keywords[fruit_names[selections[1]]])
-                    secondary_trait2 = random.choice(fruit_personality_keywords[fruit_names[selections[2]]])
-                    secondary_trait3 = random.choice(fruit_personality_keywords[fruit_names[selections[3]]])
+                    secondary_traits = elixir_personality[1:]  # Exclude the primary trait
 
-                    # Construct the elixir title
-                    elixir_title = f"{elixir_color_name} {primary_trait} Dragon Egg Elixir"
-                    
-                    # Remove used fruits from inventory
-                    for i in range(1, 4):
-                        inventory[fruit_names[selections[i]]] -= 1
-                    
-                    # Find the next available slot
-                    try:
-                        position = next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1
-                    except StopIteration:
-                        raise ValueError("No available inventory slots for new elixir")
-
-                    # Save the elixir data with separate primary and secondary traits
+                    # Save the elixir data with separate secondary traits
                     elixir_data = {
                         'rgb': elixir_color,
                         'title': elixir_title,
                         'primary_trait': primary_trait,
-                        'secondary_trait1': secondary_trait1,
-                        'secondary_trait2': secondary_trait2,
-                        'secondary_trait3': secondary_trait3,
+                        'secondary_trait1': secondary_traits[0],  # First secondary trait
+                        'secondary_trait2': secondary_traits[1],  # Second secondary trait
+                        'secondary_trait3': secondary_traits[2],  # Third secondary trait
                         'image_file': random.choice(image_filenames),
-                        'position': position
+                        'position': next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
                     }
 
-                    # Print the elixir data for debugging
-                    print(f"Elixir data to save: {elixir_data}")
                     logging.debug(f"Elixir data to save: {elixir_data}")
                     save_elixir_data(elixir_data)
-                    
+                    save_inventory_data()
 
                     # Draw color swatch behind the background
                     pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
@@ -315,7 +297,7 @@ def main():
                         if inventory_slots[i] is None:
                             image_file = random.choice(image_filenames)
                             inventory_slots[i] = (elixir_color, image_file)
-                            save_elixir_data(elixir_data)
+                            save_inventory_data()
                             break
 
                 # Handle elixir slot click
@@ -326,31 +308,10 @@ def main():
                         selected_inventory_slot = i
 
                 # Handle delete button press
-            # Handle delete button press
-            if delete_button.collidepoint(x, y) and selected_inventory_slot is not None:
-                # Get the elixir data associated with the selected slot
-                elixir_to_delete = inventory_slots[selected_inventory_slot]
-                if elixir_to_delete is not None:
-                    position = elixir_to_delete['position']
-                    # Construct the query to delete the elixir from the database
-                    try:
-                        # Connect to the database
-                        conn = sqlite3.connect(file_path)
-                        cursor = conn.cursor()
-                        # Execute delete query
-                        cursor.execute("DELETE FROM elixirs WHERE position=?", (position,))
-                        conn.commit()
-                        # Close the connection
-                        conn.close()
-                        # Remove elixir from inventory slots
-                        inventory_slots[selected_inventory_slot] = None
-                        # Save updated inventory data
-                        save_inventory_data(inventory, egg_counts, inventory_slots)
-                        selected_inventory_slot = None
-                        print(f"Deleted elixir with position {position}")
-                    except sqlite3.Error as e:
-                        print(f"Error deleting elixir from the database: {e}")
-
+                if delete_button.collidepoint(x, y) and selected_inventory_slot is not None:
+                    inventory_slots[selected_inventory_slot] = None
+                    save_inventory_data()
+                    selected_inventory_slot = None
 
         draw_screen(selected_box, selected_inventory_slot)  # Pass selected_inventory_slot to draw_screen()
 
