@@ -2,6 +2,7 @@ import pygame
 import random
 import sys
 import sqlite3
+import time
 import os
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
@@ -133,7 +134,9 @@ def draw_screen(selected_egg_index, active_timers):
         if i == selected_egg_index:
             pygame.draw.rect(screen, RED, rect.inflate(4, 4), 2)  # Draw red outline
         pygame.draw.rect(screen, egg_colors[i], rect)  # Draw the egg with its current color
-        screen.blit(egg_images[i], rect.topleft)  # Draw the correct egg image
+        
+           
+        screen.blit(egg_images[i], rect.topleft)  # Draw the correct egg/dragon image
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
@@ -143,21 +146,35 @@ def draw_screen(selected_egg_index, active_timers):
         if selected_trait is not None:
             ddragon_instance = ddragon_instances[egg_timer.egg_index]
             if selected_trait and ddragon_instance:
-                print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
+                #print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
                 statistical_pool = get_statistical_pool(ddragon_instance, dragons)
                 adjusted_pool = adjust_chances_with_nurture(statistical_pool, selected_trait)  # Adjust chances based on nurture trait
                 filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
                 selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                 if selected_dragon:
-                    print(f"Selected dragon: {selected_dragon[0]}")
+                    print(f"Selected dragon: {selected_dragon[0]} for egg index {egg_timer.egg_index}")
+                    if ddragon_instances[egg_timer.egg_index] is not None:
+                        ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
+                        #print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
+                        
+                        # Prompt the user for a pet name with a timeout
+                        petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen, timeout=10)
+                        #print(f"Pet name entered for egg {egg_timer.egg_index}: {petname}")
+                        ddragon_instances[egg_timer.egg_index].set_petname(petname)
+                        
+                        # Accumulate the Ddragon instance to save later
+                        ddragon_save_list.append(ddragon_instances[egg_timer.egg_index])
+                        #print(f"Accumulated Ddragon instance for egg {egg_timer.egg_index}")
                 else:
-                    print("No dragon selected")
+                    print(f"No dragon selected for egg {egg_timer.egg_index}")
+
             active_timers.remove(egg_timer)
             del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
-            egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
-            egg_images[egg_timer.egg_index] = unhatched_egg_image  # Reset to unhatched if no dragon is selected
+            #egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
+            #egg_images[egg_timer.egg_index] = unhatched_egg_image  # Reset to unhatched if no dragon is selected
 
     pygame.display.flip()
+
 
 
 dragons = []
@@ -235,7 +252,7 @@ def display_egg_menu(selected_egg_index):
 
                             egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
                             placed_egg_ids.append(selected_egg[0])  # Add egg ID to placed eggs list
-                            print(f"Selected egg: {selected_egg}")
+                            #print(f"Selected egg: {selected_egg}")
                             running = False
                             return selected_egg[0]  # Return the selected egg ID
     return None
@@ -305,14 +322,10 @@ def delete_egg_from_db(egg_id):
             cursor = conn.cursor()
             cursor.execute("DELETE FROM eggs WHERE id = ?", (egg_id,))
             conn.commit()
-            print(f"Egg with ID {egg_id} deleted from database")
-            # Verify deletion
             cursor.execute("SELECT * FROM eggs WHERE id = ?", (egg_id,))
             result = cursor.fetchone()
             if result:
                 print(f"Error: Egg with ID {egg_id} was not deleted.")
-            else:
-                print(f"Verification: Egg with ID {egg_id} has been deleted.")
     except sqlite3.Error as e:
         print(f"SQLite error deleting egg: {e}")
     except Exception as e:
@@ -330,8 +343,7 @@ class EggTimer:
         self.start_ticks = pygame.time.get_ticks()
         self.selected_trait = None
         self.running = True
-        print(f"Initialized EggTimer for egg ID: {self.egg_id}")  # Debug print
-
+    
     def update(self):
         seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
         countdown = self.duration - int(seconds)
@@ -339,7 +351,6 @@ class EggTimer:
         if countdown <= 0:
             self.running = False
             self.selected_trait = self.default_trait
-            print(f"Timer ended for egg {self.egg_index}, deleting egg with ID {self.egg_id}")
             delete_egg_from_db(self.egg_id)  # Delete the egg from the database when the timer ends
 
         return countdown
@@ -373,8 +384,6 @@ def get_statistical_pool(ddragon_instance, dragons):
     elixir_primary = ddragon_instance.elixir_primary if ddragon_instance.elixir_primary is not None else ""
     elixir_secondaries = ddragon_instance.elixir_secondaries if ddragon_instance.elixir_secondaries is not None else []
     
-    print(f"Elixir Primary: {elixir_primary}")
-    print(f"Elixir Secondaries: {elixir_secondaries}")
 
     for dragon in dragons:
         #print(f"Processing dragon: {dragon}")  # Debug print
@@ -394,7 +403,7 @@ def get_statistical_pool(ddragon_instance, dragons):
         if chances > 0:
             pool.extend([dragon] * chances)
 
-    print("Statistical pool:", [dragon[0] for dragon in pool])  # Print dragon IDs in the statistical pool
+    #print("Statistical pool:", [dragon[0] for dragon in pool])  # Print dragon IDs in the statistical pool
     return pool
 
 
@@ -403,7 +412,7 @@ def get_statistical_pool(ddragon_instance, dragons):
 def adjust_chances_with_nurture(pool, nurture_trait):
     adjusted_pool = []
 
-    print(f"Applying nurture trait: {nurture_trait} to statistical pool")
+    #print(f"Applying nurture trait: {nurture_trait} to statistical pool")
     for dragon in pool:
         chances = 1  # Each dragon initially has one chance
         if dragon[7] == nurture_trait:  # If the dragon's nurture trait matches the selected nurture trait
@@ -449,7 +458,7 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
 def load_dragon_image(dragon_filename):
     base_directory = os.path.dirname(__file__)
     dragon_image_path = os.path.join(base_directory, "dragons", dragon_filename)
-    print(f"Loading image from path: {dragon_image_path}")
+    #print(f"Loading image from path: {dragon_image_path}")
     
     # Check if file exists
     if not os.path.exists(dragon_image_path):
@@ -475,7 +484,7 @@ def get_dragon_image(dragon_id):
     dragon_filename = cursor.fetchone()
     conn.close()
     if dragon_filename:
-        print(f"Loading image for dragon {dragon_id}: {dragon_filename[0]}")
+        #print(f"Loading image for dragon {dragon_id}: {dragon_filename[0]}")
         return load_dragon_image(dragon_filename[0])
     return unhatched_egg_image
 
@@ -584,14 +593,13 @@ class Ddragon:
             conn.commit()
 
 
-
-# Update the main function call to display the egg menu correctly
 # Ensure you have an empty list to hold Ddragon instances
 ddragon_instances = [None] * 10
 
 egg_ids_on_board = [None] * 10
 
-def get_text_input(prompt, font, screen):
+
+def get_text_input(prompt, font, screen, timeout=10):
     input_box = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 20, 200, 40)
     color_inactive = pygame.Color('lightskyblue3')
     color_active = pygame.Color('dodgerblue2')
@@ -600,7 +608,14 @@ def get_text_input(prompt, font, screen):
     text = ''
     done = False
 
+    start_time = time.time()
+
     while not done:
+        current_time = time.time()
+        if current_time - start_time > timeout:
+            print("Timeout reached. Leaving pet name blank.")
+            break
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -627,6 +642,7 @@ def get_text_input(prompt, font, screen):
         screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
         pygame.draw.rect(screen, color, input_box, 2)
         pygame.display.flip()
+
 
     return text
 def save_all_ddragon_instances(ddragon_list):
@@ -697,10 +713,11 @@ def main():
                         egg_selected = True
                         selected_egg_id = display_egg_menu(selected_egg_index)  # Get the selected egg ID
                         if selected_egg_id is not None:
-                            ddragon_instance = Ddragon(eggs[selected_egg_index][2], eggs[selected_egg_index][4], eggs[selected_egg_index][5])
+                            ddragon_instance = Ddragon(eggs[selected_egg_index][1], eggs[selected_egg_index][4], eggs[selected_egg_index][5])
                             ddragon_instances[selected_egg_index] = ddragon_instance
                             egg_ids_on_board[selected_egg_index] = selected_egg_id  # Map the egg ID to the board position
-                            print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id}")
+                            #print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id}")
+                            
                         break
                 if not egg_selected:
                     for i, rect in enumerate(inventory_boxes):
@@ -721,7 +738,7 @@ def main():
                                 # Ensure correct egg ID is passed to EggTimer
                                 egg_position = egg_positions[selected_egg_index].topleft
                                 egg_id = egg_ids_on_board[selected_egg_index]
-                                print(f"Setting up EggTimer for egg ID: {egg_id} at index {selected_egg_index}")  # Debug print
+                                #print(f"Setting up EggTimer for egg ID: {egg_id} at index {selected_egg_index}")  # Debug print
 
                                 # Check if timer already exists for this egg
                                 if selected_egg_index not in active_timers_dict:
@@ -732,12 +749,12 @@ def main():
                                 # Update the Ddragon instance with elixir information
                                 if ddragon_instances[selected_egg_index] is not None:
                                     ddragon_instances[selected_egg_index].add_elixir_info(elixir[1], elixir[2], elixir[3], elixir[4:7])
-                                    print(f"Updated Ddragon instance for egg {selected_egg_index} with elixir information")
+                                    #print(f"Updated Ddragon instance for egg {selected_egg_index} with elixir information")
 
                                     # Display nurture options and update the Ddragon instance
                                     selected_trait = display_nurture_options()
                                     if selected_trait is not None:
-                                        print(f"Selected nurture trait: {selected_trait}")
+                                        #print(f"Selected nurture trait: {selected_trait}")
                                         ddragon_instances[selected_egg_index].nurture = selected_trait
 
                                 # Remove elixir from inventory and delete from database
@@ -751,7 +768,7 @@ def main():
             if selected_trait is not None:
                 ddragon_instance = ddragon_instances[egg_timer.egg_index]  # Get the correct Ddragon instance
                 if selected_trait and ddragon_instance:
-                    print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
+                    #print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
                     statistical_pool = get_statistical_pool(ddragon_instance, dragons)
                     adjusted_pool = adjust_chances_with_nurture(statistical_pool, selected_trait)  # Adjust chances based on nurture trait
                     filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
@@ -761,20 +778,27 @@ def main():
                         # Update the Ddragon instance with dragon information
                         if ddragon_instances[egg_timer.egg_index] is not None:
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
-                            print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
-                            # Prompt the user for a pet name
-                            petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen)
-                            print(f"Pet name entered for egg {egg_timer.egg_index}: {petname}")  # Debug print
+                            #print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
+                            
+                            # Print the Ddragon instance details for debugging
+                            #print(f"Ddragon instance: {ddragon_instances[egg_timer.egg_index].__dict__}")
+
+                            # Prompt the user for a pet name with a timeout
+                            petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen, timeout=10)
+                            #print(f"Pet name entered for egg {egg_timer.egg_index}: {petname}")  # Debug print
                             ddragon_instances[egg_timer.egg_index].set_petname(petname)
+                            
                             # Accumulate the Ddragon instance to save later
                             ddragon_save_list.append(ddragon_instances[egg_timer.egg_index])
-                            print(f"Accumulated Ddragon instance for egg {egg_timer.egg_index}")
+                            #print(f"Accumulated Ddragon instance for egg {egg_timer.egg_index}")
                     else:
                         print(f"No dragon selected for egg {egg_timer.egg_index}")
                 active_timers.remove(egg_timer)
                 del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
                 egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
                 egg_images[egg_timer.egg_index] = unhatched_egg_image  # Reset to unhatched if no dragon is selected
+            #else:
+                #print(f"Timer still running for egg index {egg_timer.egg_index}")
 
         draw_screen(selected_egg_index, active_timers)
         pygame.display.flip()  # Force a screen redraw
@@ -793,4 +817,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
