@@ -183,10 +183,10 @@ try:
     save_cursor = save_conn.cursor()
     save_cursor.execute("SELECT * FROM elixirs;")
     elixirs = save_cursor.fetchall()
-    print(f"Elixirs fetched: {elixirs}")  # Print elixirs for debugging
+    #print(f"Elixirs fetched: {elixirs}")  # Print elixirs for debugging
     save_cursor.execute("SELECT * FROM eggs;")
     eggs = save_cursor.fetchall()
-    print(f"Eggs fetched: {eggs}")  # Print eggs for debugging
+    #print(f"Eggs fetched: {eggs}")  # Print eggs for debugging
 except sqlite3.OperationalError as e:
     print(f"Error opening save database: {e}")
 finally:
@@ -295,6 +295,7 @@ def display_nurture_options():
                 running = False
     
     return selected_trait
+
 # Update the egg deletion function to use egg ID
 def delete_egg_from_db(egg_id):
     try:
@@ -388,7 +389,7 @@ def get_statistical_pool(current_elixir_details, dragons):
                 print(f"Dragon {dragon[0]} matches secondary trait: {secondary}")
                 chances += 1
 
-        print(f"Dragon ID: {dragon[0]} - Chances: {chances}")
+        #print(f"Dragon ID: {dragon[0]} - Chances: {chances}")
 
         if chances > 0:
             pool.extend([dragon] * chances)
@@ -586,6 +587,45 @@ ddragon_instances = [None] * 10
 
 egg_ids_on_board = [None] * 10
 
+def get_text_input(prompt, font, screen):
+    input_box = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 20, 200, 40)
+    color_inactive = pygame.Color('lightskyblue3')
+    color_active = pygame.Color('dodgerblue2')
+    color = color_inactive
+    active = False
+    text = ''
+    done = False
+
+    while not done:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if input_box.collidepoint(event.pos):
+                    active = not active
+                else:
+                    active = False
+                color = color_active if active else color_inactive
+            if event.type == pygame.KEYDOWN:
+                if active:
+                    if event.key == pygame.K_RETURN:
+                        done = True
+                    elif event.key == pygame.K_BACKSPACE:
+                        text = text[:-1]
+                    else:
+                        text += event.unicode
+
+        screen.fill((30, 30, 30))
+        txt_surface = font.render(prompt + text, True, color)
+        width = max(200, txt_surface.get_width()+10)
+        input_box.w = width
+        screen.blit(txt_surface, (input_box.x+5, input_box.y+5))
+        pygame.draw.rect(screen, color, input_box, 2)
+        pygame.display.flip()
+
+    return text
+
 # Ensure you update the `main` function to call `display_egg_menu` correctly
 def main():
     global elixir_color
@@ -596,7 +636,7 @@ def main():
     elixir_data = None  # Initialize elixir_data
     current_elixir_details = None  # Go-between variable to store elixir details
 
-    print("Initial eggs list:", eggs)  # Debug print
+    #print("Initial eggs list:", eggs)  # Debug print
 
     while running:
         for event in pygame.event.get():
@@ -651,6 +691,12 @@ def main():
                                     ddragon_instances[selected_egg_index].add_elixir_info(elixir[1], elixir[2])
                                     print(f"Updated Ddragon instance for egg {selected_egg_index} with elixir information")
 
+                                    # Display nurture options and update the Ddragon instance
+                                    selected_trait = display_nurture_options()
+                                    if selected_trait is not None:
+                                        print(f"Selected nurture trait: {selected_trait}")
+                                        ddragon_instances[selected_egg_index].nurture = selected_trait
+
                                 # Remove elixir from inventory and delete from database
                                 inventory_slots[i] = None
                                 elixir_color = None
@@ -675,8 +721,8 @@ def main():
                         if ddragon_instances[egg_timer.egg_index] is not None:
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
                             print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
-                            # Prompt the user for a pet name
-                            petname = input(f"Enter a pet name for your dragon from egg {egg_timer.egg_index} (up to 20 characters): ")
+                            # Prompt the user for a pet name within the Pygame window
+                            petname = get_text_input("Enter a pet name for your dragon: ", font, screen)
                             ddragon_instances[egg_timer.egg_index].set_petname(petname)
                             # Save the Ddragon instance to the database
                             ddragon_instances[egg_timer.egg_index].save_to_db()
@@ -696,7 +742,7 @@ def main():
             save_elixir_data(elixir_data)  # Pass the elixir_data variable
         except Exception as e:
             print(f"Unexpected error saving elixir data: {e}")
-            
+
     save_inventory_data()
     pygame.quit()
     sys.exit()
