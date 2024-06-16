@@ -222,7 +222,7 @@ def create_egg(dragon1, dragon2, position):
         conn.commit()
 
 # Load dragons from the database
-conn = sqlite3.connect("option dragonsedit.db")
+conn = sqlite3.connect("dragonsedit.db")
 cursor = conn.cursor()
 cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
 all_dragons = cursor.fetchall()
@@ -291,7 +291,7 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     inventory["moonbeammelon"] -= 10
 
     # Load dragons from the database
-    conn = sqlite3.connect("option dragonsedit.db")
+    conn = sqlite3.connect("dragonsedit.db")
     cursor = conn.cursor()
     cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
     all_dragons = cursor.fetchall()
@@ -474,8 +474,8 @@ def compatibility_test(dragon1, dragon2, fruit_personality_keywords):
     if dragon1["gender"] == dragon2["gender"]:
         return False
     
-    characteristics1 = set([dragon1["primary_characteristic"], dragon1["secondary_trait1"], dragon1["secondary_trait2"], dragon1["secondary_trait3"]])
-    characteristics2 = set([dragon2["primary_characteristic"], dragon2["secondary_trait1"], dragon2["secondary_trait2"], dragon2["secondary_trait3"]])
+    characteristics1 = set([dragon1["primary_characteristic"], dragon1["secondary_traits"][0], dragon1["secondary_traits"][1], dragon1["secondary_traits"][2]])
+    characteristics2 = set([dragon2["primary_characteristic"], dragon2["secondary_traits"][0], dragon2["secondary_traits"][1], dragon2["secondary_traits"][2]])
 
     # Add unique fruit characteristic for dragon1
     if dragon1["holding_fruit"]:

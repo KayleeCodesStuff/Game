@@ -3,7 +3,6 @@ import random
 import sys
 import sqlite3
 import os
-import logging
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
 pygame.init()
@@ -173,22 +172,25 @@ try:
     dragons = dragons_cursor.fetchall()
     print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
     for dragon in dragons:
-        dragons_conn.close()
+        print(dragon)  # Print each dragon's details
 except sqlite3.OperationalError as e:
     print(f"Error opening dragons database: {e}")
+finally:
+    dragons_conn.close()
 
 try:
     save_conn = sqlite3.connect(save_db_path)
     save_cursor = save_conn.cursor()
     save_cursor.execute("SELECT * FROM elixirs;")
     elixirs = save_cursor.fetchall()
+    print(f"Elixirs fetched: {elixirs}")  # Print elixirs for debugging
     save_cursor.execute("SELECT * FROM eggs;")
     eggs = save_cursor.fetchall()
-    save_conn.close()
+    print(f"Eggs fetched: {eggs}")  # Print eggs for debugging
 except sqlite3.OperationalError as e:
     print(f"Error opening save database: {e}")
-
-
+finally:
+    save_conn.close()
 
 def display_egg_menu(selected_egg_index):
     running = True
@@ -291,14 +293,22 @@ def delete_egg_from_db(egg_id):
             cursor.execute("DELETE FROM eggs WHERE id = ?", (egg_id,))
             conn.commit()
             print(f"Egg with ID {egg_id} deleted from database")
+            # Verify deletion
+            cursor.execute("SELECT * FROM eggs WHERE id = ?", (egg_id,))
+            result = cursor.fetchone()
+            if result:
+                print(f"Error: Egg with ID {egg_id} was not deleted.")
+            else:
+                print(f"Verification: Egg with ID {egg_id} has been deleted.")
     except sqlite3.Error as e:
         print(f"SQLite error deleting egg: {e}")
     except Exception as e:
         print(f"Unexpected error deleting egg: {e}")
 
 
+
 class EggTimer:
-    def __init__(self, egg_index, egg_position, egg_id, duration=60, default_trait="independent"):
+    def __init__(self, egg_index, egg_position, egg_id, duration=10, default_trait="independent"):
         self.egg_index = egg_index
         self.egg_position = egg_position
         self.egg_id = egg_id  # Store egg ID correctly
@@ -376,11 +386,12 @@ def get_statistical_pool(current_elixir_details, dragons):
     return pool
 
 
-def adjust_chances_with_nurture(statistical_pool, nurture_trait):
+
+def adjust_chances_with_nurture(pool, nurture_trait):
     adjusted_pool = []
 
     print(f"Applying nurture trait: {nurture_trait} to statistical pool")
-    for dragon in statistical_pool:
+    for dragon in pool:
         chances = 1  # Each dragon initially has one chance
         if dragon[7] == nurture_trait:  # If the dragon's nurture trait matches the selected nurture trait
             print(f"Dragon {dragon[0]} matches nurture trait: {nurture_trait}")
@@ -462,11 +473,10 @@ def select_dragon_from_pool(filtered_pool, egg_position):
     if not filtered_pool:
         return None
     selected_dragon = random.choice(filtered_pool)
-    logging.info(f"Selected dragon ID from pool: {selected_dragon[0]}")
     dragon_image = get_dragon_image(selected_dragon[0])  # Use the dragon ID
-    logging.info(f"Loaded dragon image for dragon ID {selected_dragon[0]}")
-    return selected_dragon, dragon_image
-
+    egg_index = egg_positions.index(egg_position)  # Find the index of the egg position
+    egg_images[egg_index] = dragon_image  # Update the egg image with the dragon image
+    return selected_dragon
 
 current_elixir_details = None  # Go-between variable to store elixir details
 def get_elixir_details_from_variable():
