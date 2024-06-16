@@ -384,10 +384,15 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
 
         # Check for shared secondary traits
         for secondary in elixir_secondaries:
-            if secondary in (dragon[10], dragon[11], dragon[12]):  # Adjusted indices
+            if secondary == dragon[10]:  # Adjusted indices
                 chances += 1
-        
-        print(f"{selected_trait}Initial pool (before applying nurture trait): {[dragon[0] for dragon in pool]}")
+                
+            if secondary == dragon[11]:
+                chances += 1
+            
+            if secondary == dragon[12]:
+                chances += 1
+                     
         #Adjust chances based on nurture trait
         if chances > 0 and dragon[7] == selected_trait:  # Only increase if there are already some chances
             chances += 1
