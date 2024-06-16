@@ -192,6 +192,8 @@ except sqlite3.OperationalError as e:
 finally:
     save_conn.close()
 
+placed_egg_ids = []
+
 def display_egg_menu(selected_egg_index):
     running = True
     menu_font = pygame.font.Font(None, 28)
@@ -201,13 +203,16 @@ def display_egg_menu(selected_egg_index):
         screen.fill(GREY)
         menu_rects.clear()  # Clear the list to avoid duplication
 
-        for i, egg in enumerate(eggs):
+        # Filter out placed eggs
+        available_eggs = [egg for egg in eggs if egg[0] not in placed_egg_ids]
+
+        for i, egg in enumerate(available_eggs):
             item_text = f"ID: {egg[0]}, Phenotype: {egg[2]}, Parents: {egg[4]} & {egg[5]}"  # Assuming egg[0] is the ID, egg[2] is the phenotype, egg[4] is parent 1, and egg[5] is parent 2
             text_surf = menu_font.render(item_text, True, BLACK)
             text_rect = text_surf.get_rect(center=(WIDTH // 2, 50 + i * 30))
             screen.blit(text_surf, text_rect)
-            menu_rects.append((text_rect, i))
-        
+            menu_rects.append((text_rect, egg[0]))  # Store the egg ID
+
         pygame.display.flip()
 
         for event in pygame.event.get():
@@ -215,22 +220,24 @@ def display_egg_menu(selected_egg_index):
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                for rect, index in menu_rects:
+                for rect, egg_id in menu_rects:
                     if rect.collidepoint(x, y):
-                        selected_egg = eggs[index]
-                        phenotype = selected_egg[2]
-                        egg_id = selected_egg[0]  # Extract the egg ID
-                        
-                        # Update the egg image based on the phenotype
-                        if phenotype in egg_images_dict:
-                            egg_images[selected_egg_index] = egg_images_dict[phenotype]
-                        else:
-                            egg_images[selected_egg_index] = unhatched_egg_image  # Default image if phenotype not found
+                        selected_egg = next((egg for egg in available_eggs if egg[0] == egg_id), None)
+                        if selected_egg:
+                            phenotype = selected_egg[2]
+                            # Update the egg image based on the phenotype
+                            if phenotype in egg_images_dict:
+                                egg_images[selected_egg_index] = egg_images_dict[phenotype]
+                            else:
+                                egg_images[selected_egg_index] = unhatched_egg_image  # Default image if phenotype not found
 
-                        egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
-                        print(f"Selected egg: {selected_egg}")
-                        running = False
-                        return egg_id  # Return the selected egg ID
+                            egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
+                            placed_egg_ids.append(selected_egg[0])  # Add egg ID to placed eggs list
+                            print(f"Selected egg: {selected_egg}")
+                            running = False
+                            return selected_egg[0]  # Return the selected egg ID
+    return None
+
                       
 def delete_elixir_from_db(elixir_id):
     try:
@@ -579,6 +586,7 @@ ddragon_instances = [None] * 10
 
 egg_ids_on_board = [None] * 10
 
+# Ensure you update the `main` function to call `display_egg_menu` correctly
 def main():
     global elixir_color
     elixir_color = None
@@ -695,5 +703,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
