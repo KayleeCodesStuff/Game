@@ -139,12 +139,12 @@ def draw_screen(selected_egg_index, active_timers):
     for egg_timer in active_timers[:]:
         selected_trait = egg_timer.display()
         if selected_trait is not None:
-            elixir = get_elixir_details(egg_timer.egg_index + 1)
-            if selected_trait and elixir:
-                print(f"Selected trait: {selected_trait}, Elixir: {elixir}")
-                statistical_pool = get_statistical_pool(elixir, dragons)
+            ddragon_instance = ddragon_instances[egg_timer.egg_index]  # Get the correct Ddragon instance
+            if selected_trait and ddragon_instance:
+                print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
+                statistical_pool = get_statistical_pool(ddragon_instance, dragons)
                 adjusted_pool = adjust_chances_with_nurture(statistical_pool, selected_trait)  # Adjust chances based on nurture trait
-                filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], elixir[1])
+                filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
                 selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                 if selected_dragon:
                     print(f"Selected dragon: {selected_dragon[0]}")
@@ -365,11 +365,11 @@ def get_elixir_details(position):
         return None
 
 
-def get_statistical_pool(current_elixir_details, dragons):
+def get_statistical_pool(ddragon_instance, dragons):
     pool = []
 
-    elixir_primary = current_elixir_details[3] if current_elixir_details[3] is not None else ""
-    elixir_secondaries = [current_elixir_details[4], current_elixir_details[5], current_elixir_details[6]]
+    elixir_primary = ddragon_instance.elixir_primary if ddragon_instance.elixir_primary is not None else ""
+    elixir_secondaries = ddragon_instance.elixir_secondaries
     elixir_secondaries = [trait for trait in elixir_secondaries if trait is not None]  # Remove None values
 
     print(f"Elixir Primary: {elixir_primary}")
@@ -388,8 +388,6 @@ def get_statistical_pool(current_elixir_details, dragons):
             if secondary in (dragon[9], dragon[10], dragon[11]):  # Adjusted indices
                 print(f"Dragon {dragon[0]} matches secondary trait: {secondary}")
                 chances += 1
-
-        #print(f"Dragon ID: {dragon[0]} - Chances: {chances}")
 
         if chances > 0:
             pool.extend([dragon] * chances)
@@ -503,6 +501,8 @@ class Ddragon:
         self.parent2 = parent2
         self.elixir_rgb = None
         self.elixir_title = None
+        self.elixir_primary = None
+        self.elixir_secondaries = []
         self.dragon_id = None
         self.dragon_name = None
         self.primary = None
@@ -518,9 +518,11 @@ class Ddragon:
         self.special_abilities = None
         self.petname = None
 
-    def add_elixir_info(self, rgb, title):
+    def add_elixir_info(self, rgb, title, primary, secondaries):
         self.elixir_rgb = rgb
         self.elixir_title = title
+        self.elixir_primary = primary
+        self.elixir_secondaries = secondaries
 
     def add_dragon_info(self, dragon):
         self.dragon_id = dragon[0]
@@ -636,8 +638,6 @@ def main():
     elixir_data = None  # Initialize elixir_data
     current_elixir_details = None  # Go-between variable to store elixir details
 
-    #print("Initial eggs list:", eggs)  # Debug print
-
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -669,9 +669,6 @@ def main():
                                 print(f"Could not find elixir details for position {i + 1}")
                                 continue
 
-                            current_elixir_details = elixir  # Store elixir details in the go-between variable
-                            print(f"Current Elixir details for position {i + 1}: {current_elixir_details}")
-
                             if selected_egg_index is not None and egg_selected_from_db[selected_egg_index]:
                                 egg_colors[selected_egg_index] = elixir_color
 
@@ -688,7 +685,7 @@ def main():
 
                                 # Update the Ddragon instance with elixir information
                                 if ddragon_instances[selected_egg_index] is not None:
-                                    ddragon_instances[selected_egg_index].add_elixir_info(elixir[1], elixir[2])
+                                    ddragon_instances[selected_egg_index].add_elixir_info(elixir[1], elixir[2], elixir[3], elixir[4:7])
                                     print(f"Updated Ddragon instance for egg {selected_egg_index} with elixir information")
 
                                     # Display nurture options and update the Ddragon instance
@@ -703,17 +700,16 @@ def main():
                                 delete_elixir_from_db(elixir[0])
                                 break
 
+
         for egg_timer in active_timers[:]:
             selected_trait = egg_timer.display()
             if selected_trait is not None:
-                elixir = get_elixir_details_from_variable()  # Use the new function to get elixir details from the go-between variable
-                if selected_trait and elixir:
-                    print(f"Selected trait: {selected_trait}, Elixir: {elixir}")
-                    statistical_pool = get_statistical_pool(elixir, dragons)
+                ddragon_instance = ddragon_instances[egg_timer.egg_index]  # Get the correct Ddragon instance
+                if selected_trait and ddragon_instance:
+                    print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
+                    statistical_pool = get_statistical_pool(ddragon_instance, dragons)
                     adjusted_pool = adjust_chances_with_nurture(statistical_pool, selected_trait)  # Adjust chances based on nurture trait
-                    print(f"Adjusted Pool Before Filtering: {[dragon[0] for dragon in adjusted_pool]}")
-                    filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], elixir[1])
-                    print(f"Filtered Pool: {[dragon[0] for dragon in filtered_pool]}")
+                    filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
                     selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                     if selected_dragon:
                         print(f"Selected dragon: {selected_dragon[0]}")
@@ -721,7 +717,7 @@ def main():
                         if ddragon_instances[egg_timer.egg_index] is not None:
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
                             print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
-                            # Prompt the user for a pet name within the Pygame window
+                            # Prompt the user for a pet name
                             petname = get_text_input("Enter a pet name for your dragon: ", font, screen)
                             ddragon_instances[egg_timer.egg_index].set_petname(petname)
                             # Save the Ddragon instance to the database
