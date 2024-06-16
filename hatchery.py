@@ -139,7 +139,7 @@ def draw_screen(selected_egg_index, active_timers):
     for egg_timer in active_timers[:]:
         selected_trait = egg_timer.display()
         if selected_trait is not None:
-            ddragon_instance = ddragon_instances[egg_timer.egg_index]  # Get the correct Ddragon instance
+            ddragon_instance = ddragon_instances[egg_timer.egg_index]
             if selected_trait and ddragon_instance:
                 print(f"Selected trait: {selected_trait}, Elixir: {ddragon_instance.elixir_title}")
                 statistical_pool = get_statistical_pool(ddragon_instance, dragons)
@@ -168,15 +168,15 @@ save_db_path = os.path.join(current_dir, 'save.db')
 try:
     dragons_conn = sqlite3.connect(dragons_db_path)
     dragons_cursor = dragons_conn.cursor()
-    dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3 FROM dragons;")
+    dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_characteristics, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3 FROM dragons;")
     dragons = dragons_cursor.fetchall()
     print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
-    #for dragon in dragons:
-        #print(dragon)  # Print each dragon's details
 except sqlite3.OperationalError as e:
     print(f"Error opening dragons database: {e}")
 finally:
     dragons_conn.close()
+
+
 
 try:
     save_conn = sqlite3.connect(save_db_path)
@@ -369,24 +369,24 @@ def get_statistical_pool(ddragon_instance, dragons):
     pool = []
 
     elixir_primary = ddragon_instance.elixir_primary if ddragon_instance.elixir_primary is not None else ""
-    elixir_secondaries = ddragon_instance.elixir_secondaries
-    elixir_secondaries = [trait for trait in elixir_secondaries if trait is not None]  # Remove None values
-
+    elixir_secondaries = ddragon_instance.elixir_secondaries if ddragon_instance.elixir_secondaries is not None else []
+    
     print(f"Elixir Primary: {elixir_primary}")
     print(f"Elixir Secondaries: {elixir_secondaries}")
 
     for dragon in dragons:
+        #print(f"Processing dragon: {dragon}")  # Debug print
         chances = 0
 
         # Check for shared primary trait
         if dragon[4] == elixir_primary:
-            print(f"Dragon {dragon[0]} matches primary trait: {elixir_primary}")
+            #print(f"Dragon {dragon[0]} matches primary trait: {elixir_primary}")
             chances += 1
 
         # Check for shared secondary traits
         for secondary in elixir_secondaries:
-            if secondary in (dragon[9], dragon[10], dragon[11]):  # Adjusted indices
-                print(f"Dragon {dragon[0]} matches secondary trait: {secondary}")
+            if secondary in (dragon[10], dragon[11], dragon[12]):  # Adjusted indices
+                #print(f"Dragon {dragon[0]} matches secondary trait: {secondary}")
                 chances += 1
 
         if chances > 0:
@@ -397,6 +397,7 @@ def get_statistical_pool(ddragon_instance, dragons):
 
 
 
+
 def adjust_chances_with_nurture(pool, nurture_trait):
     adjusted_pool = []
 
@@ -404,7 +405,7 @@ def adjust_chances_with_nurture(pool, nurture_trait):
     for dragon in pool:
         chances = 1  # Each dragon initially has one chance
         if dragon[7] == nurture_trait:  # If the dragon's nurture trait matches the selected nurture trait
-            print(f"Dragon {dragon[0]} matches nurture trait: {nurture_trait}")
+            #print(f"Dragon {dragon[0]} matches nurture trait: {nurture_trait}")
             chances += 1  # Increase the chances by one
 
         adjusted_pool.extend([dragon] * chances)
@@ -419,7 +420,7 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
 
     for dragon in pool:
         dragon_phenotype = dragon[2]
-        rgb_ranges = dragon[6].strip('()').split(', ')  # Adjusted index
+        rgb_ranges = dragon[7].strip('()').split(', ')  # Adjusted index
         try:
             dragon_rgb_range = [(int(r.split('-')[0]), int(r.split('-')[1])) for r in rgb_ranges]
         except ValueError as e:
@@ -441,6 +442,7 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
         filtered_pool.append(dragon)
 
     return filtered_pool
+
 
 def load_dragon_image(dragon_filename):
     base_directory = os.path.dirname(__file__)
@@ -510,7 +512,6 @@ class Ddragon:
         self.secondary2 = None
         self.secondary3 = None
         self.nurture = None
-        self.description = None
         self.gender = None
         self.rgb_range = None
         self.filename = None
@@ -528,16 +529,15 @@ class Ddragon:
         self.dragon_id = dragon[0]
         self.dragon_name = dragon[3]
         self.primary = dragon[4]
-        self.secondary1 = dragon[9]
-        self.secondary2 = dragon[10]
-        self.secondary3 = dragon[11]
-        self.nurture = dragon[7]
-        self.description = dragon[5]
-        self.gender = dragon[8]
-        self.rgb_range = dragon[6]
+        self.secondary1 = dragon[10]
+        self.secondary2 = dragon[11]
+        self.secondary3 = dragon[12]
+        self.nurture = dragon[8]
+        self.gender = dragon[9]
+        self.rgb_range = dragon[7]
         self.filename = dragon[1]
         self.type = dragon[2]
-        self.special_abilities = dragon[5]
+        self.special_abilities = dragon[6]
 
     def set_petname(self, petname):
         self.petname = petname
@@ -560,7 +560,6 @@ class Ddragon:
                     secondary2 TEXT,
                     secondary3 TEXT,
                     nurture TEXT,
-                    description TEXT,
                     gender TEXT,
                     rgb_range TEXT,
                     filename TEXT,
@@ -572,15 +571,16 @@ class Ddragon:
             cursor.execute('''
                 INSERT INTO hatcheddragons (
                     genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
-                    primary_trait, secondary1, secondary2, secondary3, nurture, description, gender,
+                    primary_trait, secondary1, secondary2, secondary3, nurture, gender,
                     rgb_range, filename, type, special_abilities, petname
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 self.genotype, self.parent1, self.parent2, self.elixir_rgb, self.elixir_title, self.dragon_id, self.dragon_name,
-                self.primary, self.secondary1, self.secondary2, self.secondary3, self.nurture, self.description, self.gender,
+                self.primary, self.secondary1, self.secondary2, self.secondary3, self.nurture, self.gender,
                 self.rgb_range, self.filename, self.type, self.special_abilities, self.petname
             ))
             conn.commit()
+
 
 
 # Update the main function call to display the egg menu correctly
@@ -620,15 +620,14 @@ def get_text_input(prompt, font, screen):
 
         screen.fill((30, 30, 30))
         txt_surface = font.render(prompt + text, True, color)
-        width = max(200, txt_surface.get_width()+10)
+        width = max(200, txt_surface.get_width() + 10)
         input_box.w = width
-        screen.blit(txt_surface, (input_box.x+5, input_box.y+5))
+        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
         pygame.draw.rect(screen, color, input_box, 2)
         pygame.display.flip()
 
     return text
 
-# Ensure you update the `main` function to call `display_egg_menu` correctly
 def main():
     global elixir_color
     elixir_color = None
