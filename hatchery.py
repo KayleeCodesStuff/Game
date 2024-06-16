@@ -73,6 +73,8 @@ fruit_images_dict = {
     "moonbeammelon": pygame.transform.scale(pygame.image.load("moonbeammelon.png"), (50, 50))
 }
 
+ddragon_save_list = []
+
 # Initialize inventory and egg counts
 inventory, egg_counts, inventory_slots = load_inventory_data()
 
@@ -627,6 +629,51 @@ def get_text_input(prompt, font, screen):
         pygame.display.flip()
 
     return text
+def save_all_ddragon_instances(ddragon_list):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS hatcheddragons (
+                    id INTEGER PRIMARY KEY,
+                    genotype TEXT,
+                    parent1 TEXT,
+                    parent2 TEXT,
+                    elixir_rgb TEXT,
+                    elixir_title TEXT,
+                    dragon_id INTEGER,
+                    dragon_name TEXT,
+                    primary_trait TEXT,
+                    secondary1 TEXT,
+                    secondary2 TEXT,
+                    secondary3 TEXT,
+                    nurture TEXT,
+                    gender TEXT,
+                    rgb_range TEXT,
+                    filename TEXT,
+                    type TEXT,
+                    special_abilities TEXT,
+                    petname TEXT
+                )
+            ''')
+            for ddragon in ddragon_list:
+                cursor.execute('''
+                    INSERT INTO hatcheddragons (
+                        genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
+                        primary_trait, secondary1, secondary2, secondary3, nurture, gender,
+                        rgb_range, filename, type, special_abilities, petname
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    ddragon.genotype, ddragon.parent1, ddragon.parent2, ddragon.elixir_rgb, ddragon.elixir_title, ddragon.dragon_id, ddragon.dragon_name,
+                    ddragon.primary, ddragon.secondary1, ddragon.secondary2, ddragon.secondary3, ddragon.nurture, ddragon.gender,
+                    ddragon.rgb_range, ddragon.filename, ddragon.type, ddragon.special_abilities, ddragon.petname
+                ))
+            conn.commit()
+            print(f"Saved {len(ddragon_list)} Ddragon instances to the database")
+    except sqlite3.Error as e:
+        print(f"SQLite error saving ddragon instances: {e}")
+    except Exception as e:
+        print(f"Unexpected error saving ddragon instances: {e}")
 
 def main():
     global elixir_color
@@ -699,7 +746,6 @@ def main():
                                 delete_elixir_from_db(elixir[0])
                                 break
 
-
         for egg_timer in active_timers[:]:
             selected_trait = egg_timer.display()
             if selected_trait is not None:
@@ -711,19 +757,20 @@ def main():
                     filtered_pool = filter_pool_by_phenotype_and_rgb(adjusted_pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
                     selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                     if selected_dragon:
-                        print(f"Selected dragon: {selected_dragon[0]}")
+                        print(f"Selected dragon: {selected_dragon[0]} for egg index {egg_timer.egg_index}")
                         # Update the Ddragon instance with dragon information
                         if ddragon_instances[egg_timer.egg_index] is not None:
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
                             print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
                             # Prompt the user for a pet name
-                            petname = get_text_input("Enter a pet name for your dragon: ", font, screen)
+                            petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen)
+                            print(f"Pet name entered for egg {egg_timer.egg_index}: {petname}")  # Debug print
                             ddragon_instances[egg_timer.egg_index].set_petname(petname)
-                            # Save the Ddragon instance to the database
-                            ddragon_instances[egg_timer.egg_index].save_to_db()
-                            print(f"Saved Ddragon instance for egg {egg_timer.egg_index} to database")
+                            # Accumulate the Ddragon instance to save later
+                            ddragon_save_list.append(ddragon_instances[egg_timer.egg_index])
+                            print(f"Accumulated Ddragon instance for egg {egg_timer.egg_index}")
                     else:
-                        print("No dragon selected")
+                        print(f"No dragon selected for egg {egg_timer.egg_index}")
                 active_timers.remove(egg_timer)
                 del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
                 egg_positions[egg_timer.egg_index] = pygame.Rect(-100, -100, 0, 0)
@@ -738,9 +785,12 @@ def main():
         except Exception as e:
             print(f"Unexpected error saving elixir data: {e}")
 
+    # Save all accumulated Ddragon instances
+    save_all_ddragon_instances(ddragon_save_list)
     save_inventory_data()
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
     main()
+
