@@ -373,6 +373,7 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
 
     elixir_primary = ddragon_instance.elixir_primary if ddragon_instance.elixir_primary is not None else ""
     elixir_secondaries = ddragon_instance.elixir_secondaries if ddragon_instance.elixir_secondaries is not None else []
+    print(f"Building pool for Ddragon instance with primary: {elixir_primary} and secondaries: {elixir_secondaries}")
     
     for dragon in dragons:
         chances = 0  # Initialize chances for each dragon
@@ -385,8 +386,9 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
         for secondary in elixir_secondaries:
             if secondary in (dragon[10], dragon[11], dragon[12]):  # Adjusted indices
                 chances += 1
-
-        # Adjust chances based on nurture trait
+        
+        print(f"{selected_trait}Initial pool (before applying nurture trait): {[dragon[0] for dragon in pool]}")
+        #Adjust chances based on nurture trait
         if chances > 0 and dragon[7] == selected_trait:  # Only increase if there are already some chances
             chances += 1
 
@@ -395,6 +397,8 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
 
     ddragon_instance.pool = pool  # Assign the pool to the Ddragon instance
 
+        # Print the pool after applying the nurture trait
+    print(f"Pool after applying nurture trait: {[dragon[0] for dragon in pool]}")
     return pool
 
 def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
@@ -686,13 +690,15 @@ def main():
                     if egg_rect.collidepoint(x, y):
                         selected_egg_index = j
                         egg_selected = True
-                        selected_egg_id = display_egg_menu(selected_egg_index)  # Get the selected egg ID
+                        selected_egg_id = display_egg_menu(selected_egg_index)
                         if selected_egg_id is not None:
-                            ddragon_instance = Ddragon(eggs[selected_egg_index][1], eggs[selected_egg_index][4], eggs[selected_egg_index][5])
+                            phenotype = eggs[selected_egg_index][2]  # Extract the phenotype from the egg
+                            ddragon_instance = Ddragon(eggs[selected_egg_index][1], eggs[selected_egg_index][4], eggs[selected_egg_index][5], phenotype)
                             ddragon_instances[selected_egg_index] = ddragon_instance
-                            egg_ids_on_board[selected_egg_index] = selected_egg_id  # Map the egg ID to the board position
-                            
+                            egg_ids_on_board[selected_egg_index] = selected_egg_id
+                            print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id} and phenotype {phenotype}")
                         break
+
                 if not egg_selected:
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
