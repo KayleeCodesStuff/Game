@@ -171,8 +171,8 @@ try:
     dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3 FROM dragons;")
     dragons = dragons_cursor.fetchall()
     print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
-    for dragon in dragons:
-        print(dragon)  # Print each dragon's details
+    #for dragon in dragons:
+        #print(dragon)  # Print each dragon's details
 except sqlite3.OperationalError as e:
     print(f"Error opening dragons database: {e}")
 finally:
@@ -219,6 +219,7 @@ def display_egg_menu(selected_egg_index):
                     if rect.collidepoint(x, y):
                         selected_egg = eggs[index]
                         phenotype = selected_egg[2]
+                        egg_id = selected_egg[0]  # Extract the egg ID
                         
                         # Update the egg image based on the phenotype
                         if phenotype in egg_images_dict:
@@ -229,7 +230,8 @@ def display_egg_menu(selected_egg_index):
                         egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
                         print(f"Selected egg: {selected_egg}")
                         running = False
-                        break
+                        return egg_id  # Return the selected egg ID
+                      
 def delete_elixir_from_db(elixir_id):
     try:
         with sqlite3.connect('save.db') as conn:
@@ -286,6 +288,7 @@ def display_nurture_options():
                 running = False
     
     return selected_trait
+# Update the egg deletion function to use egg ID
 def delete_egg_from_db(egg_id):
     try:
         with sqlite3.connect('save.db') as conn:
@@ -317,7 +320,8 @@ class EggTimer:
         self.start_ticks = pygame.time.get_ticks()
         self.selected_trait = None
         self.running = True
-        
+        print(f"Initialized EggTimer for egg ID: {self.egg_id}")  # Debug print
+
     def update(self):
         seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
         countdown = self.duration - int(seconds)
@@ -433,8 +437,6 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     return filtered_pool
 
 def load_dragon_image(dragon_filename):
-    # Adjust the path to point to the correct folder
-    # Use the base directory and the correct relative path
     base_directory = os.path.dirname(__file__)
     dragon_image_path = os.path.join(base_directory, "dragons", dragon_filename)
     print(f"Loading image from path: {dragon_image_path}")
@@ -484,7 +486,99 @@ def get_elixir_details_from_variable():
 
 active_timers_dict = {}
 
+import sqlite3
+
+class Ddragon:
+    def __init__(self, genotype, parent1, parent2):
+        self.genotype = genotype
+        self.parent1 = parent1
+        self.parent2 = parent2
+        self.elixir_rgb = None
+        self.elixir_title = None
+        self.dragon_id = None
+        self.dragon_name = None
+        self.primary = None
+        self.secondary1 = None
+        self.secondary2 = None
+        self.secondary3 = None
+        self.nurture = None
+        self.description = None
+        self.gender = None
+        self.rgb_range = None
+        self.filename = None
+        self.type = None
+        self.special_abilities = None
+        self.petname = None
+
+    def add_elixir_info(self, rgb, title):
+        self.elixir_rgb = rgb
+        self.elixir_title = title
+
+    def add_dragon_info(self, dragon):
+        self.dragon_id = dragon[0]
+        self.dragon_name = dragon[3]
+        self.primary = dragon[4]
+        self.secondary1 = dragon[9]
+        self.secondary2 = dragon[10]
+        self.secondary3 = dragon[11]
+        self.nurture = dragon[7]
+        self.description = dragon[5]
+        self.gender = dragon[8]
+        self.rgb_range = dragon[6]
+        self.filename = dragon[1]
+        self.type = dragon[2]
+        self.special_abilities = dragon[5]
+
+    def set_petname(self, petname):
+        self.petname = petname
+
+    def save_to_db(self):
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS hatcheddragons (
+                    id INTEGER PRIMARY KEY,
+                    genotype TEXT,
+                    parent1 TEXT,
+                    parent2 TEXT,
+                    elixir_rgb TEXT,
+                    elixir_title TEXT,
+                    dragon_id INTEGER,
+                    dragon_name TEXT,
+                    primary_trait TEXT,
+                    secondary1 TEXT,
+                    secondary2 TEXT,
+                    secondary3 TEXT,
+                    nurture TEXT,
+                    description TEXT,
+                    gender TEXT,
+                    rgb_range TEXT,
+                    filename TEXT,
+                    type TEXT,
+                    special_abilities TEXT,
+                    petname TEXT
+                )
+            ''')
+            cursor.execute('''
+                INSERT INTO hatcheddragons (
+                    genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
+                    primary_trait, secondary1, secondary2, secondary3, nurture, description, gender,
+                    rgb_range, filename, type, special_abilities, petname
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                self.genotype, self.parent1, self.parent2, self.elixir_rgb, self.elixir_title, self.dragon_id, self.dragon_name,
+                self.primary, self.secondary1, self.secondary2, self.secondary3, self.nurture, self.description, self.gender,
+                self.rgb_range, self.filename, self.type, self.special_abilities, self.petname
+            ))
+            conn.commit()
+
+
 # Update the main function call to display the egg menu correctly
+# Ensure you have an empty list to hold Ddragon instances
+ddragon_instances = [None] * 10
+
+egg_ids_on_board = [None] * 10
+
 def main():
     global elixir_color
     elixir_color = None
@@ -493,6 +587,8 @@ def main():
     active_timers = []
     elixir_data = None  # Initialize elixir_data
     current_elixir_details = None  # Go-between variable to store elixir details
+
+    print("Initial eggs list:", eggs)  # Debug print
 
     while running:
         for event in pygame.event.get():
@@ -505,9 +601,13 @@ def main():
                     if egg_rect.collidepoint(x, y):
                         selected_egg_index = j
                         egg_selected = True
-                        selected_egg_id = display_egg_menu(selected_egg_index)
+                        selected_egg_id = display_egg_menu(selected_egg_index)  # Get the selected egg ID
+                        if selected_egg_id is not None:
+                            ddragon_instance = Ddragon(eggs[selected_egg_index][2], eggs[selected_egg_index][4], eggs[selected_egg_index][5])
+                            ddragon_instances[selected_egg_index] = ddragon_instance
+                            egg_ids_on_board[selected_egg_index] = selected_egg_id  # Map the egg ID to the board position
+                            print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id}")
                         break
-
                 if not egg_selected:
                     for i, rect in enumerate(inventory_boxes):
                         if rect.collidepoint(x, y) and inventory_slots[i] is not None:
@@ -516,7 +616,7 @@ def main():
                             elixir_image_file = selected_elixir[1]
 
                             # Get elixir details based on position before removing it from inventory
-                            elixir = get_elixir_details(i + 1)  
+                            elixir = get_elixir_details(i + 1)
                             if not elixir:
                                 print(f"Could not find elixir details for position {i + 1}")
                                 continue
@@ -529,13 +629,19 @@ def main():
 
                                 # Ensure correct egg ID is passed to EggTimer
                                 egg_position = egg_positions[selected_egg_index].topleft
-                                egg_id = eggs[selected_egg_index][0]
+                                egg_id = egg_ids_on_board[selected_egg_index]
+                                print(f"Setting up EggTimer for egg ID: {egg_id} at index {selected_egg_index}")  # Debug print
 
                                 # Check if timer already exists for this egg
                                 if selected_egg_index not in active_timers_dict:
                                     new_timer = EggTimer(selected_egg_index, egg_position, egg_id)
                                     active_timers.append(new_timer)
                                     active_timers_dict[selected_egg_index] = new_timer
+
+                                # Update the Ddragon instance with elixir information
+                                if ddragon_instances[selected_egg_index] is not None:
+                                    ddragon_instances[selected_egg_index].add_elixir_info(elixir[1], elixir[2])
+                                    print(f"Updated Ddragon instance for egg {selected_egg_index} with elixir information")
 
                                 # Remove elixir from inventory and delete from database
                                 inventory_slots[i] = None
@@ -557,6 +663,16 @@ def main():
                     selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                     if selected_dragon:
                         print(f"Selected dragon: {selected_dragon[0]}")
+                        # Update the Ddragon instance with dragon information
+                        if ddragon_instances[egg_timer.egg_index] is not None:
+                            ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
+                            print(f"Updated Ddragon instance for egg {egg_timer.egg_index} with dragon information")
+                            # Prompt the user for a pet name
+                            petname = input(f"Enter a pet name for your dragon from egg {egg_timer.egg_index} (up to 20 characters): ")
+                            ddragon_instances[egg_timer.egg_index].set_petname(petname)
+                            # Save the Ddragon instance to the database
+                            ddragon_instances[egg_timer.egg_index].save_to_db()
+                            print(f"Saved Ddragon instance for egg {egg_timer.egg_index} to database")
                     else:
                         print("No dragon selected")
                 active_timers.remove(egg_timer)
@@ -567,10 +683,17 @@ def main():
         draw_screen(selected_egg_index, active_timers)
         pygame.display.flip()  # Force a screen redraw
 
-    save_elixir_data(elixir_data)  # Pass the elixir_data variable
+    if elixir_data:
+        try:
+            save_elixir_data(elixir_data)  # Pass the elixir_data variable
+        except Exception as e:
+            print(f"Unexpected error saving elixir data: {e}")
+            
     save_inventory_data()
     pygame.quit()
     sys.exit()
 
 if __name__ == "__main__":
     main()
+
+
