@@ -3,6 +3,7 @@ import random
 import sys
 import sqlite3
 import os
+import logging
 from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
 
 pygame.init()
@@ -375,11 +376,11 @@ def get_statistical_pool(current_elixir_details, dragons):
     return pool
 
 
-def adjust_chances_with_nurture(pool, nurture_trait):
+def adjust_chances_with_nurture(statistical_pool, nurture_trait):
     adjusted_pool = []
 
     print(f"Applying nurture trait: {nurture_trait} to statistical pool")
-    for dragon in pool:
+    for dragon in statistical_pool:
         chances = 1  # Each dragon initially has one chance
         if dragon[7] == nurture_trait:  # If the dragon's nurture trait matches the selected nurture trait
             print(f"Dragon {dragon[0]} matches nurture trait: {nurture_trait}")
@@ -461,10 +462,11 @@ def select_dragon_from_pool(filtered_pool, egg_position):
     if not filtered_pool:
         return None
     selected_dragon = random.choice(filtered_pool)
+    logging.info(f"Selected dragon ID from pool: {selected_dragon[0]}")
     dragon_image = get_dragon_image(selected_dragon[0])  # Use the dragon ID
-    egg_index = egg_positions.index(egg_position)  # Find the index of the egg position
-    egg_images[egg_index] = dragon_image  # Update the egg image with the dragon image
-    return selected_dragon
+    logging.info(f"Loaded dragon image for dragon ID {selected_dragon[0]}")
+    return selected_dragon, dragon_image
+
 
 current_elixir_details = None  # Go-between variable to store elixir details
 def get_elixir_details_from_variable():
