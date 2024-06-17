@@ -408,10 +408,11 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
         print("Dragon Phenotype:", dragon_phenotype)
         print("Dragon RGB Range:", dragon_rgb_range)
 
-        # Check phenotype
-        if egg_phenotype == "Metallic" and dragon_phenotype not in ["Gold", "Silver", "Metal"]:
-            print("Skipping due to phenotype mismatch (Metallic case)")
-            continue
+        # Check phenotype with special handling for Metallic cases
+        if egg_phenotype == "Metallic":
+            if dragon_phenotype not in ["Gold", "Silver", "Metal"]:
+                print("Skipping due to phenotype mismatch (Metallic case)")
+                continue
         elif egg_phenotype != dragon_phenotype:
             print("Skipping due to phenotype mismatch")
             continue
@@ -430,6 +431,7 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     print("Filtered Pool Dragon Types:", dragon_types)
 
     return filtered_pool
+
 
    
 
