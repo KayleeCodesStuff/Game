@@ -141,30 +141,9 @@ def draw_screen(selected_egg_index, active_timers):
 
     # Draw all active timers
     for egg_timer in active_timers[:]:
-        selected_trait = egg_timer.display()
-        if selected_trait is not None:
-            ddragon_instance = ddragon_instances[egg_timer.egg_index]
-            if selected_trait and ddragon_instance:
-                statistical_pool = get_statistical_pool(ddragon_instance, dragons, selected_trait)
-                filtered_pool = filter_pool_by_phenotype_and_rgb(statistical_pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
-                selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
-                if selected_dragon:
-                    print(f"Selected dragon: {selected_dragon[0]} for egg index {egg_timer.egg_index}")
-                    if ddragon_instances[egg_timer.egg_index] is not None:
-                        ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
-                        
-                        petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen, timeout=10)
-                        ddragon_instances[egg_timer.egg_index].set_petname(petname)
-                        
-                        ddragon_save_list.append(ddragon_instances[egg_timer.egg_index])
-                else:
-                    print(f"No dragon selected for egg {egg_timer.egg_index}")
-
-            active_timers.remove(egg_timer)
-            del active_timers_dict[egg_timer.egg_index]
+        egg_timer.display()
 
     pygame.display.flip()
-
 
 
 dragons = []
@@ -216,7 +195,7 @@ def display_egg_menu(selected_egg_index):
         available_eggs = [egg for egg in eggs if egg[0] not in placed_egg_ids]
 
         for i, egg in enumerate(available_eggs):
-            item_text = f"ID: {egg[0]}, Phenotype: {egg[2]}, Parents: {egg[4]} & {egg[5]}"  # Assuming egg[0] is the ID, egg[2] is the phenotype, egg[4] is parent 1, and egg[5] is parent 2
+            item_text = f"{egg[0]}, {egg[2]}, P1: {egg[4]} & {egg[5]}"  # Assuming egg[0] is the ID, egg[2] is the phenotype, egg[4] is parent 1, and egg[5] is parent 2
             text_surf = menu_font.render(item_text, True, BLACK)
             text_rect = text_surf.get_rect(center=(WIDTH // 2, 50 + i * 30))
             screen.blit(text_surf, text_rect)
@@ -242,8 +221,8 @@ def display_egg_menu(selected_egg_index):
 
                             egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
                             placed_egg_ids.append(selected_egg[0])  # Add egg ID to placed eggs list
-                            #print(f"Selected egg: {selected_egg}")
                             running = False
+                            print(f"Egg selected from menu: {selected_egg[0]}")  # Debug print
                             return selected_egg[0]  # Return the selected egg ID
     return None
 
@@ -412,31 +391,47 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     egg_phenotype = egg[2]
     elixir_rgb_value = eval(elixir_rgb)  # Convert string representation of RGB to tuple
 
+    print("Egg Phenotype:", egg_phenotype)
+    print("Elixir RGB Value:", elixir_rgb_value)
+
     for dragon in pool:
         dragon_phenotype = dragon[2]
         rgb_ranges = dragon[7].strip('()').split(', ')  # Adjusted index
+
         try:
             dragon_rgb_range = [(int(r.split('-')[0]), int(r.split('-')[1])) for r in rgb_ranges]
         except ValueError as e:
             print(f"Error parsing RGB range for dragon {dragon[0]}: {e}")
             continue
 
+        print("Processing Dragon:", dragon[0])
+        print("Dragon Phenotype:", dragon_phenotype)
+        print("Dragon RGB Range:", dragon_rgb_range)
+
         # Check phenotype
-        if egg_phenotype in ["Metallic", "Gold", "Silver"] and dragon_phenotype != "Metallic":
+        if egg_phenotype == "Metallic" and dragon_phenotype not in ["Gold", "Silver", "Metal"]:
+            print("Skipping due to phenotype mismatch (Metallic case)")
             continue
         elif egg_phenotype != dragon_phenotype:
+            print("Skipping due to phenotype mismatch")
             continue
 
         # Check RGB range
         if not (dragon_rgb_range[0][0] <= elixir_rgb_value[0] <= dragon_rgb_range[0][1] and
                 dragon_rgb_range[1][0] <= elixir_rgb_value[1] <= dragon_rgb_range[1][1] and
                 dragon_rgb_range[2][0] <= elixir_rgb_value[2] <= dragon_rgb_range[2][1]):
+            print("Skipping due to RGB range mismatch")
             continue
 
         filtered_pool.append(dragon)
+        print("Added Dragon:", dragon[0])
+
+    dragon_types = [dragon[2] for dragon in filtered_pool]
+    print("Filtered Pool Dragon Types:", dragon_types)
 
     return filtered_pool
 
+   
 
 def load_dragon_image(dragon_filename):
     base_directory = os.path.dirname(__file__)
@@ -675,11 +670,13 @@ def save_all_ddragon_instances(ddragon_list):
     except Exception as e:
         print(f"Unexpected error saving ddragon instances: {e}")
 
+# Main function adjustments
 def main():
     global elixir_color
     elixir_color = None
     running = True
-    selected_egg_index = None
+    selected_egg_index = None  # For egg position on the board
+    print("Initial selected_egg_index:", selected_egg_index)
     active_timers = []
     elixir_data = None  # Initialize elixir_data
     current_elixir_details = None  # Go-between variable to store elixir details
@@ -694,14 +691,20 @@ def main():
                 for j, egg_rect in enumerate(egg_positions):
                     if egg_rect.collidepoint(x, y):
                         selected_egg_index = j
+                        print("selected_egg_index set to:", selected_egg_index)
                         egg_selected = True
                         selected_egg_id = display_egg_menu(selected_egg_index)
                         if selected_egg_id is not None:
-                            phenotype = eggs[selected_egg_index][2]  # Extract the phenotype from the egg
-                            ddragon_instance = Ddragon(eggs[selected_egg_index][1], eggs[selected_egg_index][4], eggs[selected_egg_index][5], phenotype)
-                            ddragon_instances[selected_egg_index] = ddragon_instance
-                            egg_ids_on_board[selected_egg_index] = selected_egg_id
-                            print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id} and phenotype {phenotype}")
+                            # Fetch the selected egg from the database using the selected_egg_id
+                            selected_egg = next((egg for egg in eggs if egg[0] == selected_egg_id), None)
+                            print("Selected egg from database:", selected_egg)
+                            if selected_egg:
+                                phenotype = selected_egg[2]
+                                print("Phenotype from selected egg:", phenotype)
+                                ddragon_instance = Ddragon(selected_egg[1], selected_egg[4], selected_egg[5], phenotype)
+                                ddragon_instances[selected_egg_index] = ddragon_instance
+                                egg_ids_on_board[selected_egg_index] = selected_egg_id
+                                print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id} and phenotype {phenotype}")
                         break
 
                 if not egg_selected:
@@ -753,7 +756,9 @@ def main():
             if selected_trait is not None:
                 ddragon_instance = ddragon_instances[egg_timer.egg_index]  # Get the correct Ddragon instance
                 if selected_trait and ddragon_instance:
-                    filtered_pool = filter_pool_by_phenotype_and_rgb(ddragon_instance.pool, eggs[egg_timer.egg_index], ddragon_instance.elixir_rgb)
+                    # Use the correct egg from the database
+                    selected_egg = next((egg for egg in eggs if egg[0] == egg_ids_on_board[egg_timer.egg_index]), None)
+                    filtered_pool = filter_pool_by_phenotype_and_rgb(ddragon_instance.pool, selected_egg, ddragon_instance.elixir_rgb)
                     selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                     if selected_dragon:
                         print(f"Selected dragon: {selected_dragon[0]} for egg index {egg_timer.egg_index}")
@@ -790,3 +795,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
