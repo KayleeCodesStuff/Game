@@ -44,10 +44,10 @@ EGG_PADDING = 200
 
 # Load and resize egg images
 egg_images_dict = {
-    "Black": load_and_resize_image("black_egg.png", egg_size),
-    "White": load_and_resize_image("white_egg.png", egg_size),
-    "Rainbow": load_and_resize_image("rainbow_egg.png", egg_size),
-    "Metallic": load_and_resize_image("metallic_egg.png", egg_size)
+    "black": load_and_resize_image("black_egg.png", egg_size),
+    "white": load_and_resize_image("white_egg.png", egg_size),
+    "rainbow": load_and_resize_image("rainbow_egg.png", egg_size),
+    "metallic": load_and_resize_image("metallic_egg.png", egg_size)
 }
 
 

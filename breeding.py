@@ -70,18 +70,18 @@ fruit_personality_keywords = {
 
 # Define the alleles and their dominance hierarchy
 allele_dominance = {
-    'B': 'Black',
-    'W': 'White',
-    'R': 'Rainbow',
-    'M': 'Metallic'
+    'B': 'black',
+    'W': 'white',
+    'R': 'rainbow',
+    'M': 'metallic'
 }
 
 # Possible genotypes for each phenotype
 phenotype_to_genotypes = {
-    'Black': [('B', 'B'), ('B', 'W'), ('B', 'R'), ('B', 'M')],
-    'White': [('W', 'W'), ('W', 'R'), ('W', 'M')],
-    'Rainbow': [('R', 'R'), ('R', 'M')],
-    'Metallic': [('M', 'M')]
+    'black': [('B', 'B'), ('B', 'W'), ('B', 'R'), ('B', 'M')],
+    'white': [('W', 'W'), ('W', 'R'), ('W', 'M')],
+    'rainbow': [('R', 'R'), ('R', 'M')],
+    'metallic': [('M', 'M')]
 }
 
 def initialize_eggs_table(conn):
@@ -215,14 +215,14 @@ def is_aspect_ratio_16_9(width, height):
 
 def assign_genotype(dragon):
     phenotype = dragon["type"]  # Assuming 'type' is used for phenotype
-    if phenotype in ["Gold", "Silver", "Metal"]:
-        phenotype = "Metallic"
-    if phenotype == "Black":
-        genotype = random.choice(phenotype_to_genotypes["Black"])
-    elif phenotype == "White":
-        genotype = random.choice(phenotype_to_genotypes["White"])
-    elif phenotype == "Rainbow":
-        genotype = random.choice(phenotype_to_genotypes["Rainbow"])
+    if phenotype in ["gold", "silver", "metal"]:
+        phenotype = "metallic"
+    if phenotype == "black":
+        genotype = random.choice(phenotype_to_genotypes["black"])
+    elif phenotype == "white":
+        genotype = random.choice(phenotype_to_genotypes["white"])
+    elif phenotype == "rainbow":
+        genotype = random.choice(phenotype_to_genotypes["rainbow"])
     else:
         genotype = random.choice(phenotype_to_genotypes[phenotype])
     dragon["genotype"] = genotype
@@ -469,6 +469,36 @@ def determine_phenotype(genotype):
         return 'rainbow'
     else:
         return 'metallic'
+
+# def create_egg(dragon1, dragon2, position):
+#     egg_genotype = get_egg_genotype(dragon1, dragon2)
+#     egg_phenotype = determine_phenotype(egg_genotype)
+#     egg_image = egg_images_dict[egg_phenotype]
+#     egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
+#     parent1_name = dragon1["name"]
+#     parent2_name = dragon2["name"]
+#     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
+
+#     eggs_on_board.append({
+#         "genotype": egg_genotype,
+#         "phenotype": egg_phenotype,
+#         "image": egg_image,
+#         "rect": egg_image.get_rect(topleft=position)
+#     })
+
+#     # Database operations
+#     with sqlite3.connect(save_file) as conn:
+#         cursor = conn.cursor()
+
+#         # Insert a new row into the eggs table for the picked up egg
+#         cursor.execute("""
+#             INSERT INTO eggs (genotype, phenotype, image_file, parent1_name, parent2_name)
+#             VALUES (?, ?, ?, ?, ?)
+#         """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
+
+#         conn.commit()
+
+
 
 def draw_eggs_on_board(surface):
     for egg in eggs_on_board:

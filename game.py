@@ -70,10 +70,10 @@ fruit_images_dict = {
 }
 
 egg_images_dict = {
-    "Black": load_image("black_egg.png", (50, 50)),
-    "White": load_image("white_egg.png", (50, 50)),
-    "Rainbow": load_image("rainbow_egg.png", (50, 50)),
-    "Metallic": load_image("metallic_egg.png", (50, 50))
+    "black": load_image("black_egg.png", (50, 50)),
+    "white": load_image("white_egg.png", (50, 50)),
+    "rainbow": load_image("rainbow_egg.png", (50, 50)),
+    "metallic": load_image("metallic_egg.png", (50, 50))
 }
 
 # Initialize inventory and egg counts
