@@ -4,23 +4,22 @@ import os
 import random
 import math
 from tkinter import Tk, filedialog
-from game import load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, define_elixir_data
+from game import initialize, load_inventory_data, save_inventory_data, load_and_resize_image, draw_inventory, define_elixir_data
 
 # Constants
 WIDTH, HEIGHT = 1200, 900
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
-BACKGROUND_IMAGE = "breedingbackground.png"
+
 DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
 FRUIT_SPEED_MODIFIERS = {
     "gleamberry": -0.5,
     "shimmeringapple": 0.5,
 }
 
-# Initialize Pygame
-pygame.init()
-pygame.font.init()  # Initialize the font module
+# Initialization pygame and fonts from Game module
+initialize()
 
 # Define font
 small_font = pygame.font.Font(None, 24)
@@ -30,49 +29,23 @@ large_font = pygame.font.Font(None, 36)
 button_font = pygame.font.Font(None, 36)
 button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 150, 180, 50)  # Positioned above the inventory
 
-# Load background image
-background = pygame.image.load(BACKGROUND_IMAGE)
-background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-
 # Define screen (surface)
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
 
-# Fruit images
-ethereal_pear = pygame.image.load("etherealpear.png")
-flame_fruit = pygame.image.load("flamefruit.png")
-gleam_berry = pygame.image.load("gleamberry.png")
-moonbeam_melon = pygame.image.load("moonbeammelon.png")
-shimmering_apple = pygame.image.load("shimmeringapple.png")
-
-# Resize fruit images
-fruit_images = [gleam_berry, flame_fruit, shimmering_apple, ethereal_pear, moonbeam_melon]
-fruit_images = [pygame.transform.scale(fruit, (50, 50)) for fruit in fruit_images]
-fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
-fruit_images_dict = dict(zip(fruit_names, fruit_images))
-# Load heart image
-heart_image = pygame.image.load("heart.png")
-heart_image = pygame.transform.scale(heart_image, (30, 30))
+# Load images
+background = load_and_resize_image("breedingbackground.png", (WIDTH, HEIGHT))
+heart_image = load_and_resize_image("heart.png", (30, 30))
 hearts_on_board = []
+fruit_names = ["etherealpear", "flamefruit", "gleamberry", "moonbeammelon", "shimmeringapple"]
+fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
+black_egg = load_and_resize_image("black_egg.png", (70, 70))
+white_egg = load_and_resize_image("white_egg.png", (70, 70))
+rainbow_egg = load_and_resize_image("rainbow_egg.png", (70, 70))
+metallic_egg = load_and_resize_image("metallic_egg.png", (70, 70))
 
-# Load inventory data
-inventory, egg_counts, inventory_slots = load_inventory_data()
-
-# Initialize egg counts 
-egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
-
-# Load and resize egg images
-black_egg = pygame.image.load("black_egg.png")
-black_egg = pygame.transform.scale(black_egg, (50, 50))
-
-white_egg = pygame.image.load("white_egg.png")
-white_egg = pygame.transform.scale(white_egg, (50, 50))
-
-rainbow_egg = pygame.image.load("rainbow_egg.png")
-rainbow_egg = pygame.transform.scale(rainbow_egg, (50, 50))
-
-metallic_egg = pygame.image.load("metallic_egg.png")
-metallic_egg = pygame.transform.scale(metallic_egg, (50, 50))
+# Create a dictionary mapping fruit names to their images
+fruit_images_dict = dict(zip(fruit_names, fruit_images))
 
 # Create a dictionary for egg images
 egg_images_dict = {
@@ -82,6 +55,20 @@ egg_images_dict = {
     "Metallic": metallic_egg
 }
 
+# Placeholder for dragons
+dragons = []
+
+# Load inventory data
+inventory, egg_counts, inventory_slots = load_inventory_data()
+
+# Initialize egg counts 
+egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Dragon Breeding Game")
+
+tested_pairs = set()
+
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
     "flamefruit": ["Distraction", "Fierce", "Fiery", "Showy"],
@@ -89,8 +76,6 @@ fruit_personality_keywords = {
     "etherealpear": ["Earthy", "Pragmatic", "Stout", "Loyal"],
     "moonbeammelon": ["Angelic", "Unique", "Pure", "Self-righteous"]
 }
-
-tested_pairs = set()
 
 # Define the alleles and their dominance hierarchy
 allele_dominance = {
@@ -238,8 +223,6 @@ if len(male_dragons) == 0 or len(female_dragons) == 0:
     print("Not enough dragons of both genders in the selection, please check the database.")
     exit()
 
-# Placeholder for dragons
-dragons = []
 
 # Generate positions for dragons (ensure at least 10 positions)
 positions = [(x * WIDTH // 4, y * HEIGHT // 4) for x in range(1, 4) for y in range(1, 4)]
@@ -628,11 +611,8 @@ def move_dragons():
         if dragon in dragons:
             dragons.remove(dragon)
 
-# Example usage
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Dragon Breeding Game")
 
-# Main game loop with interactivity
+
 def place_fruit(x, y, selected_fruit):
     if selected_fruit and inventory[selected_fruit] > 0:
         fruits_on_board.append({"type": selected_fruit, "position": (x - 25, y - 25)})

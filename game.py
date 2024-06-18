@@ -33,7 +33,7 @@ def initialize():
     initialize_pygame()
     initialize_fonts()
 
-# Call initialization functions when the module is imported
+# Initialization pygame and fonts from Game module
 initialize()
 
 # Screen dimensions
@@ -323,6 +323,7 @@ def save_inventory_data():
         logging.error(f"Unexpected error saving inventory data: {e}")
         print(f"Unexpected error saving inventory data: {e}")
 
+
 def delete_elixir_data(position):
     try:
         with sqlite3.connect('save.db') as conn:
@@ -338,7 +339,19 @@ def delete_elixir_data(position):
         logging.error(f"Unexpected error deleting elixir data: {e}")
         print(f"Unexpected error deleting elixir data: {e}")
 
-        
+     
+ #load images in the hatchery
+def load_and_resize_image(file_path, size):
+    # Load an image from the given file path and resize it to the specified size.
+    image = pygame.image.load(file_path).convert_alpha()
+    return pygame.transform.scale(image, size)  
+
+# Function to check for overlapping rectangles
+def is_overlapping(new_rect, rect_list):
+    for rect in rect_list:
+        if new_rect.colliderect(rect):
+            return True
+    return False     
 # Example of handling errors during game loop
 def game_loop():
     running = True
