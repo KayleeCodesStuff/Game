@@ -4,7 +4,7 @@ import os
 import random
 import math
 from tkinter import Tk, filedialog
-from game import initialize, load_inventory_data, save_inventory_data, load_and_resize_image, draw_inventory, define_elixir_data
+from game import initialize, draw_inventory, load_inventory_data, save_inventory_data, load_and_resize_image, draw_inventory, define_elixir_data
 
 # Constants
 WIDTH, HEIGHT = 1200, 900
@@ -37,38 +37,29 @@ pygame.display.set_caption("Dragon Breeding Game")
 background = load_and_resize_image("breedingbackground.png", (WIDTH, HEIGHT))
 heart_image = load_and_resize_image("heart.png", (30, 30))
 hearts_on_board = []
-fruit_names = ["etherealpear", "flamefruit", "gleamberry", "moonbeammelon", "shimmeringapple"]
+fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
 fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
-black_egg = load_and_resize_image("black_egg.png", (70, 70))
-white_egg = load_and_resize_image("white_egg.png", (70, 70))
-rainbow_egg = load_and_resize_image("rainbow_egg.png", (70, 70))
-metallic_egg = load_and_resize_image("metallic_egg.png", (70, 70))
+# black_egg = load_and_resize_image("black_egg.png", (70, 70))
+# white_egg = load_and_resize_image("white_egg.png", (70, 70))
+# rainbow_egg = load_and_resize_image("rainbow_egg.png", (70, 70))
+# metallic_egg = load_and_resize_image("metallic_egg.png", (70, 70))
 
+egg_names = ["black", "white", "rainbow", "metallic"]
+egg_images = [load_and_resize_image(f"{egg}_egg.png", (70, 70)) for egg in egg_names]
 # Create a dictionary mapping fruit names to their images
 fruit_images_dict = dict(zip(fruit_names, fruit_images))
-
-# Create a dictionary for egg images
-egg_images_dict = {
-    "Black": black_egg,
-    "White": white_egg,
-    "Rainbow": rainbow_egg,
-    "Metallic": metallic_egg
-}
-
+egg_images_dict = dict(zip(egg_names, egg_images))
+   
 # Placeholder for dragons
 dragons = []
-
-# Load inventory data
-inventory, egg_counts, inventory_slots = load_inventory_data()
-
-# Initialize egg counts 
-egg_counts = {"Black": 0, "White": 0, "Rainbow": 0, "Metallic": 0}
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
 
 tested_pairs = set()
-
+# Function to draw eggs on the game board
+eggs_on_board = []
+inventory, egg_counts, inventory_slots = load_inventory_data()
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
     "flamefruit": ["Distraction", "Fierce", "Fiery", "Showy"],
@@ -92,17 +83,6 @@ phenotype_to_genotypes = {
     'Rainbow': [('R', 'R'), ('R', 'M')],
     'Metallic': [('M', 'M')]
 }
-
-def load_elixirs_from_db():
-    elixirs = []
-    try:
-        with sqlite3.connect(save_file) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT rgb, image_file, position FROM elixirs ORDER BY position ASC")
-            elixirs = cursor.fetchall()
-    except Exception as e:
-        print(f"Error loading elixirs from database: {e}")
-    return elixirs
 
 def initialize_eggs_table(conn):
     cursor = conn.cursor()
@@ -175,8 +155,6 @@ else:
     conn = sqlite3.connect(save_file)
     initialize_eggs_table(conn)
 
-# Replace custom load_inventory_data with standardized one
-inventory, egg_counts, inventory_slots = load_inventory_data()
 
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
@@ -484,44 +462,13 @@ def get_egg_genotype(parent1, parent2):
 
 def determine_phenotype(genotype):
     if 'B' in genotype:
-        return 'Black'
+        return 'black'
     elif 'W' in genotype:
-        return 'White'
+        return 'white'
     elif 'R' in genotype:
-        return 'Rainbow'
+        return 'rainbow'
     else:
-        return 'Metallic'
-
-def create_egg(dragon1, dragon2, position):
-    egg_genotype = get_egg_genotype(dragon1, dragon2)
-    egg_phenotype = determine_phenotype(egg_genotype)
-    egg_image = egg_images_dict[egg_phenotype]
-    egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
-    parent1_name = dragon1["name"]
-    parent2_name = dragon2["name"]
-    print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
-
-    eggs_on_board.append({
-        "genotype": egg_genotype,
-        "phenotype": egg_phenotype,
-        "image": egg_image,
-        "rect": egg_image.get_rect(topleft=position)
-    })
-
-    # Database operations
-    with sqlite3.connect(save_file) as conn:
-        cursor = conn.cursor()
-
-        # Insert a new row into the eggs table for the picked up egg
-        cursor.execute("""
-            INSERT INTO eggs (genotype, phenotype, image_file, parent1_name, parent2_name)
-            VALUES (?, ?, ?, ?, ?)
-        """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
-
-        conn.commit()
-
-# Function to draw eggs on the game board
-eggs_on_board = []
+        return 'metallic'
 
 def draw_eggs_on_board(surface):
     for egg in eggs_on_board:
@@ -629,15 +576,7 @@ def main():
     selected_fruit = None
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
-
-    # Load elixirs from the database
-    elixirs = load_elixirs_from_db()
-    inventory_slots = [(tuple(map(int, elixir[0].strip('()').split(','))), elixir[1]) for elixir in elixirs]
-    
-    # Pad with None if less than 5 elixirs
-    while len(inventory_slots) < 5:
-        inventory_slots.append(None)
-
+   
     # Button properties
     button_font = pygame.font.Font(None, 36)
     button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 150, 180, 50)  # Positioned above the inventory
