@@ -39,14 +39,11 @@ heart_image = load_and_resize_image("heart.png", (30, 30))
 hearts_on_board = []
 fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
 fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
-# black_egg = load_and_resize_image("black_egg.png", (70, 70))
-# white_egg = load_and_resize_image("white_egg.png", (70, 70))
-# rainbow_egg = load_and_resize_image("rainbow_egg.png", (70, 70))
-# metallic_egg = load_and_resize_image("metallic_egg.png", (70, 70))
 
 egg_names = ["black", "white", "rainbow", "metallic"]
 egg_images = [load_and_resize_image(f"{egg}_egg.png", (70, 70)) for egg in egg_names]
-# Create a dictionary mapping fruit names to their images
+
+# Create a dictionary mapping names to their images
 fruit_images_dict = dict(zip(fruit_names, fruit_images))
 egg_images_dict = dict(zip(egg_names, egg_images))
    
@@ -59,7 +56,9 @@ pygame.display.set_caption("Dragon Breeding Game")
 tested_pairs = set()
 # Function to draw eggs on the game board
 eggs_on_board = []
+
 inventory, egg_counts, inventory_slots = load_inventory_data()
+
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
     "flamefruit": ["Distraction", "Fierce", "Fiery", "Showy"],
@@ -161,8 +160,8 @@ def create_egg(dragon1, dragon2, position):
     egg_phenotype = determine_phenotype(egg_genotype)
     egg_image = egg_images_dict[egg_phenotype]
     egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
-    parent1_name = dragon1["name"]
-    parent2_name = dragon2["name"]
+    parent1_name = dragon1["type"]
+    parent2_name = dragon2["type"]
     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
 
     eggs_on_board.append({
@@ -282,8 +281,8 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     initial_speed = 1.5 + (0.5 if "speed" in new_dragon_data[4].lower() or "Flightspeed" in new_dragon_data[8] else 0)
 
     phenotype = new_dragon_data[2]
-    if phenotype in ["Gold", "Silver", "Metal"]:
-        phenotype = "Metallic"
+    if phenotype in ["gold", "silver", "metal"]:
+        phenotype = "metallic"
     genotype = random.choice(phenotype_to_genotypes[phenotype])
     
     new_dragon = {
@@ -332,8 +331,8 @@ for i, dragon_data in enumerate(selected_dragons):
     initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[8] else 0)
 
     phenotype = dragon_data[2]
-    if phenotype in ["Gold", "Silver", "Metal"]:
-        phenotype = "Metallic"
+    if phenotype in ["gold", "silver", "metal"]:
+        phenotype = "metallic"
     genotype = random.choice(phenotype_to_genotypes[phenotype])
     
     dragon = {
@@ -469,35 +468,6 @@ def determine_phenotype(genotype):
         return 'rainbow'
     else:
         return 'metallic'
-
-# def create_egg(dragon1, dragon2, position):
-#     egg_genotype = get_egg_genotype(dragon1, dragon2)
-#     egg_phenotype = determine_phenotype(egg_genotype)
-#     egg_image = egg_images_dict[egg_phenotype]
-#     egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
-#     parent1_name = dragon1["name"]
-#     parent2_name = dragon2["name"]
-#     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
-
-#     eggs_on_board.append({
-#         "genotype": egg_genotype,
-#         "phenotype": egg_phenotype,
-#         "image": egg_image,
-#         "rect": egg_image.get_rect(topleft=position)
-#     })
-
-#     # Database operations
-#     with sqlite3.connect(save_file) as conn:
-#         cursor = conn.cursor()
-
-#         # Insert a new row into the eggs table for the picked up egg
-#         cursor.execute("""
-#             INSERT INTO eggs (genotype, phenotype, image_file, parent1_name, parent2_name)
-#             VALUES (?, ?, ?, ?, ?)
-#         """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
-
-#         conn.commit()
-
 
 
 def draw_eggs_on_board(surface):
