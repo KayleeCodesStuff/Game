@@ -334,7 +334,7 @@ def load_hatched_dragons_from_db():
     conn = sqlite3.connect("save.db")
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, filename, type, petname, primary_trait, secondary1, secondary2, secondary3, special_abilities, petname, rgb_range, nurture, gender
+        SELECT id, filename, type, petname, primary_trait, secondary1, secondary2, secondary3, special_abilities, dragon_name, rgb_range, nurture, gender
         FROM hatcheddragons
     """)
     hatched_dragons = cursor.fetchall()
@@ -376,7 +376,7 @@ def handle_hatched_dragon_click(mouse_pos, hatched_dragons, start_y, item_height
     return None
 
 def summon_hatched_dragon_by_index(hatched_dragons, index, dragons, summoned_dragon_ids):
-    new_dragon_data = hatched_dragons[index]
+    new_dragon_data = hatched_dragons.pop(index)  # Remove the summoned dragon from the list
     dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, new_dragon_data[1])
     dragon_image = pygame.image.load(dragon_image_path)
     
@@ -412,8 +412,7 @@ def summon_hatched_dragon_by_index(hatched_dragons, index, dragons, summoned_dra
         "speed": initial_speed,
         "target": None,
         "holding_fruit": None,
-        "genotype": genotype,
-        "source": "hatched"  # Indicate the source of the dragon
+        "genotype": genotype
     }
     new_dragon["target"] = determine_target(new_dragon)  # Immediately determine target
     dragons.append(new_dragon)
@@ -725,7 +724,10 @@ def place_fruit(x, y, selected_fruit):
         for dragon in dragons:
             if not dragon["holding_fruit"]:
                 dragon["target"] = determine_target(dragon)
-        print(f"Placed {selected_fruit} on the board at ({x - 25}, {y - 25})")
+        else:
+            print(f"Cannot place fruit {selected_fruit}. Inventory: {inventory[selected_fruit] if selected_fruit else 'None'}")
+
+
 
 # Main game loop with interactivity
 def main():
@@ -756,6 +758,7 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 x, y = mouse_pos
+                
                 # Check if clicking on the buttons
                 if invite_dragon_button_rect.collidepoint(mouse_pos):
                     handle_button_click(mouse_pos, invite_dragon_button_rect, inventory, dragons, summoned_dragon_ids)
@@ -771,10 +774,11 @@ def main():
                     slot_index = (x - 10) // 60
                     if 0 <= slot_index < len(fruit_names):
                         selected_fruit = fruit_names[slot_index]
-                    # Place fruit on board
-                    else:
+                else:
+                    if selected_fruit is not None:
                         place_fruit(x, y, selected_fruit)
                         selected_fruit = None
+                                           
 
                 # Handle egg collection
                 handle_egg_collection(mouse_pos, egg_counts)
