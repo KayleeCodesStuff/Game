@@ -21,17 +21,14 @@ FRUIT_SPEED_MODIFIERS = {
 # Initialization pygame and fonts from Game module
 initialize()
 
-# Replace custom save_inventory_data with standardized one
-save_inventory_data()
-
-
 # Define font
 small_font = pygame.font.Font(None, 24)
 large_font = pygame.font.Font(None, 36)
 
 # Button properties
 button_font = pygame.font.Font(None, 36)
-button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 150, 180, 50)  # Positioned above the inventory
+invite_dragon_button_rect = pygame.Rect(WIDTH - 220, HEIGHT - 170, 200, 60)  # Increased size
+hatched_dragon_button_rect = pygame.Rect(WIDTH - 220, HEIGHT - 240, 200, 60)  # Increased sizey
 
 # Define screen (surface)
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -248,6 +245,7 @@ def create_egg(dragon1, dragon2, position):
         # Delete the hatched dragons from the database if they are used in egg creation
         for dragon in (dragon1, dragon2):
             if dragon.get('source') == 'hatched':
+                print(f"Deleting hatched dragon with ID {dragon['id']} from the database")
                 cursor.execute("DELETE FROM hatcheddragons WHERE id=?", (dragon["id"],))
 
         conn.commit()
@@ -342,9 +340,6 @@ def load_hatched_dragons_from_db():
     return hatched_dragons
 
 
-def handle_hatched_dragon_button_click(mouse_pos, rect, hatched_dragons, dragons, summoned_dragon_ids):
-    if rect.collidepoint(mouse_pos):
-        summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids)
         
 def draw_hatched_dragon_list(surface, hatched_dragons, font, selected_index):
     start_y = 50
@@ -412,7 +407,8 @@ def summon_hatched_dragon_by_index(hatched_dragons, index, dragons, summoned_dra
         "speed": initial_speed,
         "target": None,
         "holding_fruit": None,
-        "genotype": genotype
+        "genotype": genotype,
+        "source": "hatched"
     }
     new_dragon["target"] = determine_target(new_dragon)  # Immediately determine target
     dragons.append(new_dragon)
@@ -445,10 +441,12 @@ def outline_image(image, color, thickness=3):
     pygame.draw.lines(outline_surface, color, True, outline, thickness)
     return outline_surface
 
-def draw_button(surface, text, font, color, rect, border_color, border_width):
-    pygame.draw.rect(surface, border_color, rect, border_width)
-    text_surface = font.render(text, True, color)
+def draw_button(surface, text, font, text_color, rect, border_color, border_width, bg_color):
+    pygame.draw.rect(surface, bg_color, rect)  # Draw opaque background
+    pygame.draw.rect(surface, border_color, rect, border_width)  # Draw border
+    text_surface = font.render(text, True, text_color)
     surface.blit(text_surface, (rect.x + (rect.width - text_surface.get_width()) // 2, rect.y + (rect.height - text_surface.get_height()) // 2))
+
 
 def handle_button_click(mouse_pos, rect, inventory, dragons, summoned_dragon_ids):
     if rect.collidepoint(mouse_pos) and inventory["moonbeammelon"] >= 10:
@@ -741,11 +739,6 @@ def main():
     hatched_dragon_list_visible = False
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
-   
-    # Button properties
-    button_font = pygame.font.Font(None, 36)
-    invite_dragon_button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 150, 180, 50)  # Positioned above the inventory
-    hatched_dragon_button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 220, 180, 50)  # Positioned above the invite dragon button
 
     # Track summoned dragon IDs
     summoned_dragon_ids = set(dragon["id"] for dragon in dragons)
@@ -755,10 +748,11 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+                save_inventory_data(inventory)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 x, y = mouse_pos
-                
+
                 # Check if clicking on the buttons
                 if invite_dragon_button_rect.collidepoint(mouse_pos):
                     handle_button_click(mouse_pos, invite_dragon_button_rect, inventory, dragons, summoned_dragon_ids)
@@ -778,7 +772,6 @@ def main():
                     if selected_fruit is not None:
                         place_fruit(x, y, selected_fruit)
                         selected_fruit = None
-                                           
 
                 # Handle egg collection
                 handle_egg_collection(mouse_pos, egg_counts)
@@ -792,8 +785,8 @@ def main():
         draw_fruits_on_board(screen)
         draw_eggs_on_board(screen)  # Draw eggs on the board
         draw_hearts(screen)  # Draw hearts on the board
-        draw_button(screen, "Invite Dragon", button_font, WHITE, invite_dragon_button_rect, BLUE, 2)  # Draw the button
-        draw_button(screen, "Hatched Dragon", button_font, WHITE, hatched_dragon_button_rect, BLUE, 2)  # Draw the new button
+        draw_button(screen, "Invite Dragon", button_font, WHITE, invite_dragon_button_rect, BLUE, 2, (0, 0, 0, 200))  # Draw the button with opaque background
+        draw_button(screen, "Hatched Dragon", button_font, WHITE, hatched_dragon_button_rect, BLUE, 2, (0, 0, 0, 200))  # Draw the new button with opaque background
         if hatched_dragon_list_visible:
             start_y, item_height = draw_hatched_dragon_list(screen, hatched_dragons, small_font, selected_hatched_dragon_index)
         pygame.display.flip()  # Update the display
@@ -804,3 +797,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

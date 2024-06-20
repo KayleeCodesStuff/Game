@@ -248,6 +248,7 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+                save_inventory_data()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
                 # Handle selection box clicks
