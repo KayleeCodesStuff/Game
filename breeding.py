@@ -213,8 +213,8 @@ def create_egg(dragon1, dragon2, position):
     egg_phenotype = determine_phenotype(egg_genotype)
     egg_image = egg_images_dict[egg_phenotype]
     egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
-    parent1_name = dragon1["type"]
-    parent2_name = dragon2["type"]
+    parent1_name = dragon1["name"]
+    parent2_name = dragon2["name"]
     print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
 
     eggs_on_board.append({
@@ -234,7 +234,24 @@ def create_egg(dragon1, dragon2, position):
             VALUES (?, ?, ?, ?, ?)
         """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
 
+        # Check if the phenotype already exists in egg_inventory
+        cursor.execute("SELECT count FROM egg_inventory WHERE phenotype=?", (egg_phenotype,))
+        row = cursor.fetchone()
+        if row:
+            # If it exists, increment the count
+            egg_count = row[0] + 1
+            cursor.execute("UPDATE egg_inventory SET count=? WHERE phenotype=?", (egg_count, egg_phenotype))
+        else:
+            # If it does not exist, insert a new row with count 1
+            cursor.execute("INSERT INTO egg_inventory (phenotype, count) VALUES (?, ?)", (egg_phenotype, 1))
+
+        # Delete the hatched dragons from the database if they are used in egg creation
+        for dragon in (dragon1, dragon2):
+            if dragon.get('source') == 'hatched':
+                cursor.execute("DELETE FROM hatcheddragons WHERE id=?", (dragon["id"],))
+
         conn.commit()
+
 
 def load_dragons_from_db():
     conn = sqlite3.connect("dragonsedit.db")
@@ -328,19 +345,38 @@ def load_hatched_dragons_from_db():
 def handle_hatched_dragon_button_click(mouse_pos, rect, hatched_dragons, dragons, summoned_dragon_ids):
     if rect.collidepoint(mouse_pos):
         summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids)
+        
+def draw_hatched_dragon_list(surface, hatched_dragons, font, selected_index):
+    start_y = 50
+    item_height = 30
+    for index, dragon in enumerate(hatched_dragons):
+        text_color = WHITE if index != selected_index else BLUE
+        dragon_name = dragon[3] if dragon[3] else dragon[9]  # Use petname if available, otherwise fallback to dragon_name
+        text_surface = font.render(dragon_name, True, text_color)
+        surface.blit(text_surface, (50, start_y + index * item_height))
+    return start_y, item_height
 
-def summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids):
-    if not hatched_dragons:
-        print("No hatched dragons available in the database.")
-        return
 
-    # Filter out already summoned dragons
-    available_dragons = [d for d in hatched_dragons if d[0] not in summoned_dragon_ids]
-    if not available_dragons:
-        print("All hatched dragons have already been summoned.")
-        return
+def handle_hatched_dragon_selection(event, hatched_dragons, selected_index):
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_UP:
+            selected_index = (selected_index - 1) % len(hatched_dragons)
+        elif event.key == pygame.K_DOWN:
+            selected_index = (selected_index + 1) % len(hatched_dragons)
+        elif event.key == pygame.K_RETURN:
+            return selected_index
+    return None
 
-    new_dragon_data = random.choice(available_dragons)
+def handle_hatched_dragon_click(mouse_pos, hatched_dragons, start_y, item_height):
+    x, y = mouse_pos
+    if 50 <= x <= 300:  # Assuming the names are drawn within this range
+        index = (y - start_y) // item_height
+        if 0 <= index < len(hatched_dragons):
+            return index
+    return None
+
+def summon_hatched_dragon_by_index(hatched_dragons, index, dragons, summoned_dragon_ids):
+    new_dragon_data = hatched_dragons[index]
     dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, new_dragon_data[1])
     dragon_image = pygame.image.load(dragon_image_path)
     
@@ -358,8 +394,7 @@ def summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids):
         phenotype = "metallic"
     genotype = random.choice(phenotype_to_genotypes[phenotype])
     
-    # Use petname if available, otherwise fallback to dragon_name
-    dragon_name = new_dragon_data[3] if new_dragon_data[3] else new_dragon_data[9]
+    dragon_name = new_dragon_data[3] if new_dragon_data[3] else new_dragon_data[9]  # Use petname if available, otherwise fallback to dragon_name
     
     new_dragon = {
         "id": new_dragon_data[0],
@@ -377,13 +412,13 @@ def summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids):
         "speed": initial_speed,
         "target": None,
         "holding_fruit": None,
-        "genotype": genotype
+        "genotype": genotype,
+        "source": "hatched"  # Indicate the source of the dragon
     }
     new_dragon["target"] = determine_target(new_dragon)  # Immediately determine target
     dragons.append(new_dragon)
     summoned_dragon_ids.add(new_dragon_data[0])
     print(f"Summoned new hatched dragon: {new_dragon['name']}")
-
 
 
 def is_aspect_ratio_16_9(width, height):
@@ -700,6 +735,8 @@ def main():
     running = True
     selected_inventory_slot = None
     selected_fruit = None
+    selected_hatched_dragon_index = None
+    hatched_dragon_list_visible = False
     spawn_fruits()  # Spawn initial fruits on the board
     clock = pygame.time.Clock()  # Create a clock object to manage frame rate
    
@@ -723,16 +760,21 @@ def main():
                 if invite_dragon_button_rect.collidepoint(mouse_pos):
                     handle_button_click(mouse_pos, invite_dragon_button_rect, inventory, dragons, summoned_dragon_ids)
                 elif hatched_dragon_button_rect.collidepoint(mouse_pos):
-                    handle_hatched_dragon_button_click(mouse_pos, hatched_dragon_button_rect, hatched_dragons, dragons, summoned_dragon_ids)
+                    hatched_dragon_list_visible = True
+                elif hatched_dragon_list_visible:
+                    selected_index = handle_hatched_dragon_click(mouse_pos, hatched_dragons, start_y, item_height)
+                    if selected_index is not None:
+                        summon_hatched_dragon_by_index(hatched_dragons, selected_index, dragons, summoned_dragon_ids)
+                        hatched_dragon_list_visible = False
                 # Check if clicking on a fruit in the inventory
                 elif y > HEIGHT - 100:
                     slot_index = (x - 10) // 60
                     if 0 <= slot_index < len(fruit_names):
                         selected_fruit = fruit_names[slot_index]
-                # Place fruit on board
-                else:
-                    place_fruit(x, y, selected_fruit)
-                    selected_fruit = None
+                    # Place fruit on board
+                    else:
+                        place_fruit(x, y, selected_fruit)
+                        selected_fruit = None
 
                 # Handle egg collection
                 handle_egg_collection(mouse_pos, egg_counts)
@@ -747,7 +789,9 @@ def main():
         draw_eggs_on_board(screen)  # Draw eggs on the board
         draw_hearts(screen)  # Draw hearts on the board
         draw_button(screen, "Invite Dragon", button_font, WHITE, invite_dragon_button_rect, BLUE, 2)  # Draw the button
-        draw_button(screen, "Summon Hatched Dragon", button_font, WHITE, hatched_dragon_button_rect, BLUE, 2)  # Draw the new button
+        draw_button(screen, "Hatched Dragon", button_font, WHITE, hatched_dragon_button_rect, BLUE, 2)  # Draw the new button
+        if hatched_dragon_list_visible:
+            start_y, item_height = draw_hatched_dragon_list(screen, hatched_dragons, small_font, selected_hatched_dragon_index)
         pygame.display.flip()  # Update the display
 
         clock.tick(50)  # Set the frame rate to 50 FPS
@@ -756,4 +800,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

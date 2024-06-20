@@ -78,7 +78,7 @@ egg_images_dict = {
 
 # Initialize inventory and egg counts
 fruit_names = list(fruit_images_dict.keys())
-inventory = {fruit: 5 for fruit in fruit_names}
+#inventory = {fruit: 5 for fruit in fruit_names}
 egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
 
 # Inventory slots
