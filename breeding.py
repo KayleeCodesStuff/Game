@@ -49,13 +49,18 @@ egg_images_dict = dict(zip(egg_names, egg_images))
    
 # Placeholder for dragons
 dragons = []
+repulsor_counter = 0
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Dragon Breeding Game")
 
 tested_pairs = set()
+
 # Function to draw eggs on the game board
 eggs_on_board = []
+
+# Function to draw fruits on the game board
+fruits_on_board = []
 
 inventory, egg_counts, inventory_slots = load_inventory_data()
 
@@ -103,7 +108,7 @@ def draw_hearts(surface):
         else:
             surface.blit(heart_image, heart["position"])
 
-repulsor_counter = 0
+
 
 save_file = os.path.join(os.getcwd(), "save.db")
 if not os.path.exists(save_file):
@@ -384,8 +389,6 @@ def draw_dragons(surface):
             fruit_image = fruit_images_dict[dragon["holding_fruit"]]
             surface.blit(fruit_image, (dragon["rect"].x + 25, dragon["rect"].y + 25))
 
-# Function to draw fruits on the game board
-fruits_on_board = []
 
 def spawn_fruits():
     fruit_types = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear"]

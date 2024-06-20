@@ -351,7 +351,7 @@ def delete_elixir_from_db(elixir_id):
 
 def fetch_random_nurture_options():
     try:
-        conn = sqlite3.connect('option dragonsedit.db')
+        conn = sqlite3.connect('dragonsedit.db')
         cursor = conn.cursor()
         
         options = {}
@@ -489,8 +489,8 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
         #print("Dragon RGB Range:", dragon_rgb_range)
 
         # Check phenotype with special handling for Metallic cases
-        if egg_phenotype == "Metallic":
-            if dragon_phenotype not in ["Gold", "Silver", "Metal"]:
+        if egg_phenotype == "metallic":
+            if dragon_phenotype not in ["gold", "silver", "metal"]:
                 #print("Skipping due to phenotype mismatch (Metallic case)")
                 continue
         elif egg_phenotype != dragon_phenotype:
