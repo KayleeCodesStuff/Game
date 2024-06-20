@@ -339,16 +339,26 @@ def load_hatched_dragons_from_db():
     conn.close()
     return hatched_dragons
 
-
         
 def draw_hatched_dragon_list(surface, hatched_dragons, font, selected_index):
     start_y = 50
     item_height = 30
+    padding = 20  # Padding around the text
+
+    # Calculate the width of the longest text field
+    max_text_width = max(font.size(dragon[3] if dragon[3] else dragon[9])[0] for dragon in hatched_dragons)
+    list_width = max_text_width + padding * 2  # Add padding to the width
+    list_height = len(hatched_dragons) * item_height + 10  # Calculate height based on the number of dragons
+    background_rect = pygame.Rect(40, start_y - 10, list_width, list_height)  # Create the background rectangle
+
+    # Draw the background
+    pygame.draw.rect(surface, (0, 0, 0, 200), background_rect)  # Opaque black background
+
     for index, dragon in enumerate(hatched_dragons):
         text_color = WHITE if index != selected_index else BLUE
         dragon_name = dragon[3] if dragon[3] else dragon[9]  # Use petname if available, otherwise fallback to dragon_name
         text_surface = font.render(dragon_name, True, text_color)
-        surface.blit(text_surface, (50, start_y + index * item_height))
+        surface.blit(text_surface, (background_rect.x + padding, start_y + index * item_height))
     return start_y, item_height
 
 
@@ -797,4 +807,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

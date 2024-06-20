@@ -11,7 +11,7 @@ import pygame
 # Custom imports
 from game import initialize, load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, load_and_resize_image, is_overlapping
 
-#pygame and fonts
+# Initialize pygame and fonts
 initialize()
 
 # Screen dimensions
@@ -31,6 +31,7 @@ background = load_and_resize_image("hatchery.png", (WIDTH, HEIGHT))
 unhatched_egg_image = load_and_resize_image("unhatched.png", (80, 80))
 DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
 
+
 # Resize egg images and create egg rectangles with increased spacing
 egg_size = (80, 80)
 unhatched_egg_image = pygame.transform.scale(unhatched_egg_image, egg_size)
@@ -41,7 +42,6 @@ egg_selected_from_db = [False] * 10  # Track if eggs have been selected from the
 # Adjust padding between eggs
 EGG_PADDING = 200
 
-
 # Load and resize egg images
 egg_images_dict = {
     "black": load_and_resize_image("black_egg.png", egg_size),
@@ -50,12 +50,10 @@ egg_images_dict = {
     "metallic": load_and_resize_image("metallic_egg.png", egg_size)
 }
 
-
 # Load and resize fruit images
 fruit_size = (50, 50)
 fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
 fruit_images_dict = {name: load_and_resize_image(f"{name}.png", fruit_size) for name in fruit_names}
-
 
 # Initialize inventory and other variables
 inventory, egg_counts, inventory_slots = load_inventory_data()
@@ -67,7 +65,6 @@ ddragon_instances = [None] * 10
 elixir_data = None
 current_elixir_details = None  # Go-between variable to store elixir details
 active_timers_dict = {}
-
 
 # Create inventory slots with a fixed offset from the left side of the screen
 x_offset = WIDTH - (60 * len(inventory_slots))
@@ -115,39 +112,64 @@ try:
     save_cursor = save_conn.cursor()
     save_cursor.execute("SELECT * FROM elixirs;")
     elixirs = save_cursor.fetchall()
-    #print(f"Elixirs fetched: {elixirs}")  # Print elixirs for debugging
     save_cursor.execute("SELECT * FROM eggs;")
     eggs = save_cursor.fetchall()
-    #print(f"Eggs fetched: {eggs}")  # Print eggs for debugging
 except sqlite3.OperationalError as e:
     print(f"Error opening save database: {e}")
 finally:
     save_conn.close()
 
+# Define load_image function
+def load_image(file_path):
+    try:
+        image = pygame.image.load(file_path).convert_alpha()
+        print(f"Loaded image from {file_path} with original size {image.get_size()}")  # Debug print
+        return image
+    except pygame.error as e:
+        print(f"Error loading image {file_path}: {e}")
+        return None  # Return None if loading fails
+
+# Preload baby images with resizing
+base_directory = os.path.dirname(__file__)
+baby_images = {
+    "black": [load_and_resize_image(os.path.join(base_directory, "baby", f"blackbaby{i}.png"), egg_size) for i in range(1, 6)],
+    "white": [load_and_resize_image(os.path.join(base_directory, "baby", f"whitebaby{i}.png"), egg_size) for i in range(1, 6)],
+    "rainbow": [load_and_resize_image(os.path.join(base_directory, "baby", f"rainbowbaby{i}.png"), egg_size) for i in range(1, 6)],
+    "metallic": [load_and_resize_image(os.path.join(base_directory, "baby", f"metallicbaby{i}.png"), egg_size) for i in range(1, 6)]
+}
+
+# Print debug information for preloaded baby images
+for phenotype, images in baby_images.items():
+    for i, img in enumerate(images):
+        if img:
+            print(f"{phenotype} baby image {i+1}: {img.get_size()}")
+        else:
+            print(f"Failed to load {phenotype} baby image {i+1}")
 
 class EggTimer:
-    def __init__(self, egg_index, egg_position, egg_id, duration=10, default_trait="independent"):
+    def __init__(self, egg_index, egg_position, egg, duration=10, default_trait="independent"):
         self.egg_index = egg_index
         self.egg_position = egg_position
-        self.egg_id = egg_id
+        self.egg_id = egg[0]
+        self.egg_phenotype = egg[2]
         self.duration = duration
         self.default_trait = default_trait
         self.start_ticks = pygame.time.get_ticks()
         self.selected_trait = None
         self.running = True
-        self.dragon_image = None
-    
+        self.baby_dragon_image = None
+        self.adult_dragon_image = None
+        self.mid_image_loaded = False  # To check if the mid-timer event has already been triggered
+        self.hide_egg_rect = False  # Initialize the flag to hide the elixir-dyed square
+        self.events = {5: self.mid_timer_event, 0: self.end_timer_event}  # Define events
+
     def update(self):
         seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
         countdown = self.duration - int(seconds)
 
-        if countdown <= 0:
-            self.running = False
-            self.selected_trait = self.default_trait
-
-            # Load the dragon image
-            self.dragon_image = get_dragon_image(self.egg_id)
-            print(f"Dragon image loaded for egg index: {self.egg_index}")
+        # Trigger events
+        if countdown in self.events:
+            self.events[countdown]()
 
         return countdown
 
@@ -157,10 +179,32 @@ class EggTimer:
             timer_text = font.render(str(countdown), True, (57, 255, 20))  # Neon green color
             screen.blit(timer_text, (self.egg_position[0], self.egg_position[1] - 30))  # Adjust position as needed
         else:
-            if self.dragon_image:
-                screen.blit(self.dragon_image, self.egg_position)  # Draw the dragon image at the egg position
+            if self.adult_dragon_image:
+                screen.blit(self.adult_dragon_image, self.egg_position)  # Draw the adult dragon image at the egg position
         return self.selected_trait if not self.running else None
-    
+
+    def mid_timer_event(self):
+        if not self.mid_image_loaded:  # Check if the mid-timer event has already been triggered
+            if self.egg_phenotype in baby_images:
+                self.baby_dragon_image = random.choice(baby_images[self.egg_phenotype])
+                if self.baby_dragon_image:
+                    print(f"Mid-timer event: {self.baby_dragon_image} loaded for egg index: {self.egg_index} with size {self.baby_dragon_image.get_size()}")
+                else:
+                    print(f"Mid-timer event: Failed to load baby image for egg index: {self.egg_index}")
+                self.mid_image_loaded = True  # Ensure this event is only triggered once
+                
+                # Hide the elixir-dyed square to avoid drawing over the baby dragon image
+                self.hide_egg_rect = True
+
+    def end_timer_event(self):
+        self.running = False
+        self.selected_trait = self.default_trait
+
+        # Load the dragon image
+        self.adult_dragon_image = get_dragon_image(self.egg_id)
+        print(f"Dragon image loaded for egg index: {self.egg_index}")
+
+
 
 class Ddragon:
     def __init__(self, genotype, parent1, parent2, phenotype):
@@ -275,13 +319,22 @@ def draw_screen(selected_egg_index, active_timers, dragon_images):
     for i, rect in enumerate(egg_positions):
         if i == selected_egg_index:
             pygame.draw.rect(screen, RED, rect.inflate(4, 4), 2)  # Draw red outline
-        pygame.draw.rect(screen, egg_colors[i], rect)  # Draw the egg with its current color
+
+        if not any(timer.hide_egg_rect for timer in active_timers if timer.egg_index == i):
+            pygame.draw.rect(screen, egg_colors[i], rect)  # Draw the egg with its current color if not hidden
         
-        if dragon_images[i]:
-            #print(f"Drawing dragon image at position: {rect.topleft}")  # Debug print
-            screen.blit(dragon_images[i], rect.topleft)  # Draw the dragon image
-        else:
-            screen.blit(egg_images[i], rect.topleft)  # Draw the egg image if no dragon image
+        if egg_images[i] is not None:
+            print(f"Drawing egg image at position: {rect.topleft}")  # Debug print
+            screen.blit(egg_images[i], rect.topleft)  # Draw the egg image if not None
+        if dragon_images[i] is not None:
+            print(f"Drawing adult dragon image at position: {rect.topleft}")  # Debug print
+            screen.blit(dragon_images[i], rect.topleft)  # Draw the adult dragon image if not None
+
+        # Check for baby dragon images
+        for egg_timer in active_timers:
+            if egg_timer.egg_index == i and egg_timer.baby_dragon_image is not None:
+                print(f"Drawing baby dragon image at position: {rect.topleft}")  # Debug print
+                screen.blit(egg_timer.baby_dragon_image, rect.topleft)  # Draw the baby dragon image if not None
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
@@ -292,6 +345,7 @@ def draw_screen(selected_egg_index, active_timers, dragon_images):
     pygame.display.flip()
 
 
+ 
 def display_egg_menu(selected_egg_index):
     running = True
     menu_font = pygame.font.Font(None, 28)
@@ -512,7 +566,16 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
 
     return filtered_pool
 
-
+#Load baby dragon images
+def load_image(file_path):
+    try:
+        image = pygame.image.load(file_path).convert_alpha()
+        print(f"Loaded image from {file_path} with original size {image.get_size()}")  # Debug print
+        return image
+    except pygame.error as e:
+        print(f"Error loading image {file_path}: {e}")
+        return None  # Return None if loading fails
+    
 def load_selected_dragon_images(ddragon_instances):
     dragon_images = [None] * len(ddragon_instances)
     for i, ddragon in enumerate(ddragon_instances):
@@ -731,7 +794,8 @@ def main():
 
                                 # Check if timer already exists for this egg
                                 if selected_egg_index not in active_timers_dict:
-                                    new_timer = EggTimer(selected_egg_index, egg_position, egg_id)
+                                    selected_egg = next((egg for egg in eggs if egg[0] == egg_id), None)
+                                    new_timer = EggTimer(selected_egg_index, egg_position, selected_egg)  # Pass the egg tuple
                                     active_timers.append(new_timer)
                                     active_timers_dict[selected_egg_index] = new_timer
 
@@ -776,13 +840,12 @@ def main():
                     else:
                         print(f"No dragon selected for egg {egg_timer.egg_index}")
                         # Ensure egg is deleted from database when timer ends
-                
+
                 egg_id = egg_ids_on_board[egg_timer.egg_index]
                 delete_egg_from_db(egg_id)  # Call the existing delete function
-                
+
                 active_timers.remove(egg_timer)
                 del active_timers_dict[egg_timer.egg_index]  # Remove from dictionary
-                
 
         # Load the selected dragon images
         dragon_images = load_selected_dragon_images(ddragon_instances)
