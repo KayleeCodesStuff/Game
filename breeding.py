@@ -21,6 +21,10 @@ FRUIT_SPEED_MODIFIERS = {
 # Initialization pygame and fonts from Game module
 initialize()
 
+# Replace custom save_inventory_data with standardized one
+save_inventory_data()
+
+
 # Define font
 small_font = pygame.font.Font(None, 24)
 large_font = pygame.font.Font(None, 36)
@@ -63,6 +67,8 @@ eggs_on_board = []
 fruits_on_board = []
 
 inventory, egg_counts, inventory_slots = load_inventory_data()
+# Replace custom draw_inventory with standardized one
+draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
 fruit_personality_keywords = {
     "gleamberry": ["Dark", "Brooding", "Responsible", "Common"],
@@ -87,6 +93,48 @@ phenotype_to_genotypes = {
     'rainbow': [('R', 'R'), ('R', 'M')],
     'metallic': [('M', 'M')]
 }
+
+def initialize_game():
+    global small_font, large_font, button_font, screen, background, heart_image, hearts_on_board, fruit_images, egg_images, fruit_images_dict, egg_images_dict
+    global dragons, repulsor_counter, tested_pairs, eggs_on_board, fruits_on_board, inventory, egg_counts, inventory_slots, fruit_personality_keywords, allele_dominance, phenotype_to_genotypes
+
+    # Initialization pygame and fonts from Game module
+    initialize()
+
+    # Replace custom save_inventory_data with standardized one
+    save_inventory_data()
+
+    # Define fonts
+    small_font = pygame.font.Font(None, 24)
+    large_font = pygame.font.Font(None, 36)
+    button_font = pygame.font.Font(None, 36)
+
+    # Define screen (surface)
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Dragon Breeding Game")
+
+    # Load images
+    background = load_and_resize_image("breedingbackground.png", (WIDTH, HEIGHT))
+    heart_image = load_and_resize_image("heart.png", (30, 30))
+    hearts_on_board = []
+    fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
+    fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
+    egg_names = ["black", "white", "rainbow", "metallic"]
+    egg_images = [load_and_resize_image(f"{egg}_egg.png", (70, 70)) for egg in egg_names]
+
+    # Create a dictionary mapping names to their images
+    fruit_images_dict = dict(zip(fruit_names, fruit_images))
+    egg_images_dict = dict(zip(egg_names, egg_images))
+   
+    # Placeholder for dragons
+    dragons = []
+    repulsor_counter = 0
+    tested_pairs = set()
+    eggs_on_board = []
+    fruits_on_board = []
+    
+    
+
 
 def initialize_eggs_table(conn):
     cursor = conn.cursor()
@@ -188,31 +236,155 @@ def create_egg(dragon1, dragon2, position):
 
         conn.commit()
 
-# Load dragons from the database
-conn = sqlite3.connect("dragonsedit.db")
-cursor = conn.cursor()
-cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
-all_dragons = cursor.fetchall()
-conn.close()
+def load_dragons_from_db():
+    conn = sqlite3.connect("dragonsedit.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
+    all_dragons = cursor.fetchall()
+    conn.close()
+    return all_dragons
 
-# Randomly select 10 unique dragons ensuring a mix of genders
-selected_dragons = random.sample(all_dragons, 10)
-male_dragons = [d for d in selected_dragons if d[-1] == "Male"]
-female_dragons = [d for d in selected_dragons if d[-1] == "Female"]
+def initialize_dragons():
+    all_dragons = load_dragons_from_db()
+    selected_dragons = random.sample(all_dragons, 10)
+    male_dragons = [d for d in selected_dragons if d[-1] == "Male"]
+    female_dragons = [d for d in selected_dragons if d[-1] == "Female"]
 
-# Ensure there are both genders
-if len(male_dragons) == 0 or len(female_dragons) == 0:
-    print("Not enough dragons of both genders in the selection, please check the database.")
-    exit()
+    # Ensure there are both genders
+    if len(male_dragons) == 0 or len(female_dragons) == 0:
+        print("Not enough dragons of both genders in the selection, please check the database.")
+        exit()
+
+    # Generate positions for dragons (ensure at least 10 positions)
+    positions = [(x * WIDTH // 4, y * HEIGHT // 4) for x in range(1, 4) for y in range(1, 4)]
+    while len(positions) < 9:
+        positions.append((random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150)))  # Add random positions if not enough
+    positions = positions[:9]  # Ensure exactly 9 positions
+    positions.append((WIDTH // 2, 0))  # Position the 10th dragon at the top center
+    random.shuffle(positions)
+
+    for i, dragon_data in enumerate(selected_dragons):
+        dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, dragon_data[1])
+        dragon_image = pygame.image.load(dragon_image_path)
+        
+        width, height = dragon_image.get_size()
+        if is_aspect_ratio_16_9(width, height):
+            scale_factor = 100 / min(width, height)
+            new_size = (int(width * scale_factor), int(height * scale_factor))
+        else:
+            # Scale to fit within a 50x50 box while preserving aspect ratio
+            if width > height:
+                new_size = (100, int(100 * (height / width)))
+            else:
+                new_size = (int(100 * (width / height)), 100)
+        
+        dragon_image = pygame.transform.scale(dragon_image, new_size)
+        outline_color = BLUE if dragon_data[12] == "Male" else RED
+        dragon_image = outline_image(dragon_image, outline_color)
+        
+        initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[8] else 0)
+
+        phenotype = dragon_data[2]
+        if phenotype in ["gold", "silver", "metal"]:
+            phenotype = "metallic"
+        genotype = random.choice(phenotype_to_genotypes[phenotype])
+        
+        dragon = {
+            "id": dragon_data[0],
+            "name": dragon_data[3],
+            "type": dragon_data[2],
+            "primary_characteristic": dragon_data[4],
+            "secondary_traits": [dragon_data[5], dragon_data[6], dragon_data[7]],
+            "special_abilities": dragon_data[8],
+            "description": dragon_data[9],
+            "rgb_value_range": dragon_data[10],
+            "nurture": dragon_data[11],
+            "gender": dragon_data[12],
+            "image": dragon_image,
+            "rect": dragon_image.get_rect(topleft=positions[i]),
+            "speed": initial_speed,
+            "target": None,
+            "holding_fruit": None,
+            "genotype": genotype
+        }
+        dragons.append(dragon)
+
+    for dragon in dragons:
+        if "genotype" not in dragon:
+            assign_genotype(dragon)
+            
+def load_hatched_dragons_from_db():
+    conn = sqlite3.connect("save.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, filename, type, petname, primary_trait, secondary1, secondary2, secondary3, special_abilities, petname, rgb_range, nurture, gender
+        FROM hatcheddragons
+    """)
+    hatched_dragons = cursor.fetchall()
+    conn.close()
+    return hatched_dragons
 
 
-# Generate positions for dragons (ensure at least 10 positions)
-positions = [(x * WIDTH // 4, y * HEIGHT // 4) for x in range(1, 4) for y in range(1, 4)]
-while len(positions) < 9:
-    positions.append((random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150)))  # Add random positions if not enough
-positions = positions[:9]  # Ensure exactly 9 positions
-positions.append((WIDTH // 2, 0))  # Position the 10th dragon at the top center
-random.shuffle(positions)
+def handle_hatched_dragon_button_click(mouse_pos, rect, hatched_dragons, dragons, summoned_dragon_ids):
+    if rect.collidepoint(mouse_pos):
+        summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids)
+
+def summon_hatched_dragon(hatched_dragons, dragons, summoned_dragon_ids):
+    if not hatched_dragons:
+        print("No hatched dragons available in the database.")
+        return
+
+    # Filter out already summoned dragons
+    available_dragons = [d for d in hatched_dragons if d[0] not in summoned_dragon_ids]
+    if not available_dragons:
+        print("All hatched dragons have already been summoned.")
+        return
+
+    new_dragon_data = random.choice(available_dragons)
+    dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, new_dragon_data[1])
+    dragon_image = pygame.image.load(dragon_image_path)
+    
+    width, height = dragon_image.get_size()
+    scale_factor = 50 / min(width, height)  # Match the initial size (50x50)
+    new_size = (int(width * scale_factor), int(height * scale_factor))
+    dragon_image = pygame.transform.scale(dragon_image, new_size)
+    outline_color = BLUE if new_dragon_data[12] == "Male" else RED
+    dragon_image = outline_image(dragon_image, outline_color)
+
+    initial_speed = 1.5 + (0.5 if "speed" in new_dragon_data[4].lower() or "Flightspeed" in new_dragon_data[8] else 0)
+
+    phenotype = new_dragon_data[2]
+    if phenotype in ["gold", "silver", "metal"]:
+        phenotype = "metallic"
+    genotype = random.choice(phenotype_to_genotypes[phenotype])
+    
+    # Use petname if available, otherwise fallback to dragon_name
+    dragon_name = new_dragon_data[3] if new_dragon_data[3] else new_dragon_data[9]
+    
+    new_dragon = {
+        "id": new_dragon_data[0],
+        "name": dragon_name,
+        "type": new_dragon_data[2],
+        "primary_characteristic": new_dragon_data[4],
+        "secondary_traits": [new_dragon_data[5], new_dragon_data[6], new_dragon_data[7]],
+        "special_abilities": new_dragon_data[8],
+        "description": new_dragon_data[9],
+        "rgb_value_range": new_dragon_data[10],
+        "nurture": new_dragon_data[11],
+        "gender": new_dragon_data[12],
+        "image": dragon_image,
+        "rect": dragon_image.get_rect(topleft=(random.randint(50, WIDTH - 50), random.randint(50, HEIGHT - 150))),
+        "speed": initial_speed,
+        "target": None,
+        "holding_fruit": None,
+        "genotype": genotype
+    }
+    new_dragon["target"] = determine_target(new_dragon)  # Immediately determine target
+    dragons.append(new_dragon)
+    summoned_dragon_ids.add(new_dragon_data[0])
+    print(f"Summoned new hatched dragon: {new_dragon['name']}")
+
+
 
 def is_aspect_ratio_16_9(width, height):
     return abs((width / height) - (16 / 9)) < 0.01  # Allowing a small margin for floating point comparisons
@@ -313,64 +485,13 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     summoned_dragon_ids.add(new_dragon_data[0])
     print(f"Summoned new dragon: {new_dragon['name']}")
 
-# Create dragon dictionary with valid genotypes
-for i, dragon_data in enumerate(selected_dragons):
-    dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, dragon_data[1])
-    dragon_image = pygame.image.load(dragon_image_path)
-    
-    width, height = dragon_image.get_size()
-    if is_aspect_ratio_16_9(width, height):
-        scale_factor = 100 / min(width, height)
-        new_size = (int(width * scale_factor), int(height * scale_factor))
-    else:
-        # Scale to fit within a 50x50 box while preserving aspect ratio
-        if width > height:
-            new_size = (100, int(100 * (height / width)))
-        else:
-            new_size = (int(100 * (width / height)), 100)
-    
-    dragon_image = pygame.transform.scale(dragon_image, new_size)
-    outline_color = BLUE if dragon_data[12] == "Male" else RED
-    dragon_image = outline_image(dragon_image, outline_color)
-    
-    initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[8] else 0)
-
-    phenotype = dragon_data[2]
-    if phenotype in ["gold", "silver", "metal"]:
-        phenotype = "metallic"
-    genotype = random.choice(phenotype_to_genotypes[phenotype])
-    
-    dragon = {
-        "id": dragon_data[0],
-        "name": dragon_data[3],
-        "type": dragon_data[2],
-        "primary_characteristic": dragon_data[4],
-        "secondary_traits": [dragon_data[5], dragon_data[6], dragon_data[7]],
-        "special_abilities": dragon_data[8],
-        "description": dragon_data[9],
-        "rgb_value_range": dragon_data[10],
-        "nurture": dragon_data[11],
-        "gender": dragon_data[12],
-        "image": dragon_image,
-        "rect": dragon_image.get_rect(topleft=positions[i]),
-        "speed": initial_speed,
-        "target": None,
-        "holding_fruit": None,
-        "genotype": genotype
-    }
-    dragons.append(dragon)
-
-for dragon in dragons:
-    if "genotype" not in dragon:
-        assign_genotype(dragon)
 
 # Function to draw text
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, position)
 
-# Replace custom save_inventory_data with standardized one
-save_inventory_data()
+
 
 def handle_egg_collection(mouse_pos, egg_counts):
     for egg in eggs_on_board:
@@ -378,8 +499,7 @@ def handle_egg_collection(mouse_pos, egg_counts):
             eggs_on_board.remove(egg)
             break
 
-# Replace custom draw_inventory with standardized one
-draw_inventory(screen, inventory, egg_counts, inventory_slots)
+
 
 # Function to draw dragons
 def draw_dragons(surface):
@@ -574,6 +694,9 @@ def place_fruit(x, y, selected_fruit):
 
 # Main game loop with interactivity
 def main():
+    initialize_game()
+    initialize_dragons()
+
     running = True
     selected_inventory_slot = None
     selected_fruit = None
@@ -582,10 +705,12 @@ def main():
    
     # Button properties
     button_font = pygame.font.Font(None, 36)
-    button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 150, 180, 50)  # Positioned above the inventory
+    invite_dragon_button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 150, 180, 50)  # Positioned above the inventory
+    hatched_dragon_button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 220, 180, 50)  # Positioned above the invite dragon button
 
     # Track summoned dragon IDs
     summoned_dragon_ids = set(dragon["id"] for dragon in dragons)
+    hatched_dragons = load_hatched_dragons_from_db()  # Load hatched dragons from save.db
 
     while running:
         for event in pygame.event.get():
@@ -594,9 +719,11 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 x, y = mouse_pos
-                # Check if clicking on the button
-                if button_rect.collidepoint(mouse_pos):
-                    handle_button_click(mouse_pos, button_rect, inventory, dragons, summoned_dragon_ids)
+                # Check if clicking on the buttons
+                if invite_dragon_button_rect.collidepoint(mouse_pos):
+                    handle_button_click(mouse_pos, invite_dragon_button_rect, inventory, dragons, summoned_dragon_ids)
+                elif hatched_dragon_button_rect.collidepoint(mouse_pos):
+                    handle_hatched_dragon_button_click(mouse_pos, hatched_dragon_button_rect, hatched_dragons, dragons, summoned_dragon_ids)
                 # Check if clicking on a fruit in the inventory
                 elif y > HEIGHT - 100:
                     slot_index = (x - 10) // 60
@@ -619,12 +746,14 @@ def main():
         draw_fruits_on_board(screen)
         draw_eggs_on_board(screen)  # Draw eggs on the board
         draw_hearts(screen)  # Draw hearts on the board
-        draw_button(screen, "Invite Dragon", button_font, WHITE, button_rect, BLUE, 2)  # Draw the button
+        draw_button(screen, "Invite Dragon", button_font, WHITE, invite_dragon_button_rect, BLUE, 2)  # Draw the button
+        draw_button(screen, "Summon Hatched Dragon", button_font, WHITE, hatched_dragon_button_rect, BLUE, 2)  # Draw the new button
         pygame.display.flip()  # Update the display
 
-        clock.tick(50)  # Set the frame rate to 20 FPS
+        clock.tick(50)  # Set the frame rate to 50 FPS
 
     pygame.quit()
 
 if __name__ == "__main__":
     main()
+
