@@ -35,9 +35,10 @@ def initialize_fonts():
 def initialize():
     initialize_pygame()
     initialize_fonts()
-
+    
 # Initialization pygame and fonts from Game module
 initialize()
+
 
 # Screen dimensions
 WIDTH, HEIGHT = 1200, 900
