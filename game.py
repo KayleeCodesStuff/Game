@@ -7,6 +7,9 @@ import logging
 logging.basicConfig(filename='game.log', level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+font = None
+small_font = None
+
 # Define initialization functions
 def initialize_pygame():
     try:
