@@ -486,25 +486,104 @@ def initialize_player_dragons():
 def load_player_dragon(dragon_id):
     conn = connect_db('save.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities FROM hatcheddragons WHERE id=?", (dragon_id,))
+    cursor.execute("SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, facing_direction, bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
     row = cursor.fetchone()
     conn.close()
     if row:
-        primary_trait, secondary1, secondary2, secondary3, nurture_trait, image_filename, special_abilities = row
-        secondary_traits = [secondary1, secondary2, secondary3]
-        stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-        stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon_id)
-        return {
-            'primary_trait': primary_trait,
-            'secondary_traits': secondary_traits,
-            'nurture_trait': nurture_trait,
-            'image_filename': image_filename,
-            'stats': stats,
-            'special_attack': special_abilities  # Store the special abilities text
+        dragon = {
+            'id': row[0],
+            'dragon_name': row[1],
+            'petname': row[2],
+            'primary_trait': row[3],
+            'secondary1': row[4],
+            'secondary2': row[5],
+            'secondary3': row[6],
+            'nurture': row[7],
+            'filename': row[8],
+            'special_abilities': row[9],
+            'facing_direction': row[10],
+            'bonus_health': row[11],
+            'bonus_attack': row[12],
+            'bonus_defense': row[13],
+            'bonus_dodge': row[14]
         }
+        secondary_traits = [dragon['secondary1'], dragon['secondary2'], dragon['secondary3']]
+        stats = calculate_dragon_stats(dragon['primary_trait'], secondary_traits, dragon['nurture'])
+        stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon_id)
+        dragon['stats'] = stats
+        return dragon
     return None
 
+def display_player_dragon_selection(player_dragons):
+    conn = connect_db('save.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, bonus_health, bonus_attack, bonus_defense, bonus_dodge, facing_direction FROM hatcheddragons")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    dragons = []
+    for row in rows:
+        dragon = {
+            'id': row[0],
+            'dragon_name': row[1],
+            'petname': row[2],
+            'primary_trait': row[3],
+            'secondary1': row[4],
+            'secondary2': row[5],
+            'secondary3': row[6],
+            'nurture': row[7],
+            'filename': row[8],
+            'special_abilities': row[9],
+            'bonus_health': row[10],
+            'bonus_attack': row[11],
+            'bonus_defense': row[12],
+            'bonus_dodge': row[13],
+            'facing_direction': row[14]
+        }
+        secondary_traits = [dragon['secondary1'], dragon['secondary2'], dragon['secondary3']]
+        stats = calculate_dragon_stats(dragon['primary_trait'], secondary_traits, dragon['nurture'])
+        stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon['id'])
+        dragon['stats'] = stats
+        dragons.append(dragon)
 
+    running = True
+    selected_dragon_id = None
+    while running:
+        screen.fill((50, 50, 50))  # Darker background color
+        draw_text(screen, "Select a Dragon", font, WHITE, (WIDTH // 2 - 100, 20))
+
+        for i, dragon in enumerate(dragons):
+            display_name = dragon['petname'] if dragon['petname'] else dragon['dragon_name']
+            max_hp = 100 + int((100 * (dragon['stats']['health'] + dragon['bonus_health'])) / 100)
+            damage = 100 + int((100 * (dragon['stats']['attack'] + dragon['bonus_attack'])) / 100)
+            defense = dragon['stats']['defense'] + dragon['bonus_defense']
+            dodge = dragon['stats']['dodge'] + dragon['bonus_dodge']
+
+            text = f"{display_name}: HP: {max_hp} DMG: {damage} DEF: {defense} DODGE: {dodge}"
+            y_pos = 100 + i * 30
+            text_surf = font.render(text, True, WHITE)
+            screen.blit(text_surf, (50, y_pos))
+
+            rect = pygame.Rect(50, y_pos, 700, 30)
+            if rect.collidepoint(pygame.mouse.get_pos()):
+                pygame.draw.rect(screen, RED, rect, 2)
+                if pygame.mouse.get_pressed()[0]:
+                    selected_dragon_id = dragon['id']
+                    running = False
+
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+    return selected_dragon_id
+
+def flip_dragon_image(image, facing_direction, target_direction):
+    if facing_direction == target_direction:
+        return image
+    else:
+        return pygame.transform.flip(image, True, False)
+    
 def draw_player_dragon_slots(player_dragons):
     # Grid dimensions and positions
     grid_start_x = WIDTH * 0.65
@@ -523,12 +602,22 @@ def draw_player_dragon_slots(player_dragons):
             draw_beveled_button(screen, rect, LIGHT_GREY, "Click to add dragon", small_font)
         else:
             dragon = player_dragons[i]
-            image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon['image_filename'])
+            image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon['filename'])
             dragon_image = load_and_resize_image_keeping_aspect(image_path, (int(slot_width), int(slot_height)))
+            dragon_image = flip_dragon_image(dragon_image, dragon['facing_direction'], "left")
             screen.blit(dragon_image, (slot_x, slot_y))
 
-            stats_text = f"H: {dragon['stats']['health']}  A: {dragon['stats']['attack']}  D: {dragon['stats']['defense']}  d: {dragon['stats']['dodge']}"
+            max_hp = 100 + int((100 * (dragon['stats']['health'] + dragon['bonus_health'])) / 100)
+            damage = 100 + int((100 * (dragon['stats']['attack'] + dragon['bonus_attack'])) / 100)
+            defense = dragon['stats']['defense'] + dragon['bonus_defense']
+            dodge = dragon['stats']['dodge'] + dragon['bonus_dodge']
+
+            stats_text = f"HP{max_hp} A{damage} D{defense} d{dodge}"
             draw_text(screen, stats_text, small_font, WHITE, (slot_x, slot_y + slot_height - 30))
+
+
+
+
 
 def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
     grid_start_x = WIDTH * 0.65
@@ -543,8 +632,9 @@ def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
         slot_y = grid_start_y + (i // 3) * slot_height
         rect = pygame.Rect(slot_x, slot_y, slot_width, slot_height)
         if rect.collidepoint(mouse_x, mouse_y):
-            dragon_id = prompt_for_dragon_id()  # Placeholder for getting the dragon ID (e.g., from user input)
-            player_dragons[i] = load_player_dragon(dragon_id)
+            dragon_id = display_player_dragon_selection(player_dragons)
+            if dragon_id:
+                player_dragons[i] = load_player_dragon(dragon_id)
             break
 
 def prompt_for_dragon_id():
