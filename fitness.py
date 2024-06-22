@@ -59,8 +59,8 @@ modify_database()
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
-    initialize_inventory()  # Ensure the inventory is initialized before loading data
-
+    logging.info("Loading inventory data from database")
+    
     try:
         with sqlite3.connect('save.db') as conn:
             cursor = conn.cursor()
@@ -71,6 +71,7 @@ def load_inventory_data():
             for row in rows:
                 fruit, count = row
                 inventory[fruit] = count
+                logging.info(f"Loaded {count} of {fruit}")
 
             # Load eggs counts from eggs table
             cursor.execute("SELECT phenotype, COUNT(*) FROM eggs GROUP BY phenotype")
@@ -78,6 +79,7 @@ def load_inventory_data():
             for row in rows:
                 phenotype, count = row
                 egg_counts[phenotype] = count
+                logging.info(f"Loaded {count} of {phenotype} eggs")
 
             # Load elixirs into inventory slots
             cursor.execute("SELECT rgb, image_file, position FROM elixirs")
@@ -86,6 +88,7 @@ def load_inventory_data():
                 rgb = tuple(map(int, row[0][1:-1].split(', ')))
                 image_file, position = row[1], row[2]
                 inventory_slots[position - 1] = (rgb, image_file)
+                logging.info(f"Loaded elixir at position {position}")
 
     except sqlite3.Error as e:
         logging.error(f"SQLite error loading inventory data: {e}")
@@ -94,7 +97,7 @@ def load_inventory_data():
         logging.error(f"Unexpected error loading inventory data: {e}")
         print(f"Unexpected error loading inventory data: {e}")
 
-    return inventory, egg_counts, inventory_slots
+    logging.info("Inventory loaded successfully")
 
 def load_quests(dragon_id):
     conn = connect_db()
@@ -103,6 +106,38 @@ def load_quests(dragon_id):
     quests = cursor.fetchall()
     conn.close()
     return quests
+
+def complete_quest(quest_id):
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE quests SET completed=1 WHERE quest_id=?", (quest_id,))
+    conn.commit()
+    conn.close()
+
+def update_inventory(reward_str):
+    rewards = reward_str.split()
+    fruit, amount = rewards[1], int(rewards[0])
+    inventory[fruit] += amount
+    save_inventory_data()
+
+def handle_quest_click(dragon_id, mouse_x, mouse_y):
+    quests = load_quests(dragon_id)
+    total_challenge_rating = 0
+    for i, quest in enumerate(quests):
+        x = (i % 3) * 200 + 300
+        y = (i // 3) * 100 + 200
+        if x <= mouse_x <= x + 150 and y <= mouse_y <= y + 50:
+            if not quest[5]:  # Only handle if not already completed
+                complete_quest(quest[0])
+                update_inventory(quest[4])
+                total_challenge_rating += quest[3]
+                if total_challenge_rating >= 10:
+                    flag_dragon_aggressive(dragon_id)
+            break
+
+def flag_dragon_aggressive(dragon_id):
+    # Placeholder function for flagging dragon as aggressive
+    print(f"Dragon {dragon_id} is now aggressive!")
 
 def draw_area_gameboard(dragon_id):
     screen.fill(GREY)
@@ -121,30 +156,6 @@ def draw_area_gameboard(dragon_id):
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     pygame.display.flip()
-
-def complete_quest(quest_id):
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE quests SET completed=1 WHERE quest_id=?", (quest_id,))
-    conn.commit()
-    conn.close()
-
-def handle_quest_click(dragon_id, mouse_x, mouse_y):
-    quests = load_quests(dragon_id)
-    for i, quest in enumerate(quests):
-        x = (i % 3) * 200 + 300
-        y = (i // 3) * 100 + 200
-        if x <= mouse_x <= x + 150 and y <= mouse_y <= y + 50:
-            if not quest[5]:  # Only handle if not already completed
-                complete_quest(quest[0])
-                update_inventory(quest[4])
-            break
-
-def update_inventory(reward_str):
-    rewards = reward_str.split()
-    fruit, amount = rewards[1], int(rewards[0])
-    inventory[fruit] += amount
-    save_inventory_data()
 
 def draw_hub_gameboard():
     screen.fill(GREY)
