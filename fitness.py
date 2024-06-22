@@ -18,6 +18,9 @@ GREY = (200, 200, 200)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
+# Load the background image using the existing load_image function from game.py
+background_path = os.path.join(os.path.dirname(__file__), "background.png")
+background = load_image(background_path, (WIDTH, HEIGHT))
 
 def connect_db(db_name):
     db_path = os.path.join(os.path.dirname(__file__), db_name)
@@ -109,7 +112,7 @@ def save_inventory_data():
 def load_quests(dragon_id):
     conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT quest_id, title, description, challenge_rating, rewards, completed FROM quests WHERE dragon_id=?", (dragon_id,))
+    cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed FROM quests WHERE Category=?", (dragon_id,))
     quests = cursor.fetchall()
     conn.close()
     return quests
@@ -117,7 +120,7 @@ def load_quests(dragon_id):
 def complete_quest(quest_id):
     conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
-    cursor.execute("UPDATE quests SET completed=1 WHERE quest_id=?", (quest_id,))
+    cursor.execute("UPDATE quests SET completed=1 WHERE ID=?", (quest_id,))
     conn.commit()
     conn.close()
 
@@ -148,23 +151,25 @@ def flag_dragon_aggressive(dragon_id):
     # Placeholder function for flagging dragon as aggressive
     print(f"Dragon {dragon_id} is now aggressive!")
 
-# Function to load images with additional logging and debug prints
-def load_image_with_debug(file_name, scale_to):
-    try:
-        image = pygame.image.load(file_name).convert()
-        logging.info(f"Loaded image {file_name}")
-        print(f"Loaded image {file_name}")
-        return pygame.transform.scale(image, scale_to)
-    except pygame.error as e:
-        logging.error(f"Error loading image {file_name}: {e}")
-        print(f"Error loading image {file_name}: {e}")
-        return pygame.Surface(scale_to)  # Return a blank surface as a placeholder
+def draw_area_gameboard(dragon_id):
+    screen.fill(GREY)
+    screen.blit(background, (0, 0))  # Add this line to blit the background image
+    draw_text(screen, f"Area Gameboard {dragon_id}", font, WHITE, (WIDTH // 2 - 150, 20))
 
-# Load the background image using the debug load_image function
-background_path = os.path.join(os.path.dirname(__file__), "background.png")
-background = load_image_with_debug(background_path, (WIDTH, HEIGHT))
+    # Load and display quests
+    quests = load_quests(dragon_id)
+    for i, quest in enumerate(quests):
+        x = (i % 3) * 200 + 300
+        y = (i // 3) * 100 + 200
+        color = GREY if quest[5] else BLUE  # Grey out if completed
+        pygame.draw.rect(screen, color, (x, y, 150, 50))
+        draw_text(screen, quest[2], small_font, WHITE, (x + 10, y + 15))
 
-# Ensure the background is displayed in the game loop
+    # Draw the inventory
+    draw_inventory(screen, inventory, egg_counts, inventory_slots)
+
+    pygame.display.flip()
+
 def draw_hub_gameboard():
     screen.fill(GREY)
     screen.blit(background, (0, 0))  # Add this line to blit the background image
@@ -180,26 +185,6 @@ def draw_hub_gameboard():
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     pygame.display.flip()
-
-def draw_area_gameboard(dragon_id):
-    screen.fill(GREY)
-    screen.blit(background, (0, 0))  # Add this line to blit the background image
-    draw_text(screen, f"Area Gameboard {dragon_id}", font, WHITE, (WIDTH // 2 - 150, 20))
-
-    # Load and display quests
-    quests = load_quests(dragon_id)
-    for i, quest in enumerate(quests):
-        x = (i % 3) * 200 + 300
-        y = (i // 3) * 100 + 200
-        color = GREY if quest[5] else BLUE  # Grey out if completed
-        pygame.draw.rect(screen, color, (x, y, 150, 50))
-        draw_text(screen, quest[1], small_font, WHITE, (x + 10, y + 15))
-
-    # Draw the inventory
-    draw_inventory(screen, inventory, egg_counts, inventory_slots)
-
-    pygame.display.flip()
-
 
 def game_loop():
     running = True
