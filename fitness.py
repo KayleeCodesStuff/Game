@@ -252,9 +252,15 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
         if width > height:
             new_width = max_size[0]
             new_height = new_width / aspect_ratio
+            if new_height > max_size[1]:
+                new_height = max_size[1]
+                new_width = new_height * aspect_ratio
         else:
             new_height = max_size[1]
             new_width = new_height * aspect_ratio
+            if new_width > max_size[0]:
+                new_width = max_size[0]
+                new_height = new_width / aspect_ratio
 
         new_size = (int(new_width), int(new_height))
         logging.info(f"Loaded and resized image {file_path} to {new_size}")
@@ -263,6 +269,7 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
         logging.error(f"Error loading image {file_path}: {e}")
         print(f"Error loading image {file_path}: {e}")
         return pygame.Surface(max_size)  # Return a blank surface as a placeholder
+
 
 def draw_hub_gameboard():
     screen.fill(GREY)
@@ -593,6 +600,8 @@ def draw_player_dragon_slots(player_dragons):
     slot_width = grid_width / 3
     slot_height = grid_height / 3
 
+    small_font = pygame.font.Font(None, 24)  # Use a smaller font size
+
     for i in range(9):
         slot_x = grid_start_x + (i % 3) * slot_width
         slot_y = grid_start_y + (i // 3) * slot_height
@@ -609,15 +618,8 @@ def draw_player_dragon_slots(player_dragons):
 
             max_hp = 100 + int((100 * (dragon['stats']['health'] + dragon['bonus_health'])) / 100)
             damage = 100 + int((100 * (dragon['stats']['attack'] + dragon['bonus_attack'])) / 100)
-            defense = dragon['stats']['defense'] + dragon['bonus_defense']
-            dodge = dragon['stats']['dodge'] + dragon['bonus_dodge']
-
-            stats_text = f"HP{max_hp} A{damage} D{defense} d{dodge}"
-            draw_text(screen, stats_text, small_font, WHITE, (slot_x, slot_y + slot_height - 30))
-
-
-
-
+            stats_text = f"hp {max_hp} dmg {damage}"
+            draw_text(screen, stats_text, small_font, WHITE, (slot_x + 5, slot_y + slot_height - 25))
 
 def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
     grid_start_x = WIDTH * 0.65
