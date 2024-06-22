@@ -19,7 +19,7 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 MAGENTA = (255, 0, 255)
 REDDISH_ORANGE = (255, 69, 0)
-GREEN = (0, 255, 0)
+GREEN = (0, 125, 0)
 PURPLE = (128, 0, 128)
 
 # Category to color mapping
@@ -129,12 +129,22 @@ def update_inventory(reward_str):
     save_inventory_data()
 
 def handle_quest_click(category, mouse_x, mouse_y):
+    if WIDTH - 160 <= mouse_x <= WIDTH - 10 and HEIGHT - 150 <= mouse_y <= HEIGHT - 100:
+        return 'hub'
     quests = load_quests(category)
     total_challenge_rating = 0
     for i, quest in enumerate(quests):
-        x = (i % 3) * 200 + 300
-        y = (i // 3) * 100 + 200
-        if x <= mouse_x <= x + 150 and y <= mouse_y <= y + 50:
+        text_surface = small_font.render(quest[2], True, WHITE)
+        button_width = text_surface.get_width() + 20
+        grid_cols = 3
+        grid_rows = 4
+        grid_width = WIDTH // grid_cols
+        grid_height = (HEIGHT * 0.6) // grid_rows
+        margin_x = (grid_width - button_height) // 2
+        margin_y = (grid_height - button_height) // 2
+        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
+        y = HEIGHT * 0.4 + (i // grid_cols) * grid_height + margin_y
+        if x <= mouse_x <= x + button_width and y <= mouse_y <= y + button_height:
             if not quest[5]:  # Only handle if not already completed
                 complete_quest(quest[0])
                 update_inventory(quest[4])
@@ -142,6 +152,7 @@ def handle_quest_click(category, mouse_x, mouse_y):
                 if total_challenge_rating >= 10:
                     flag_dragon_aggressive(category)
             break
+    return 'area'
 
 def flag_dragon_aggressive(category):
     # Placeholder function for flagging dragon as aggressive
@@ -226,11 +237,10 @@ def game_loop():
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             current_screen = 'area'
                             break
-                elif current_screen == 'area':
-                    if WIDTH - 200 <= mouse_x <= WIDTH - 50 and HEIGHT - 100 <= mouse_y <= HEIGHT - 50:
+                elif current_screen == 'area' and selected_area is not None:
+                    result = handle_quest_click(selected_area, mouse_x, mouse_y)
+                    if result == 'hub':
                         current_screen = 'hub'
-                    else:
-                        handle_quest_click(selected_area, mouse_x, mouse_y)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
@@ -242,7 +252,7 @@ def game_loop():
     pygame.quit()
     logging.info("Game loop ended")
     print("Game loop ended")
-
+    
 if __name__ == "__main__":
     # Initialize the game
     initialize()
