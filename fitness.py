@@ -3,7 +3,7 @@ import sqlite3
 import logging
 import os
 import random
-from game import initialize, draw_text, load_image, draw_inventory, font, small_font, fruit_images_dict, egg_images_dict, fruit_names, inventory, egg_counts, inventory_slots, load_and_resize_image
+from game import *
 
 # Initialize the game
 initialize()
@@ -157,8 +157,19 @@ def load_boss_dragon_image(dragon_filename, max_height):
         print(f"Error loading boss dragon image {dragon_image_path}: {e}")
         return pygame.Surface((max_height * aspect_ratio, max_height))  # Return a blank surface as a placeholder
 
+def calculate_boss_stats(stats):
+    base_hp = 1000
+    base_damage = 100
 
-def draw_area_gameboard(category, boss_dragon_filename):
+    # Calculate HP
+    hp = base_hp + (base_hp * stats['health'] / 100)
+
+    # Calculate Damage
+    damage = base_damage + (base_damage * stats['attack'] / 100)
+
+    return int(hp), int(damage), int(stats['defense']), int(stats['dodge'])
+
+def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
     draw_text(screen, f"Area Gameboard {category}", font, WHITE, (WIDTH // 2 - 150, 20))
@@ -167,6 +178,11 @@ def draw_area_gameboard(category, boss_dragon_filename):
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
     screen.blit(boss_dragon_image, (0, 0))
+
+    # Calculate and display boss stats
+    boss_hp, boss_damage, boss_defense, boss_dodge = calculate_boss_stats(boss_dragon_stats)
+    stats_text = f"HP: {boss_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
+    draw_text(screen, stats_text, small_font, WHITE, (10, max_height + 10))
 
     # Load and display quests
     quests = load_quests(category)
@@ -198,8 +214,6 @@ def draw_area_gameboard(category, boss_dragon_filename):
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
     pygame.display.flip()
-
-
 
 
 def get_random_dragon():
@@ -293,9 +307,67 @@ def handle_quest_click(category, mouse_x, mouse_y):
                     flag_dragon_aggressive(category)
             break
 
+# Calculate dragon stats from traits and save to stats variable
+def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
+    # Initialize stats
+    stats = {
+        "health": 0,
+        "attack": 0,
+        "defense": 0,
+        "dodge": 0
+    }
+
+    # Add stats based on primary trait
+    if primary_trait in primary_traits_with_stats:
+        main_stat = primary_traits_with_stats[primary_trait]["main"]
+        off_stat = primary_traits_with_stats[primary_trait]["off"]
+        stats[main_stat] += 10
+        stats[off_stat] += 5
+
+    # Add stats based on secondary traits
+    for trait in secondary_traits:
+        for fruit, traits in fruit_traits_with_stats.items():
+            if trait in traits:
+                stat = traits[trait]
+                stats[stat] += 5
+
+    # Add stats based on nurture trait, if available
+    if nurture_trait and nurture_trait in nurture_traits_with_stats:
+        stat = nurture_traits_with_stats[nurture_trait]
+        stats[stat] += 15
+
+    return stats
+
+# Apply the bonuses to boss and player dragons
+def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
+    if is_boss:
+        # Apply tier bonuses for boss dragons
+        tier_bonus = tier * 25
+        for stat in stats:
+            stats[stat] += tier_bonus
+    else:
+        if dragon_id is not None:
+            # Connect to the database and fetch bonuses for the player dragon
+            conn = sqlite3.connect('save.db')
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                stats["health"] += row[0]
+                stats["attack"] += row[1]
+                stats["defense"] += row[2]
+                stats["dodge"] += row[3]
+            
+            conn.close()
+
+    return stats
+
+# Calculate damage based on attack, defense, and trait matching
 def calculate_damage(attacker_attack, defender_defense, primary_trait_match=False, secondary_traits_match=0):
     # Base damage calculation
-    base_damage = max(0, attacker_attack - defender_defense)
+    base_damage = 100 + (100 * attacker_attack / 100)
     
     # Apply primary trait match (double damage)
     if primary_trait_match:
@@ -319,55 +391,74 @@ def calculate_damage(attacker_attack, defender_defense, primary_trait_match=Fals
     
     return final_damage
 
-def dodge_chance(defender_speed, attacker_speed):
-    chance = defender_speed / (defender_speed + attacker_speed)
-    return random.random() < chance
+# Dodge mechanics
+def calculate_dodge_chance(defender_dodge, attacker_dodge):
+    if defender_dodge == 0 and attacker_dodge == 0:
+        return 0.5  # Default to 50% dodge chance if both stats are zero
+    return 0.05 + 0.90 * (defender_dodge / (defender_dodge + attacker_dodge))
 
+def dodge_attack(defender_dodge, attacker_dodge):
+    dodge_chance = calculate_dodge_chance(defender_dodge, attacker_dodge)
+    return random.random() < dodge_chance
+
+# Count trait matches
 def trait_match_count(player_traits, boss_traits):
     return len(set(player_traits).intersection(set(boss_traits)))
 
+# Player dragon attacks boss dragon
 def player_attack_boss(player_dragon, boss_dragon):
     primary_trait_match = player_dragon['primary_trait'] == boss_dragon['primary_trait']
     secondary_traits_match = trait_match_count(player_dragon['secondary_traits'], boss_dragon['secondary_traits'])
     
     return calculate_damage(player_dragon['attack'], boss_dragon['defense'], primary_trait_match, secondary_traits_match)
 
+# Boss dragon attacks player dragon
 def boss_attack_player(boss_dragon, player_dragon):
-    if not dodge_chance(player_dragon['speed'], boss_dragon['speed']):
-        secondary_traits_match = trait_match_count(boss_dragon['secondary_traits'], player_dragon['secondary_traits'])
-        return calculate_damage(boss_dragon['attack'], player_dragon['defense'], False, secondary_traits_match)
+    # Check if the attack is dodged
+    if not dodge_attack(player_dragon['dodge'], boss_dragon['dodge']):
+        # Calculate the number of matching secondary traits
+        matching_traits = trait_match_count(boss_dragon['secondary_traits'], player_dragon['secondary_traits'])
+        
+        # Calculate the base damage
+        base_damage = 100 + (100 * boss_dragon['attack'] / 100)
+        
+        # Apply defense and trait reductions
+        effective_damage = calculate_damage_reduction(base_damage, player_dragon['defense'], matching_traits)
+        
+        return effective_damage
     else:
         return 0  # Attack dodged
 
-# Example dragons for testing
-player_dragon = {
-    'attack': 50,
-    'defense': 30,
-    'speed': 25,
-    'primary_trait': 'Mystical',
-    'secondary_traits': ['Distraction', 'Unique', 'Self-righteous']
-}
-
-boss_dragon = {
-    'attack': 60,
-    'defense': 40,
-    'speed': 20,
-    'primary_trait': 'Mystical',
-    'secondary_traits': ['Distraction', 'Courageous', 'Fearsome']
-}
-
-# Player dragon attacks boss dragon
-damage_to_boss = player_attack_boss(player_dragon, boss_dragon)
-print(f"Player Dragon deals {damage_to_boss} damage to Boss Dragon")
-
-# Boss dragon attacks player dragon
-damage_to_player = boss_attack_player(boss_dragon, player_dragon)
-if damage_to_player > 0:
-    print(f"Boss Dragon deals {damage_to_player} damage to Player Dragon")
-else:
-    print("Player Dragon dodges the attack!")
+# Calculate damage reduction with continuous scaling (max 25% reduction at defense stat 100)
+def calculate_damage_reduction(incoming_damage, defender_defense, matching_traits):
+    # Calculate defense reduction with continuous scaling (max 25% reduction at defense stat 100)
+    defense_reduction = defender_defense / 400
     
- # Example combat interaction
+    # Calculate trait matching reduction
+    if matching_traits == 1:
+        trait_reduction = 0.15
+    elif matching_traits == 2:
+        trait_reduction = 0.30
+    elif matching_traits == 3:
+        trait_reduction = 0.50
+    else:
+        trait_reduction = 0.0
+    
+    # Total reduction
+    total_reduction = defense_reduction + trait_reduction
+    
+    # Cap the total reduction to ensure at least 25% damage is applied
+    effective_reduction = min(0.75, total_reduction)
+    
+    # Calculate the effective damage
+    effective_damage = incoming_damage * (1 - effective_reduction)
+    
+    # Ensure at least 25% of the damage is applied
+    effective_damage = max(incoming_damage * 0.25, effective_damage)
+    
+    return effective_damage
+
+# Example combat interaction
 def combat(player_dragons, boss_dragon):
     while boss_dragon['health'] > 0 and any(d['health'] > 0 for d in player_dragons):
         for player_dragon in player_dragons:
@@ -393,46 +484,13 @@ def combat(player_dragons, boss_dragon):
     else:
         print("Boss wins!")
 
-# Example dragons for testing
-player_dragons = [
-    {
-        'attack': 50,
-        'defense': 30,
-        'speed': 25,
-        'health': 100,
-        'primary_trait': 'Mystical',
-        'secondary_traits': ['Distraction', 'Unique', 'Self-righteous']
-    },
-    {
-        'attack': 45,
-        'defense': 35,
-        'speed': 30,
-        'health': 100,
-        'primary_trait': 'Courageous',
-        'secondary_traits': ['Distraction', 'Courageous', 'Fearsome']
-    },
-    # Add more player dragons as needed
-]
-
-boss_dragon = {
-    'attack': 60,
-    'defense': 40,
-    'speed': 20,
-    'health': 300,
-    'primary_trait': 'Mystical',
-    'secondary_traits': ['Distraction', 'Courageous', 'Fearsome']
-}
-
-# Run the combat
-combat(player_dragons, boss_dragon)
-   
-
 # Main game loop update with combat integration
 def game_loop():
     running = True
     current_screen = 'hub'
     selected_area = None
     boss_dragon_filename = None  # Store the selected boss dragon filename
+    boss_dragon_stats = None  # Store the selected boss dragon stats
 
     while running:
         for event in pygame.event.get():
@@ -449,6 +507,11 @@ def game_loop():
                         if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             boss_dragon_filename = dragon_image_file  # Store the selected boss dragon filename
+                            boss_dragon_stats = calculate_dragon_stats(
+                                primary_trait="Mystical",  # Example primary trait
+                                secondary_traits=["Distraction", "Courageous", "Fearsome"]  # Example secondary traits
+                            )
+                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
@@ -459,20 +522,18 @@ def game_loop():
                         # Check if the player has enough tokens to initiate a boss fight
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
-                            boss_dragon = generate_random_boss(selected_area)
-                            combat(player_dragons, boss_dragon)
+                            combat(player_dragons, boss_dragon_stats)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            draw_area_gameboard(selected_area, boss_dragon_filename)  # Pass the boss dragon filename
+            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats)  # Pass the boss dragon filename and stats
 
         pygame.display.flip()
 
     pygame.quit()
     logging.info("Game loop ended")
     print("Game loop ended")
-
 
 if __name__ == "__main__":
     initialize()
