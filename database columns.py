@@ -1,17 +1,17 @@
 import sqlite3
 
-def add_bonus_columns_to_database():
-    conn = sqlite3.connect('save.db')
+def add_facing_direction_column(db_path):
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # Add columns for bonuses
-    cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN bonus_health INTEGER DEFAULT 0")
-    cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN bonus_attack INTEGER DEFAULT 0")
-    cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN bonus_defense INTEGER DEFAULT 0")
-    cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN bonus_dodge INTEGER DEFAULT 0")
+    # Add the facing_direction column to the hatcheddragons table
+    cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN facing_direction TEXT")
     
     conn.commit()
     conn.close()
+    print("Column facing_direction added successfully.")
 
-# Run the function to add columns
-add_bonus_columns_to_database()
+# Path to your database file
+db_path = 'save.db'  # Adjust the path if necessary
+
+add_facing_direction_column(db_path)

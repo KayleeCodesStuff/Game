@@ -22,6 +22,7 @@ MAGENTA = (255, 0, 255)
 REDDISH_ORANGE = (255, 69, 0)
 GREEN = (0, 125, 0)
 PURPLE = (128, 0, 128)
+LIGHT_GREY = (220, 220, 220)
 
 # Category to color mapping
 CATEGORY_INFO = {
@@ -30,6 +31,15 @@ CATEGORY_INFO = {
     'dining': {'color': GREEN, 'fruit': 'shimmeringapple'},
     'exercise': {'color': BLUE, 'fruit': 'etherealpear'},
     'goals': {'color': PURPLE, 'fruit': 'moonbeammelon'}
+}
+
+# Initialize player tokens for each category
+player_tokens = {
+    'daily': 0,
+    'cleaning': 0,
+    'dining': 0,
+    'exercise': 0,
+    'goals': 0
 }
 
 # Load the background image using the existing load_image function from game.py
@@ -169,7 +179,7 @@ def calculate_boss_stats(stats):
 
     return int(hp), int(damage), int(stats['defense']), int(stats['dodge'])
 
-def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats):
+def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
     draw_text(screen, f"Area Gameboard {category}", font, WHITE, (WIDTH // 2 - 150, 20))
@@ -213,8 +223,9 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats):
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
-    pygame.display.flip()
+    draw_player_dragon_slots(player_dragons)
 
+    pygame.display.flip()
 
 def get_random_dragon():
     conn = connect_db('dragonsedit.db')
@@ -345,6 +356,16 @@ def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
         tier_bonus = tier * 25
         for stat in stats:
             stats[stat] += tier_bonus
+
+        # Apply trait bonuses for boss dragons (same as player dragons)
+        # Note: Assuming that boss dragons have primary, secondary, and possibly nurture traits
+        primary_trait = "Mystical"  # Example primary trait
+        secondary_traits = ["Distraction", "Courageous", "Fearsome"]  # Example secondary traits
+        nurture_trait = None  # Example nurture trait, if any
+
+        trait_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
+        for stat in stats:
+            stats[stat] += trait_stats[stat]
     else:
         if dragon_id is not None:
             # Connect to the database and fetch bonuses for the player dragon
@@ -458,31 +479,77 @@ def calculate_damage_reduction(incoming_damage, defender_defense, matching_trait
     
     return effective_damage
 
-# Example combat interaction
-def combat(player_dragons, boss_dragon):
-    while boss_dragon['health'] > 0 and any(d['health'] > 0 for d in player_dragons):
-        for player_dragon in player_dragons:
-            if player_dragon['health'] > 0:
-                # Player dragon attacks boss dragon
-                damage_to_boss = player_attack_boss(player_dragon, boss_dragon)
-                boss_dragon['health'] -= damage_to_boss
-                print(f"Player Dragon deals {damage_to_boss} damage to Boss Dragon")
+def initialize_player_dragons():
+    player_dragons = [None] * 9  # Initialize 9 slots for player dragons
+    return player_dragons
 
-        if boss_dragon['health'] > 0:
-            for player_dragon in player_dragons:
-                if player_dragon['health'] > 0:
-                    # Boss dragon attacks player dragon
-                    damage_to_player = boss_attack_player(boss_dragon, player_dragon)
-                    player_dragon['health'] -= damage_to_player
-                    if damage_to_player > 0:
-                        print(f"Boss Dragon deals {damage_to_player} damage to Player Dragon")
-                    else:
-                        print("Player Dragon dodges the attack!")
+def load_player_dragon(dragon_id):
+    conn = connect_db('save.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities FROM hatcheddragons WHERE id=?", (dragon_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        primary_trait, secondary1, secondary2, secondary3, nurture_trait, image_filename, special_abilities = row
+        secondary_traits = [secondary1, secondary2, secondary3]
+        stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
+        stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon_id)
+        return {
+            'primary_trait': primary_trait,
+            'secondary_traits': secondary_traits,
+            'nurture_trait': nurture_trait,
+            'image_filename': image_filename,
+            'stats': stats,
+            'special_attack': special_abilities  # Store the special abilities text
+        }
+    return None
 
-    if boss_dragon['health'] <= 0:
-        print("Player wins!")
-    else:
-        print("Boss wins!")
+
+def draw_player_dragon_slots(player_dragons):
+    # Grid dimensions and positions
+    grid_start_x = WIDTH * 0.65
+    grid_start_y = 0
+    grid_width = WIDTH * 0.35
+    grid_height = HEIGHT * 0.35
+    slot_width = grid_width / 3
+    slot_height = grid_height / 3
+
+    for i in range(9):
+        slot_x = grid_start_x + (i % 3) * slot_width
+        slot_y = grid_start_y + (i // 3) * slot_height
+        rect = pygame.Rect(slot_x, slot_y, slot_width, slot_height)
+        
+        if player_dragons[i] is None:
+            draw_beveled_button(screen, rect, LIGHT_GREY, "Click to add dragon", small_font)
+        else:
+            dragon = player_dragons[i]
+            image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon['image_filename'])
+            dragon_image = load_and_resize_image_keeping_aspect(image_path, (int(slot_width), int(slot_height)))
+            screen.blit(dragon_image, (slot_x, slot_y))
+
+            stats_text = f"H: {dragon['stats']['health']}  A: {dragon['stats']['attack']}  D: {dragon['stats']['defense']}  d: {dragon['stats']['dodge']}"
+            draw_text(screen, stats_text, small_font, WHITE, (slot_x, slot_y + slot_height - 30))
+
+def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
+    grid_start_x = WIDTH * 0.65
+    grid_start_y = 0
+    grid_width = WIDTH * 0.35
+    grid_height = HEIGHT * 0.35
+    slot_width = grid_width / 3
+    slot_height = grid_height / 3
+
+    for i in range(9):
+        slot_x = grid_start_x + (i % 3) * slot_width
+        slot_y = grid_start_y + (i // 3) * slot_height
+        rect = pygame.Rect(slot_x, slot_y, slot_width, slot_height)
+        if rect.collidepoint(mouse_x, mouse_y):
+            dragon_id = prompt_for_dragon_id()  # Placeholder for getting the dragon ID (e.g., from user input)
+            player_dragons[i] = load_player_dragon(dragon_id)
+            break
+
+def prompt_for_dragon_id():
+    # Placeholder function to simulate getting a dragon ID from the user
+    return random.randint(1, 100)  # Random ID for demonstration purposes
 
 # Main game loop update with combat integration
 def game_loop():
@@ -491,6 +558,7 @@ def game_loop():
     selected_area = None
     boss_dragon_filename = None  # Store the selected boss dragon filename
     boss_dragon_stats = None  # Store the selected boss dragon stats
+    player_dragons = initialize_player_dragons()
 
     while running:
         for event in pygame.event.get():
@@ -507,11 +575,11 @@ def game_loop():
                         if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             boss_dragon_filename = dragon_image_file  # Store the selected boss dragon filename
-                            boss_dragon_stats = calculate_dragon_stats(
-                                primary_trait="Mystical",  # Example primary trait
-                                secondary_traits=["Distraction", "Courageous", "Fearsome"]  # Example secondary traits
-                            )
-                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
+                            primary_trait = "Mystical"  # Example primary trait for boss dragon
+                            secondary_traits = ["Distraction", "Courageous", "Fearsome"]  # Example secondary traits for boss dragon
+                            nurture_trait = None  # Example nurture trait for boss dragon, if any
+                            boss_dragon_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
+                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)  # Apply both trait and tier bonuses
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
@@ -523,11 +591,12 @@ def game_loop():
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
                             combat(player_dragons, boss_dragon_stats)
+                handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats)  # Pass the boss dragon filename and stats
+            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)  # Pass the boss dragon filename, stats, and player dragons
 
         pygame.display.flip()
 

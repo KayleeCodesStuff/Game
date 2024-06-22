@@ -99,13 +99,15 @@ save_db_path = os.path.join(current_dir, 'save.db')
 try:
     dragons_conn = sqlite3.connect(dragons_db_path)
     dragons_cursor = dragons_conn.cursor()
-    dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_characteristics, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3 FROM dragons;")
+    dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_characteristics, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3, facing_direction FROM dragons;")
     dragons = dragons_cursor.fetchall()
     print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
 except sqlite3.OperationalError as e:
     print(f"Error opening dragons database: {e}")
 finally:
     dragons_conn.close()
+
+
 
 try:
     save_conn = sqlite3.connect(save_db_path)
@@ -238,10 +240,11 @@ class Ddragon:
         self.gender = None
         self.rgb_range = None
         self.filename = None
-        self.type = phenotype #egg phenotype to start
+        self.type = phenotype  # egg phenotype to start
         self.special_abilities = None
         self.petname = None
         self.pool = []  # Add pool attribute
+        self.facing_direction = None  # Ensure facing_direction is initialized
 
     def add_elixir_info(self, rgb, title, primary, secondaries):
         self.elixir_rgb = rgb
@@ -260,8 +263,10 @@ class Ddragon:
         self.gender = dragon[9]
         self.rgb_range = dragon[7]
         self.filename = dragon[1]
-        self.type = dragon[2] #Dragon type overrides egg 
+        self.type = dragon[2]  # Dragon type overrides egg 
         self.special_abilities = dragon[6]
+        self.facing_direction = dragon[13]  # Ensure facing_direction is assigned
+        print(f"Assigned facing_direction: {self.facing_direction} for dragon_id: {self.dragon_id}")  # Debugging print
 
     def set_petname(self, petname):
         self.petname = petname
@@ -289,22 +294,24 @@ class Ddragon:
                     filename TEXT,
                     type TEXT,
                     special_abilities TEXT,
-                    petname TEXT
+                    petname TEXT,
+                    facing_direction TEXT
                 )
             ''')
-            cursor.execute('''
-                INSERT INTO hatcheddragons (
-                    genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
-                    primary_trait, secondary1, secondary2, secondary3, nurture, gender,
-                    rgb_range, filename, type, special_abilities, petname
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                self.genotype, self.parent1, self.parent2, self.elixir_rgb, self.elixir_title, self.dragon_id, self.dragon_name,
-                self.primary, self.secondary1, self.secondary2, self.secondary3, self.nurture, self.gender,
-                self.rgb_range, self.filename, self.type, self.special_abilities, self.petname
-            ))
-            conn.commit()
-
+            print(f"Saving facing_direction: {self.facing_direction} for dragon_id: {self.dragon_id}")  # Debugging print
+        cursor.execute('''
+            INSERT INTO hatcheddragons (
+                genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
+                primary_trait, secondary1, secondary2, secondary3, nurture, gender,
+                rgb_range, filename, type, special_abilities, petname, facing_direction
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            self.genotype, self.parent1, self.parent2, self.elixir_rgb, self.elixir_title, self.dragon_id, self.dragon_name,
+            self.primary, self.secondary1, self.secondary2, self.secondary3, self.nurture, self.gender,
+            self.rgb_range, self.filename, self.type, self.special_abilities, self.petname, self.facing_direction
+        ))
+        print(f"Saving dragon with facing_direction: {self.facing_direction}")  # Debugging print
+        conn.commit()
 
 # Add these lines before the main function
 def draw_text(surface, text, font, color, position):
@@ -612,6 +619,7 @@ def load_selected_dragon_images(ddragon_instances):
     dragon_images = [None] * len(ddragon_instances)
     for i, ddragon in enumerate(ddragon_instances):
         if ddragon and ddragon.filename:
+            #print(f"Loading image for dragon {ddragon.dragon_id} with facing direction {ddragon.facing_direction}")  # Debugging print
             dragon_image = load_dragon_image(ddragon.filename)
             dragon_images[i] = dragon_image
     return dragon_images
@@ -745,7 +753,8 @@ def save_all_ddragon_instances(ddragon_list):
                     filename TEXT,
                     type TEXT,
                     special_abilities TEXT,
-                    petname TEXT
+                    petname TEXT,
+                    facing_direction TEXT
                 )
             ''')
             for ddragon in ddragon_list:
@@ -753,19 +762,21 @@ def save_all_ddragon_instances(ddragon_list):
                     INSERT INTO hatcheddragons (
                         genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
                         primary_trait, secondary1, secondary2, secondary3, nurture, gender,
-                        rgb_range, filename, type, special_abilities, petname
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        rgb_range, filename, type, special_abilities, petname, facing_direction
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     ddragon.genotype, ddragon.parent1, ddragon.parent2, ddragon.elixir_rgb, ddragon.elixir_title, ddragon.dragon_id, ddragon.dragon_name,
                     ddragon.primary, ddragon.secondary1, ddragon.secondary2, ddragon.secondary3, ddragon.nurture, ddragon.gender,
-                    ddragon.rgb_range, ddragon.filename, ddragon.type, ddragon.special_abilities, ddragon.petname
+                    ddragon.rgb_range, ddragon.filename, ddragon.type, ddragon.special_abilities, ddragon.petname, ddragon.facing_direction
                 ))
+                print(f"Saving dragon with facing_direction: {ddragon.facing_direction}")  # Debugging print
             conn.commit()
             print(f"Saved {len(ddragon_list)} Ddragon instances to the database")
     except sqlite3.Error as e:
         print(f"SQLite error saving ddragon instances: {e}")
     except Exception as e:
         print(f"Unexpected error saving ddragon instances: {e}")
+
 
 # Main function adjustments
 def main():
@@ -899,3 +910,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
