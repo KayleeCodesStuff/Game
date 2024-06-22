@@ -3,8 +3,7 @@ import sqlite3
 import logging
 import os
 import random
-from game import initialize, draw_text, load_image, draw_inventory, font, small_font, fruit_images_dict, egg_images_dict, fruit_names, inventory, egg_counts, inventory_slots
-
+from game import initialize, draw_text, load_image, draw_inventory, font, small_font, fruit_images_dict, egg_images_dict, fruit_names, inventory, egg_counts, inventory_slots, load_and_resize_image
 # Initialize the game
 initialize()
 
@@ -129,31 +128,7 @@ def update_inventory(reward_str):
     logging.info(f"New inventory count for {fruit}: {inventory[fruit]}")
     save_inventory_data()
 
-def handle_quest_click(category, mouse_x, mouse_y):
-    if WIDTH - 160 <= mouse_x <= WIDTH - 10 and HEIGHT - 150 <= mouse_y <= HEIGHT - 100:
-        return 'hub'
-    quests = load_quests(category)
-    total_challenge_rating = 0
-    for i, quest in enumerate(quests):
-        text_surface = small_font.render(quest[2], True, WHITE)
-        button_width = text_surface.get_width() + 20
-        grid_cols = 3
-        grid_rows = 4
-        grid_width = WIDTH // grid_cols
-        grid_height = (HEIGHT * 0.6) // grid_rows
-        margin_x = (grid_width - button_height) // 2
-        margin_y = (grid_height - button_height) // 2
-        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
-        y = HEIGHT * 0.4 + (i // grid_cols) * grid_height + margin_y
-        if x <= mouse_x <= x + button_width and y <= mouse_y <= y + button_height:
-            if not quest[5]:  # Only handle if not already completed
-                complete_quest(quest[0])
-                update_inventory(quest[4])
-                total_challenge_rating += quest[3]
-                if total_challenge_rating >= 10:
-                    flag_dragon_aggressive(category)
-            break
-    return 'area'
+
 
 def flag_dragon_aggressive(category):
     # Placeholder function for flagging dragon as aggressive
@@ -204,9 +179,7 @@ def draw_area_gameboard(category):
     pygame.display.flip()
 
 
-selected_dragons = [None] * 5  # Placeholder for the selected dragons
-
-def get_random_dragon_image():
+def get_random_dragon():
     conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
     cursor.execute("SELECT filename FROM dragons")
@@ -214,10 +187,34 @@ def get_random_dragon_image():
     conn.close()
     return random.choice(dragons)[0]
 
+# Initialize the selected dragons
+selected_dragons = [None] * 5  # Placeholder for the selected dragons
+
 def initialize_dragons():
     for i in range(len(selected_dragons)):
         if selected_dragons[i] is None:
-            selected_dragons[i] = get_random_dragon_image()
+            selected_dragons[i] = get_random_dragon()
+
+def load_and_resize_image_keeping_aspect(file_path, max_size):
+    try:
+        image = pygame.image.load(file_path).convert_alpha()
+        width, height = image.get_size()
+        aspect_ratio = width / height
+
+        if width > height:
+            new_width = max_size[0]
+            new_height = new_width / aspect_ratio
+        else:
+            new_height = max_size[1]
+            new_width = new_height * aspect_ratio
+
+        new_size = (int(new_width), int(new_height))
+        logging.info(f"Loaded and resized image {file_path} to {new_size}")
+        return pygame.transform.scale(image, new_size)
+    except pygame.error as e:
+        logging.error(f"Error loading image {file_path}: {e}")
+        print(f"Error loading image {file_path}: {e}")
+        return pygame.Surface(max_size)  # Return a blank surface as a placeholder
 
 def draw_hub_gameboard():
     screen.fill(GREY)
@@ -233,8 +230,9 @@ def draw_hub_gameboard():
     for i, pos in enumerate(dragon_positions):
         dragon_image_file = selected_dragons[i]
         dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_image_file)
-        dragon_image = load_image(dragon_image_path, (100, 100))
-        screen.blit(dragon_image, (pos[0] - 50, pos[1] - 50))
+        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))  # Resize to fit within 150x150 while keeping aspect ratio
+        image_rect = dragon_image.get_rect(center=pos)
+        screen.blit(dragon_image, image_rect.topleft)
         draw_text(screen, f"Dragon {i+1}", small_font, WHITE, (pos[0] - 30, pos[1] + 60))
 
     # Draw the inventory
@@ -242,8 +240,25 @@ def draw_hub_gameboard():
 
     pygame.display.flip()
 
+def handle_quest_click(category, mouse_x, mouse_y):
+    quests = load_quests(category)
+    total_challenge_rating = 0
+    for i, quest in enumerate(quests):
+        text_surface = small_font.render(quest[2], True, WHITE)
+        button_width = text_surface.get_width() + 20
+        x = (i % 3) * 200 + 300
+        y = (i // 3) * 100 + 200
+        rect = pygame.Rect(x, y, button_width, 50)
+        if rect.collidepoint(mouse_x, mouse_y):
+            if not quest[5]:  # Only handle if not already completed
+                complete_quest(quest[0])
+                update_inventory(quest[4])
+                total_challenge_rating += quest[3]
+                if total_challenge_rating >= 10:
+                    flag_dragon_aggressive(category)
+            break
 
-
+# Sample game loop calling the updated draw_hub_gameboard function
 def game_loop():
     running = True
     current_screen = 'hub'
@@ -256,16 +271,20 @@ def game_loop():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if current_screen == 'hub':
-                    # Check if any dragon icon is clicked
                     for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
-                        if (mouse_x - pos[0]) ** 2 + (mouse_y - pos[1]) ** 2 <= 50 ** 2:
+                        dragon_image_file = selected_dragons[i]
+                        dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_image_file)
+                        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))  # Resize to fit within 150x150
+                        image_rect = dragon_image.get_rect(center=pos)
+                        if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             current_screen = 'area'
                             break
-                elif current_screen == 'area' and selected_area is not None:
-                    result = handle_quest_click(selected_area, mouse_x, mouse_y)
-                    if result == 'hub':
+                elif current_screen == 'area':
+                    if WIDTH - 200 <= mouse_x <= WIDTH - 50 and HEIGHT - 100 <= mouse_y <= HEIGHT - 50:
                         current_screen = 'hub'
+                    else:
+                        handle_quest_click(selected_area, mouse_x, mouse_y)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
@@ -277,25 +296,10 @@ def game_loop():
     pygame.quit()
     logging.info("Game loop ended")
     print("Game loop ended")
-    
+
+# Call the game loop to test the updated function
 if __name__ == "__main__":
-    # Initialize the game
     initialize()
-    
-    # Load inventory data
-    try:
-        load_inventory_data()
-        logging.info("Initial inventory data loaded successfully")
-        print("Initial inventory data loaded successfully")
-    except Exception as e:
-        logging.error(f"Error loading initial inventory data: {e}")
-        print(f"Error loading initial inventory data: {e}")
-
-    # Start the game loop
+    load_inventory_data()
     game_loop()
-
-    # Save inventory data on exit
-    logging.info("Saving inventory data on exit")
     save_inventory_data()
-    logging.info("Inventory data saved on exit")
-    print("Inventory data saved on exit")
