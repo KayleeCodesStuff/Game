@@ -139,10 +139,34 @@ def draw_beveled_button(surface, rect, color, text, font):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
-def draw_area_gameboard(category):
+def load_boss_dragon_image(dragon_filename, max_height):
+    dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_filename)
+    try:
+        image = pygame.image.load(dragon_image_path).convert_alpha()
+        width, height = image.get_size()
+        aspect_ratio = width / height
+
+        new_height = max_height
+        new_width = new_height * aspect_ratio
+
+        new_size = (int(new_width), int(new_height))
+        logging.info(f"Loaded and resized boss dragon image {dragon_image_path} to {new_size}")
+        return pygame.transform.scale(image, new_size)
+    except pygame.error as e:
+        logging.error(f"Error loading boss dragon image {dragon_image_path}: {e}")
+        print(f"Error loading boss dragon image {dragon_image_path}: {e}")
+        return pygame.Surface((max_height * aspect_ratio, max_height))  # Return a blank surface as a placeholder
+
+
+def draw_area_gameboard(category, boss_dragon_filename):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
     draw_text(screen, f"Area Gameboard {category}", font, WHITE, (WIDTH // 2 - 150, 20))
+
+    # Load and display boss dragon image
+    max_height = int(HEIGHT * 0.35)
+    boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
+    screen.blit(boss_dragon_image, (0, 0))
 
     # Load and display quests
     quests = load_quests(category)
@@ -174,7 +198,6 @@ def draw_area_gameboard(category):
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
     pygame.display.flip()
-
 
 
 
@@ -270,11 +293,146 @@ def handle_quest_click(category, mouse_x, mouse_y):
                     flag_dragon_aggressive(category)
             break
 
-# Sample game loop calling the updated draw_hub_gameboard function
+def calculate_damage(attacker_attack, defender_defense, primary_trait_match=False, secondary_traits_match=0):
+    # Base damage calculation
+    base_damage = max(0, attacker_attack - defender_defense)
+    
+    # Apply primary trait match (double damage)
+    if primary_trait_match:
+        base_damage *= 2
+    
+    # Apply random variation (-10% to +10%)
+    variation = random.uniform(0.9, 1.1)
+    base_damage = int(base_damage * variation)
+    
+    # Apply secondary traits damage reduction
+    if secondary_traits_match == 1:
+        damage_reduction = 0.15
+    elif secondary_traits_match == 2:
+        damage_reduction = 0.30
+    elif secondary_traits_match == 3:
+        damage_reduction = 0.50
+    else:
+        damage_reduction = 0.0
+    
+    final_damage = int(base_damage * (1 - damage_reduction))
+    
+    return final_damage
+
+def dodge_chance(defender_speed, attacker_speed):
+    chance = defender_speed / (defender_speed + attacker_speed)
+    return random.random() < chance
+
+def trait_match_count(player_traits, boss_traits):
+    return len(set(player_traits).intersection(set(boss_traits)))
+
+def player_attack_boss(player_dragon, boss_dragon):
+    primary_trait_match = player_dragon['primary_trait'] == boss_dragon['primary_trait']
+    secondary_traits_match = trait_match_count(player_dragon['secondary_traits'], boss_dragon['secondary_traits'])
+    
+    return calculate_damage(player_dragon['attack'], boss_dragon['defense'], primary_trait_match, secondary_traits_match)
+
+def boss_attack_player(boss_dragon, player_dragon):
+    if not dodge_chance(player_dragon['speed'], boss_dragon['speed']):
+        secondary_traits_match = trait_match_count(boss_dragon['secondary_traits'], player_dragon['secondary_traits'])
+        return calculate_damage(boss_dragon['attack'], player_dragon['defense'], False, secondary_traits_match)
+    else:
+        return 0  # Attack dodged
+
+# Example dragons for testing
+player_dragon = {
+    'attack': 50,
+    'defense': 30,
+    'speed': 25,
+    'primary_trait': 'Mystical',
+    'secondary_traits': ['Distraction', 'Unique', 'Self-righteous']
+}
+
+boss_dragon = {
+    'attack': 60,
+    'defense': 40,
+    'speed': 20,
+    'primary_trait': 'Mystical',
+    'secondary_traits': ['Distraction', 'Courageous', 'Fearsome']
+}
+
+# Player dragon attacks boss dragon
+damage_to_boss = player_attack_boss(player_dragon, boss_dragon)
+print(f"Player Dragon deals {damage_to_boss} damage to Boss Dragon")
+
+# Boss dragon attacks player dragon
+damage_to_player = boss_attack_player(boss_dragon, player_dragon)
+if damage_to_player > 0:
+    print(f"Boss Dragon deals {damage_to_player} damage to Player Dragon")
+else:
+    print("Player Dragon dodges the attack!")
+    
+ # Example combat interaction
+def combat(player_dragons, boss_dragon):
+    while boss_dragon['health'] > 0 and any(d['health'] > 0 for d in player_dragons):
+        for player_dragon in player_dragons:
+            if player_dragon['health'] > 0:
+                # Player dragon attacks boss dragon
+                damage_to_boss = player_attack_boss(player_dragon, boss_dragon)
+                boss_dragon['health'] -= damage_to_boss
+                print(f"Player Dragon deals {damage_to_boss} damage to Boss Dragon")
+
+        if boss_dragon['health'] > 0:
+            for player_dragon in player_dragons:
+                if player_dragon['health'] > 0:
+                    # Boss dragon attacks player dragon
+                    damage_to_player = boss_attack_player(boss_dragon, player_dragon)
+                    player_dragon['health'] -= damage_to_player
+                    if damage_to_player > 0:
+                        print(f"Boss Dragon deals {damage_to_player} damage to Player Dragon")
+                    else:
+                        print("Player Dragon dodges the attack!")
+
+    if boss_dragon['health'] <= 0:
+        print("Player wins!")
+    else:
+        print("Boss wins!")
+
+# Example dragons for testing
+player_dragons = [
+    {
+        'attack': 50,
+        'defense': 30,
+        'speed': 25,
+        'health': 100,
+        'primary_trait': 'Mystical',
+        'secondary_traits': ['Distraction', 'Unique', 'Self-righteous']
+    },
+    {
+        'attack': 45,
+        'defense': 35,
+        'speed': 30,
+        'health': 100,
+        'primary_trait': 'Courageous',
+        'secondary_traits': ['Distraction', 'Courageous', 'Fearsome']
+    },
+    # Add more player dragons as needed
+]
+
+boss_dragon = {
+    'attack': 60,
+    'defense': 40,
+    'speed': 20,
+    'health': 300,
+    'primary_trait': 'Mystical',
+    'secondary_traits': ['Distraction', 'Courageous', 'Fearsome']
+}
+
+# Run the combat
+combat(player_dragons, boss_dragon)
+   
+
+# Main game loop update with combat integration
 def game_loop():
     running = True
     current_screen = 'hub'
     selected_area = None
+    boss_dragon_filename = None  # Store the selected boss dragon filename
 
     while running:
         for event in pygame.event.get():
@@ -290,6 +448,7 @@ def game_loop():
                         image_rect = dragon_image.get_rect(center=pos)
                         if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
+                            boss_dragon_filename = dragon_image_file  # Store the selected boss dragon filename
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
@@ -297,11 +456,16 @@ def game_loop():
                         current_screen = 'hub'
                     else:
                         handle_quest_click(selected_area, mouse_x, mouse_y)
+                        # Check if the player has enough tokens to initiate a boss fight
+                        if player_tokens[selected_area] >= 10:
+                            player_tokens[selected_area] -= 10
+                            boss_dragon = generate_random_boss(selected_area)
+                            combat(player_dragons, boss_dragon)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            draw_area_gameboard(selected_area)
+            draw_area_gameboard(selected_area, boss_dragon_filename)  # Pass the boss dragon filename
 
         pygame.display.flip()
 
@@ -309,7 +473,7 @@ def game_loop():
     logging.info("Game loop ended")
     print("Game loop ended")
 
-# Call the game loop to test the updated function
+
 if __name__ == "__main__":
     initialize()
     load_inventory_data()
