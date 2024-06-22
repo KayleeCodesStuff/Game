@@ -2,6 +2,7 @@ import pygame
 import sqlite3
 import logging
 import os
+import random
 from game import initialize, draw_text, load_image, draw_inventory, font, small_font, fruit_images_dict, egg_images_dict, fruit_names, inventory, egg_counts, inventory_slots
 
 # Initialize the game
@@ -203,21 +204,45 @@ def draw_area_gameboard(category):
     pygame.display.flip()
 
 
+selected_dragons = [None] * 5  # Placeholder for the selected dragons
+
+def get_random_dragon_image():
+    conn = connect_db('dragonsedit.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT filename FROM dragons")
+    dragons = cursor.fetchall()
+    conn.close()
+    return random.choice(dragons)[0]
+
+def initialize_dragons():
+    for i in range(len(selected_dragons)):
+        if selected_dragons[i] is None:
+            selected_dragons[i] = get_random_dragon_image()
+
 def draw_hub_gameboard():
     screen.fill(GREY)
     screen.blit(background, (0, 0))
     draw_text(screen, "Hub Gameboard", font, WHITE, (WIDTH // 2 - 100, 20))
 
-    # Example dragon icons (placeholders)
+    # Initialize dragons if not already done
+    initialize_dragons()
+
+    # Example dragon icons (randomly selected from database)
     dragon_positions = [(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]
+
     for i, pos in enumerate(dragon_positions):
-        pygame.draw.circle(screen, BLUE, pos, 50)
-        draw_text(screen, f"Dragon {i+1}", small_font, WHITE, (pos[0] - 30, pos[1] - 10))
+        dragon_image_file = selected_dragons[i]
+        dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_image_file)
+        dragon_image = load_image(dragon_image_path, (100, 100))
+        screen.blit(dragon_image, (pos[0] - 50, pos[1] - 50))
+        draw_text(screen, f"Dragon {i+1}", small_font, WHITE, (pos[0] - 30, pos[1] + 60))
 
     # Draw the inventory
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     pygame.display.flip()
+
+
 
 def game_loop():
     running = True
