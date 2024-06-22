@@ -110,7 +110,7 @@ def load_quests(category):
     cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed FROM quests WHERE Category=?", (category,))
     quests = cursor.fetchall()
     conn.close()
-    print(f"Loaded quests for category {category}: {quests}")
+    #print(f"Loaded quests for category {category}: {quests}")
     return quests
 
 def complete_quest(quest_id):
@@ -161,29 +161,36 @@ def draw_area_gameboard(category):
 
     # Load and display quests
     quests = load_quests(category)
-    print(f"Drawing quests for category {category}: {quests}")
-    button_width = 150
-    button_height = 50
-    margin_x = (WIDTH - 3 * button_width) // 4
-    margin_y = (HEIGHT - 4 * button_height) // 6
+    # print(f"Drawing quests for category {category}: {quests}")
+    button_height = 50  # Fixed height for consistency
+    grid_cols = 3
+    grid_rows = 4
+    grid_width = WIDTH // grid_cols
+    grid_height = (HEIGHT * 0.6) // grid_rows
+    margin_x = (grid_width - button_height) // 2
+    margin_y = (grid_height - button_height) // 2
+
     for i, quest in enumerate(quests):
-        x = margin_x + (i % 3) * (button_width + margin_x)
-        y = margin_y + (i // 3) * (button_height + margin_y) + HEIGHT // 3
+        text_surface = small_font.render(quest[2], True, WHITE)
+        button_width = text_surface.get_width() + 20
+        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
+        y = HEIGHT * 0.4 + (i // grid_cols) * grid_height + margin_y
         color = CATEGORY_INFO.get(quest[1], {}).get('color', BLUE)
         if quest[5]:  # If completed
             color = GREY
         rect = pygame.Rect(x, y, button_width, button_height)
-        print(f"Drawing button for quest {quest[0]} at {rect} with color {color}")
+        # print(f"Drawing button for quest {quest[0]} at {rect} with color {color}")
         draw_beveled_button(screen, rect, color, quest[2], small_font)
 
     # Draw the inventory
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
     # Draw back to hub button
-    hub_button_rect = pygame.Rect(WIDTH - 200, HEIGHT - 100, 150, 50)
-    draw_beveled_button(screen, hub_button_rect, RED, "Back to Hub", small_font)
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
+    draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
     pygame.display.flip()
+
 
 def draw_hub_gameboard():
     screen.fill(GREY)
