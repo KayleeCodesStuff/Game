@@ -4,6 +4,7 @@ import logging
 import os
 import random
 from game import initialize, draw_text, load_image, draw_inventory, font, small_font, fruit_images_dict, egg_images_dict, fruit_names, inventory, egg_counts, inventory_slots, load_and_resize_image
+
 # Initialize the game
 initialize()
 
@@ -110,7 +111,6 @@ def load_quests(category):
     cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed FROM quests WHERE Category=?", (category,))
     quests = cursor.fetchall()
     conn.close()
-    #print(f"Loaded quests for category {category}: {quests}")
     return quests
 
 def complete_quest(quest_id):
@@ -127,8 +127,6 @@ def update_inventory(reward_str):
     inventory[fruit] += amount
     logging.info(f"New inventory count for {fruit}: {inventory[fruit]}")
     save_inventory_data()
-
-
 
 def flag_dragon_aggressive(category):
     # Placeholder function for flagging dragon as aggressive
@@ -148,25 +146,24 @@ def draw_area_gameboard(category):
 
     # Load and display quests
     quests = load_quests(category)
-    # print(f"Drawing quests for category {category}: {quests}")
     button_height = 50  # Fixed height for consistency
     grid_cols = 3
     grid_rows = 4
-    grid_width = WIDTH // grid_cols
-    grid_height = (HEIGHT * 0.6) // grid_rows
-    margin_x = (grid_width - button_height) // 2
-    margin_y = (grid_height - button_height) // 2
+    total_grid_height = (HEIGHT - 100) * 0.6  # Exclude bottom 100 pixels for the inventory box
+    total_grid_width = WIDTH
+    grid_height = total_grid_height // grid_rows
+    grid_width = total_grid_width // grid_cols
+    start_y = (HEIGHT - 100) * 0.4  # Start the grid at 40% of the adjusted height
 
     for i, quest in enumerate(quests):
         text_surface = small_font.render(quest[2], True, WHITE)
         button_width = text_surface.get_width() + 20
         x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
-        y = HEIGHT * 0.4 + (i // grid_cols) * grid_height + margin_y
+        y = start_y + (i // grid_cols) * grid_height + (grid_height - button_height) // 2
         color = CATEGORY_INFO.get(quest[1], {}).get('color', BLUE)
         if quest[5]:  # If completed
             color = GREY
         rect = pygame.Rect(x, y, button_width, button_height)
-        # print(f"Drawing button for quest {quest[0]} at {rect} with color {color}")
         draw_beveled_button(screen, rect, color, quest[2], small_font)
 
     # Draw the inventory
@@ -177,6 +174,9 @@ def draw_area_gameboard(category):
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
     pygame.display.flip()
+
+
+
 
 
 def get_random_dragon():
@@ -240,15 +240,27 @@ def draw_hub_gameboard():
 
     pygame.display.flip()
 
+def handle_back_to_hub_click(mouse_x, mouse_y):
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
+    return back_button_rect.collidepoint(mouse_x, mouse_y)
+
 def handle_quest_click(category, mouse_x, mouse_y):
     quests = load_quests(category)
     total_challenge_rating = 0
+    button_height = 50
+    grid_cols = 3
+    grid_rows = 4
+    grid_width = WIDTH // grid_cols
+    grid_height = (HEIGHT * 0.6) // grid_rows
+    margin_x = (grid_width - button_height) // 2
+    margin_y = (grid_height - button_height) // 2
+
     for i, quest in enumerate(quests):
         text_surface = small_font.render(quest[2], True, WHITE)
         button_width = text_surface.get_width() + 20
-        x = (i % 3) * 200 + 300
-        y = (i // 3) * 100 + 200
-        rect = pygame.Rect(x, y, button_width, 50)
+        x = margin_x + (i % grid_cols) * (grid_width + margin_x)
+        y = HEIGHT * 0.4 + (i // grid_cols) * grid_height + margin_y
+        rect = pygame.Rect(x, y, button_width, button_height)
         if rect.collidepoint(mouse_x, mouse_y):
             if not quest[5]:  # Only handle if not already completed
                 complete_quest(quest[0])
@@ -281,7 +293,7 @@ def game_loop():
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
-                    if WIDTH - 200 <= mouse_x <= WIDTH - 50 and HEIGHT - 100 <= mouse_y <= HEIGHT - 50:
+                    if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
                     else:
                         handle_quest_click(selected_area, mouse_x, mouse_y)
