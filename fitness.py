@@ -46,6 +46,9 @@ player_tokens = {
 background_path = os.path.join(os.path.dirname(__file__), "background.png")
 background = load_image(background_path, (WIDTH, HEIGHT))
 
+category_font = pygame.font.Font(None, 60)  # Larger font for category word
+token_font = pygame.font.Font(None, 90)  # Much larger font for player token count
+
 def connect_db(db_name):
     db_path = os.path.join(os.path.dirname(__file__), db_name)
     conn = sqlite3.connect(db_path)
@@ -192,17 +195,43 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
-def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons, fight_button_rect):
+def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
-    # Adjust the position of the category title
-    draw_text(screen, category.capitalize(), font, WHITE, (WIDTH // 2 - 10, 80))
+    # Adjust the position of the category title and player token count
+    category_text = category.capitalize()
+    category_pos = (WIDTH // 2 - 10, 80)
+    token_text = str(player_tokens[category])
+    token_pos = (WIDTH // 2 , 140)
+
+    # Calculate the size of the text surfaces
+    category_surface = category_font.render(category_text, True, WHITE)
+    token_surface = token_font.render(token_text, True, WHITE)
+
+    # Create the semi-transparent boxes
+    category_box = pygame.Rect(category_pos[0] - 10, category_pos[1] - 10, category_surface.get_width() + 20, category_surface.get_height() + 20)
+    token_box = pygame.Rect(token_pos[0] - 10, token_pos[1] - 10, token_surface.get_width() + 20, token_surface.get_height() + 20)
+
+    # Draw the semi-transparent boxes
+    s1 = pygame.Surface((category_box.width, category_box.height))
+    s1.set_alpha(128)  # Alpha level
+    s1.fill((0, 0, 0))  # Fill the surface with color
+    screen.blit(s1, category_box.topleft)
+
+    s2 = pygame.Surface((token_box.width, token_box.height))
+    s2.set_alpha(128)  # Alpha level
+    s2.fill((0, 0, 0))  # Fill the surface with color
+    screen.blit(s2, token_box.topleft)
+
+    # Draw the text
+    draw_text(screen, category_text, category_font, WHITE, category_pos)
+    draw_text(screen, token_text, token_font, WHITE, token_pos)
 
     # Load and display boss dragon image
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
-    
+
     # Check and flip boss dragon image if necessary
     conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
@@ -250,12 +279,14 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
     # Draw fight button
-    fight_button_rect = pygame.Rect((WIDTH // 2-10), 200, 150, 50)  # Moved 100 pixels to the left
+    fight_button_rect = pygame.Rect(WIDTH // 2 - 20, 200, 150, 50)  # Adjust position here
     draw_beveled_button(screen, fight_button_rect, RED, "Fight!", font)
 
     draw_player_dragon_slots(player_dragons)
 
     pygame.display.flip()
+
+    return fight_button_rect  # Return the rect for fight button click handling
 
 
 def get_random_dragon():
@@ -696,7 +727,6 @@ def game_loop():
     boss_dragon_filename = None  # Store the selected boss dragon filename
     boss_dragon_stats = None  # Store the selected boss dragon stats
     player_dragons = initialize_player_dragons()
-    fight_button_rect = pygame.Rect(WIDTH // 2 - 75, 150, 150, 50)  # Define fight_button_rect outside of the draw_area_gameboard function
 
     while running:
         for event in pygame.event.get():
@@ -723,24 +753,26 @@ def game_loop():
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
-                    elif fight_button_rect.collidepoint(mouse_x, mouse_y):
-                        if player_tokens[selected_area] >= 10:
-                            player_tokens[selected_area] -= 10
-                            combat(player_dragons, boss_dragon_stats)
                     else:
                         handle_quest_click(selected_area, mouse_x, mouse_y)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)  # Ensure this is only called in the 'area' screen
+                        fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)
+                        if fight_button_rect.collidepoint(mouse_x, mouse_y):
+                            if player_tokens[selected_area] >= 10:
+                                player_tokens[selected_area] -= 10
+                                combat(player_dragons, boss_dragon_stats)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, fight_button_rect)  # Pass the fight_button_rect as a parameter
+            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)
 
         pygame.display.flip()
 
     pygame.quit()
     logging.info("Game loop ended")
     print("Game loop ended")
+
 
 if __name__ == "__main__":
     initialize()
