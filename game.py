@@ -421,6 +421,57 @@ def is_overlapping(new_rect, rect_list):
         if new_rect.colliderect(rect):
             return True
     return False     
+def draw_center_fruits(screen, box_top_left, box_bottom_right, fruit_images_dict):
+    box_width = box_bottom_right[0] - box_top_left[0]
+    box_height = box_bottom_right[1] - box_top_left[1]
+
+    # Load the fruit images
+    gleamberry_image = fruit_images_dict["gleamberry"]
+    flamefruit_image = fruit_images_dict["flamefruit"]
+    shimmeringapple_image = fruit_images_dict["shimmeringapple"]
+    etherealpear_image = fruit_images_dict["etherealpear"]
+    moonbeammelon_image = fruit_images_dict["moonbeammelon"]
+
+    # Align the images within the box
+    screen.blit(gleamberry_image, box_top_left)
+    flamefruit_position = (box_top_left[0], box_top_left[1] + box_height - flamefruit_image.get_height())
+    screen.blit(flamefruit_image, flamefruit_position)
+
+    # Calculate the position for the right side images
+    shimmeringapple_position = (box_top_left[0] + box_width - shimmeringapple_image.get_width(), box_top_left[1])
+    etherealpear_position = (box_top_left[0] + box_width - etherealpear_image.get_width(), box_top_left[1] + box_height - etherealpear_image.get_height())
+
+    # Draw the right side images
+    screen.blit(shimmeringapple_image, shimmeringapple_position)
+    screen.blit(etherealpear_image, etherealpear_position)
+
+    # Calculate the space for the moonbeammelon image
+    space_left = flamefruit_position[0] + flamefruit_image.get_width() + 10
+    space_right = shimmeringapple_position[0] - 10
+    available_width = space_right - space_left
+    available_height = box_height
+
+    # Resize the moonbeammelon image to fit the available space while keeping its aspect ratio
+    moonbeammelon_aspect_ratio = moonbeammelon_image.get_width() / moonbeammelon_image.get_height()
+
+    if available_width / moonbeammelon_aspect_ratio <= available_height:
+        moonbeammelon_new_width = available_width
+        moonbeammelon_new_height = available_width / moonbeammelon_aspect_ratio
+    else:
+        moonbeammelon_new_height = available_height
+        moonbeammelon_new_width = available_height * moonbeammelon_aspect_ratio
+
+    moonbeammelon_image = pygame.transform.scale(moonbeammelon_image, (int(moonbeammelon_new_width), int(moonbeammelon_new_height)))
+
+    # Calculate the position for the moonbeammelon image
+    moonbeammelon_position = (
+        space_left + (available_width - moonbeammelon_new_width) // 2,
+        box_top_left[1] + (available_height - moonbeammelon_new_height) // 2
+    )
+
+    screen.blit(moonbeammelon_image, moonbeammelon_position)
+
+
 # Example of handling errors during game loop
 def game_loop():
     running = True

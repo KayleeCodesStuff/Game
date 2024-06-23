@@ -220,20 +220,20 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     draw_text(screen, token_text, token_font, WHITE, (WIDTH // 2 + 50, 75))
 
     box_width, box_height = category_font.size(category.capitalize())
-    s = pygame.Surface((box_width + 20, box_height + 10))
+    s = pygame.Surface((box_width + 10, box_height + 10))
     s.set_alpha(128)
     s.fill((0, 0, 0))
-    screen.blit(s, (WIDTH // 2 - 20, 5))
+    screen.blit(s, (WIDTH // 2 - 25, 5))
 
     box_width, box_height = token_font.size(token_text)
     s = pygame.Surface((box_width + 20, box_height + 10))
     s.set_alpha(128)
     s.fill((0, 0, 0))
-    screen.blit(s, (WIDTH // 2 + 30, 65))
+    screen.blit(s, (WIDTH // 2 + 40, 65))
 
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
-    
+
     conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
     cursor.execute("SELECT facing_direction FROM dragons WHERE filename=?", (boss_dragon_filename,))
@@ -252,45 +252,10 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     # Calculate the rectangle position
     box_top_left = (WIDTH // 2 - 45, 140)
     box_bottom_right = (WIDTH - 420, 265)
-    box_width = box_bottom_right[0] - box_top_left[0]
-    box_height = box_bottom_right[1] - box_top_left[1]
-    pygame.draw.rect(screen, WHITE, (*box_top_left, box_width, box_height), 2)
-
-    # Load and draw the fruit images
-    gleamberry_image = fruit_images_dict["gleamberry"]
-    flamefruit_image = fruit_images_dict["flamefruit"]
-    shimmeringapple_image = fruit_images_dict["shimmeringapple"]
-    etherealpear_image = fruit_images_dict["etherealpear"]
-    moonbeammelon_image = fruit_images_dict["moonbeammelon"]
-
-    # Align the images within the box
-    screen.blit(gleamberry_image, box_top_left)
-    flamefruit_position = (box_top_left[0], box_top_left[1] + box_height - flamefruit_image.get_height())
-    screen.blit(flamefruit_image, flamefruit_position)
-
-    # Calculate the position for the right side images
-    shimmeringapple_position = (box_top_left[0] + box_width - shimmeringapple_image.get_width(), box_top_left[1])
-    etherealpear_position = (box_top_left[0] + box_width - etherealpear_image.get_width(), box_top_left[1] + box_height - etherealpear_image.get_height())
-
-    # Draw the right side images
-    screen.blit(shimmeringapple_image, shimmeringapple_position)
-    screen.blit(etherealpear_image, etherealpear_position)
-
-    # Calculate the center position for the moonbeammelon image
-    moonbeammelon_center_x = (flamefruit_position[0] + flamefruit_image.get_width() + shimmeringapple_position[0]) // 2
-    moonbeammelon_center_y = (box_top_left[1] + box_bottom_right[1]) // 2
-    moonbeammelon_position = (
-        moonbeammelon_center_x - moonbeammelon_image.get_width() // 2,
-        moonbeammelon_center_y - moonbeammelon_image.get_height() // 2
-    )
-
-    # Adjust the position to be 10 pixels from the edges of adjacent images
-    moonbeammelon_position = (
-        flamefruit_position[0] + flamefruit_image.get_width() + 10,
-        moonbeammelon_position[1]
-    )
     
-    screen.blit(moonbeammelon_image, moonbeammelon_position)
+
+    # Draw the fruit images in the center
+    draw_center_fruits(screen, box_top_left, box_bottom_right, fruit_images_dict)
 
     quests = load_quests(category)
     button_height = 50
@@ -325,6 +290,8 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     pygame.display.flip()
 
     return fight_button_rect
+
+
 
 def get_random_dragon():
     conn = connect_db('dragonsedit.db')
@@ -479,7 +446,7 @@ def handle_quest_click(category, mouse_x, mouse_y):
 
     # Reload the quests to reflect any changes
     updated_quests = load_quests(category)
-    print(f"Updated quests after handling click: {updated_quests}")
+    #print(f"Updated quests after handling click: {updated_quests}")
 
 
 
