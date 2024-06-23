@@ -55,7 +55,6 @@ def connect_db(db_name='save.db'):
     conn = sqlite3.connect(db_path)
     return conn
 
-
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
     
@@ -124,7 +123,6 @@ def load_quests(category):
     conn.close()
     return quests
 
-
 def complete_daily_quest(quest_id):
     conn = connect_db('save.db')
     cursor = conn.cursor()
@@ -133,7 +131,6 @@ def complete_daily_quest(quest_id):
     conn.commit()
     conn.close()
 
-    
 def update_inventory(reward_str):
     rewards = reward_str.split()
     fruit, amount = rewards[1], int(rewards[0])
@@ -149,7 +146,6 @@ def update_inventory(reward_str):
 
     # Save the updated inventory to the database
     save_inventory_data()
-
 
 def flag_dragon_aggressive(category):
     print(f"Category {category} is now aggressive!")
@@ -199,7 +195,7 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
-def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons):
+def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons, quests):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
@@ -248,7 +244,6 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     box_bottom_right = (WIDTH - 420, 265)
     draw_center_fruits(screen, box_top_left, box_bottom_right, fruit_images_dict)
 
-    quests = load_quests(category)
     button_height = 50
     grid_cols = 3
     grid_rows = 4
@@ -281,7 +276,6 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     pygame.display.flip()
 
     return fight_button_rect
-
 
 def get_random_dragon():
     conn = connect_db('dragonsedit.db')
@@ -348,46 +342,44 @@ def handle_back_to_hub_click(mouse_x, mouse_y):
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
     return back_button_rect.collidepoint(mouse_x, mouse_y)
 
-def remove_and_replace_quest(quest_id, category):
+def remove_and_replace_quest(quest_id, category, displayed_quests):
     conn = sqlite3.connect('save.db')
     cursor = conn.cursor()
     try:
-        print(f"Removing and replacing quest ID {quest_id} in category {category}")
-
         cursor.execute("UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
-        print(f"Updated tally for quest ID {quest_id}")
-
         cursor.execute("UPDATE playerquests SET completed = 0, reset = NULL WHERE ID = ?", (quest_id,))
-        print(f"Marked quest ID {quest_id} as available")
-
-        new_quest = None
-        for attempt in range(10):
-            cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ? AND ID != ? AND (reset IS NULL OR reset <= date('now')) ORDER BY RANDOM() LIMIT 1", (category, quest_id))
-            new_quest = cursor.fetchone()
-            if new_quest:
-                break
-
-        if new_quest:
-            print(f"Selected new quest: {new_quest}")
+        
+        displayed_quest_ids = set(q[0] for q in displayed_quests)
+        displayed_quest_descriptions = set(q[2] for q in displayed_quests)
+        
+        cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ?", (category,))
+        all_cleaning_quests = cursor.fetchall()
+        
+        available_quests = [
+            quest for quest in all_cleaning_quests 
+            if quest[0] not in displayed_quest_ids and quest[2] not in displayed_quest_descriptions and quest[0] != quest_id
+        ]
+        
+        if not available_quests:
+            # Fallback to the original quest
+            new_quest = next((q for q in all_cleaning_quests if q[0] == quest_id), None)
         else:
-            print("No new quest found or selected quest is the same as the old quest")
-
+            new_quest = random.choice(available_quests)
+        
         conn.commit()
     except sqlite3.Error as e:
-        print(f"SQLite error: {e}")
         new_quest = None
     except Exception as e:
-        print(f"Unexpected error: {e}")
         new_quest = None
     finally:
         conn.close()
-
+    
     return new_quest
 
 
-def handle_quest_click(category, mouse_x, mouse_y):
+def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
     print(f"Handling quest click for category {category} at position ({mouse_x}, {mouse_y})")
-    quests = load_quests(category)
+    quests_updated = False  # Flag to track if quests were updated
     
     button_height = 50
     grid_cols = 3
@@ -400,9 +392,9 @@ def handle_quest_click(category, mouse_x, mouse_y):
 
     # Only handle clicks within the quest button area
     if mouse_y < start_y or mouse_y > start_y + grid_rows * grid_height:
-        return
+        return displayed_quests, quests_updated
 
-    for i, quest in enumerate(quests):
+    for i, quest in enumerate(displayed_quests):
         text_surface = small_font.render(quest[2], True, WHITE)
         button_width = text_surface.get_width() + 20
         x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
@@ -419,14 +411,15 @@ def handle_quest_click(category, mouse_x, mouse_y):
             if category == 'daily':
                 complete_daily_quest(quest[0])
             else:
-                new_quest = remove_and_replace_quest(quest[0], category)
+                new_quest = remove_and_replace_quest(quest[0], category, displayed_quests)
                 if new_quest:
-                    quests[i] = new_quest
+                    displayed_quests[i] = new_quest
+                    quests_updated = True  # Set the flag to True when quests are updated
                     print(f"Replaced quest {quest[0]} with new quest {new_quest[0]}")
                 else:
                     print(f"Failed to replace quest {quest[0]}")
             break
-
+    return displayed_quests, quests_updated
 
 def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
     stats = {
@@ -725,6 +718,7 @@ def game_loop():
     boss_dragon_filename = None
     boss_dragon_stats = None
     player_dragons = initialize_player_dragons()
+    displayed_quests = []  # Initialize an empty list for displayed quests
     
     while running:
         for event in pygame.event.get():
@@ -746,33 +740,37 @@ def game_loop():
                             nurture_trait = None
                             boss_dragon_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
                             boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
+                            all_quests = load_quests(selected_area)
+                            displayed_quests = random.sample(all_quests, min(12, len(all_quests)))  # Randomly select 12 quests or fewer if there are less than 12
+                            print(f"Switched to area screen: {selected_area}, Loaded quests: {displayed_quests}")
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
+                        print("Switched to hub screen")
                     elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
                             combat(player_dragons, boss_dragon_stats)
                     else:
-                        handle_quest_click(selected_area, mouse_x, mouse_y)
+                        displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
+                        if quests_updated:
+                            print(f"Updated quests: {displayed_quests}")
+                            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)  # Redraw gameboard with updated quests
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)
+            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
 
         pygame.display.flip()
 
     pygame.quit()
-    logging.info("Game loop ended")
     print("Game loop ended")
 
-
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     initialize()
     load_inventory_data()
     game_loop()

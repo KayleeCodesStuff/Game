@@ -473,55 +473,55 @@ def draw_center_fruits(screen, box_top_left, box_bottom_right, fruit_images_dict
 
 
 # Example of handling errors during game loop
-def game_loop():
-    running = True
-    selected_inventory_slot = None
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
+# def game_loop():
+#     running = True
+#     selected_inventory_slot = None
+#     while running:
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 running = False
+#             elif event.type == pygame.KEYDOWN:
+#                 if event.key == pygame.K_ESCAPE:
+#                     running = False
 
-        screen.fill(GREY)
-        screen.blit(background, (0, 0))
+#         screen.fill(GREY)
+#         screen.blit(background, (0, 0))
 
-        # Draw inventory with error handling
-        try:
-            draw_inventory(screen, inventory, egg_counts, inventory_slots, selected_inventory_slot)
-        except pygame.error as e:
-            logging.error(f"Error drawing inventory: {e}")
-            print(f"Error drawing inventory: {e}")
+#         # Draw inventory with error handling
+#         try:
+#             draw_inventory(screen, inventory, egg_counts, inventory_slots, selected_inventory_slot)
+#         except pygame.error as e:
+#             logging.error(f"Error drawing inventory: {e}")
+#             print(f"Error drawing inventory: {e}")
 
-        pygame.display.flip()
+#         pygame.display.flip()
 
-    pygame.quit()
-    logging.info("Game loop ended")
-    print("Game loop ended")
+#     pygame.quit()
+#     logging.info("Game loop ended")
+#     print("Game loop ended")
 
-def main():
-    # Call initialization functions
-    initialize_pygame()
-    initialize_fonts()
+# def main():
+#     # Call initialization functions
+#     initialize_pygame()
+#     initialize_fonts()
     
-    # Call load_inventory_data with exception handling
-    try:
-        load_inventory_data()
-        logging.info("Initial inventory data loaded successfully")
-        print("Initial inventory data loaded successfully")
-    except Exception as e:
-        logging.error(f"Error loading initial inventory data: {e}")
-        print(f"Error loading initial inventory data: {e}")
+#     # Call load_inventory_data with exception handling
+#     try:
+#         load_inventory_data()
+#         logging.info("Initial inventory data loaded successfully")
+#         print("Initial inventory data loaded successfully")
+#     except Exception as e:
+#         logging.error(f"Error loading initial inventory data: {e}")
+#         print(f"Error loading initial inventory data: {e}")
 
-    # Start the game loop
-    try:
-        game_loop()
-    except Exception as e:
-        logging.error(f"Error during game loop: {e}")
-        print(f"Error during game loop: {e}")
-    finally:
-        save_inventory_data()
+#     # Start the game loop
+#     try:
+#         game_loop()
+#     except Exception as e:
+#         logging.error(f"Error during game loop: {e}")
+#         print(f"Error during game loop: {e}")
+#     finally:
+#         save_inventory_data()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
