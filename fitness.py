@@ -215,21 +215,21 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
-    draw_text(screen, category.capitalize(), category_font, WHITE, (WIDTH // 2 - 50, 80))
+    draw_text(screen, category.capitalize(), category_font, WHITE, (WIDTH // 2 - 20, 10))
     token_text = str(player_tokens[category])
-    draw_text(screen, token_text, token_font, WHITE, (WIDTH // 2 - 50, 150))
+    draw_text(screen, token_text, token_font, WHITE, (WIDTH // 2 + 50, 75))
 
     box_width, box_height = category_font.size(category.capitalize())
     s = pygame.Surface((box_width + 20, box_height + 10))
     s.set_alpha(128)
     s.fill((0, 0, 0))
-    screen.blit(s, (WIDTH // 2 - 60, 70))
+    screen.blit(s, (WIDTH // 2 - 20, 5))
 
     box_width, box_height = token_font.size(token_text)
     s = pygame.Surface((box_width + 20, box_height + 10))
     s.set_alpha(128)
     s.fill((0, 0, 0))
-    screen.blit(s, (WIDTH // 2 - 60, 140))
+    screen.blit(s, (WIDTH // 2 + 30, 65))
 
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
@@ -277,7 +277,7 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
-    fight_button_rect = pygame.Rect(WIDTH // 2 - 75, 250, 150, 50)
+    fight_button_rect = pygame.Rect(WIDTH // 2 - 10, 265, 150, 50)
     draw_beveled_button(screen, fight_button_rect, RED, "Fight!", font)
 
     draw_player_dragon_slots(player_dragons)
@@ -361,27 +361,49 @@ def handle_back_to_hub_click(mouse_x, mouse_y):
 
 
 def remove_and_replace_quest(quest_id, category):
-    conn = connect_db('save.db')
+    conn = sqlite3.connect('save.db')
     cursor = conn.cursor()
-    logging.info(f"Removing and replacing quest ID {quest_id} in category {category}")
-    # Increment the tally column
-    cursor.execute("UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
-    # Mark the quest as available
-    cursor.execute("UPDATE playerquests SET completed = 0, reset = NULL WHERE ID = ?", (quest_id,))
-    # Select a new quest from the pool of available quests
-    cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ? AND (reset IS NULL OR reset <= date('now')) ORDER BY RANDOM() LIMIT 1", (category,))
-    new_quest = cursor.fetchone()
-    logging.info(f"Selected new quest: {new_quest}")
-    conn.commit()
-    conn.close()
+    try:
+        print(f"Removing and replacing quest ID {quest_id} in category {category}")
+
+        # Increment the tally column
+        cursor.execute("UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
+        print(f"Updated tally for quest ID {quest_id}")
+
+        # Mark the quest as available
+        cursor.execute("UPDATE playerquests SET completed = 0, reset = NULL WHERE ID = ?", (quest_id,))
+        print(f"Marked quest ID {quest_id} as available")
+
+        # Select a new quest from the pool of available quests
+        new_quest = None
+        for attempt in range(10):  # Attempt to find a different quest
+            cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ? AND ID != ? AND (reset IS NULL OR reset <= date('now')) ORDER BY RANDOM() LIMIT 1", (category, quest_id))
+            new_quest = cursor.fetchone()
+            if new_quest:
+                break
+
+        if new_quest:
+            print(f"Selected new quest: {new_quest}")
+        else:
+            print("No new quest found or selected quest is the same as the old quest")
+
+        conn.commit()
+    except sqlite3.Error as e:
+        print(f"SQLite error: {e}")
+        new_quest = None
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        new_quest = None
+    finally:
+        conn.close()
+
     return new_quest
 
 
 def handle_quest_click(category, mouse_x, mouse_y):
     print(f"Handling quest click for category {category} at position ({mouse_x}, {mouse_y})")
     quests = load_quests(category)
-    print(f"Loaded quests: {quests}")
-
+    
     button_height = 50
     grid_cols = 3
     grid_rows = 4
@@ -398,8 +420,6 @@ def handle_quest_click(category, mouse_x, mouse_y):
         y = start_y + (i // grid_cols) * grid_height + (grid_height - button_height) // 2
         rect = pygame.Rect(x, y, button_width, button_height)
 
-        print(f"Checking quest '{quest[2]}' with button boundaries: top-left ({x}, {y}), size ({button_width}x{button_height})")
-
         if rect.collidepoint(mouse_x, mouse_y):
             print(f"Quest '{quest[2]}' clicked!")
             update_inventory(f"{quest[3]} {CATEGORY_INFO[category]['fruit']}")
@@ -411,8 +431,17 @@ def handle_quest_click(category, mouse_x, mouse_y):
                 complete_daily_quest(quest[0])
             else:
                 new_quest = remove_and_replace_quest(quest[0], category)
-                quests[i] = new_quest
+                if new_quest:
+                    quests[i] = new_quest
+                    print(f"Replaced quest {quest[0]} with new quest {new_quest[0]}")
+                else:
+                    print(f"Failed to replace quest {quest[0]}")
             break
+
+    # Reload the quests to reflect any changes
+    updated_quests = load_quests(category)
+    print(f"Updated quests after handling click: {updated_quests}")
+
 
 
 # Calculate dragon stats from traits and save to stats variable
@@ -701,7 +730,7 @@ def draw_player_dragon_slots(player_dragons):
         rect = pygame.Rect(slot_x, slot_y, slot_width, slot_height)
         
         if player_dragons[i] is None:
-            draw_beveled_button(screen, rect, LIGHT_GREY, "Click to add dragon", small_font)
+            draw_beveled_button(screen, rect, LIGHT_GREY, "Add dragon", small_font)
         else:
             dragon = player_dragons[i]
             image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon['filename'])
@@ -755,8 +784,7 @@ def game_loop():
     boss_dragon_filename = None
     boss_dragon_stats = None
     player_dragons = initialize_player_dragons()
-    fight_button_rect = pygame.Rect(WIDTH // 2 - 75, 150, 150, 50)
-
+    
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
