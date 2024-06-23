@@ -257,9 +257,9 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
-    inventory = {fruit: 0 for fruit in fruit_names}
-    egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
-    inventory_slots = [None] * 10
+    # inventory = {fruit: 0 for fruit in fruit_names}
+    # egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
+    # inventory_slots = [None] * 10
 
     try:
         with sqlite3.connect('save.db') as conn:
@@ -408,7 +408,22 @@ def delete_elixir_data(position):
         logging.error(f"Unexpected error deleting elixir data: {e}")
         print(f"Unexpected error deleting elixir data: {e}")
 
-     
+#Updae the inventory in the fitness game after 
+def update_inventory(reward_str):
+    rewards = reward_str.split()
+    fruit, amount = rewards[1], int(rewards[0])
+    print(f"Updating inventory: Adding {amount} of {fruit}")
+
+    # Ensure the fruit exists in the inventory before updating
+    if fruit in inventory:
+        inventory[fruit] += amount
+    else:
+        inventory[fruit] = amount
+        
+
+    # Save the updated inventory to the database
+    save_inventory_data()
+         
  #load images in the hatchery
 def load_and_resize_image(file_path, size):
     # Load an image from the given file path and resize it to the specified size.

@@ -55,66 +55,6 @@ def connect_db(db_name='save.db'):
     conn = sqlite3.connect(db_path)
     return conn
 
-def load_inventory_data():
-    global inventory, egg_counts, inventory_slots
-    
-    try:
-        with connect_db('save.db') as conn:
-            cursor = conn.cursor()
-
-            # Load fruits inventory
-            cursor.execute("SELECT fruit, count FROM inventory")
-            rows = cursor.fetchall()
-            for row in rows:
-                fruit, count = row
-                inventory[fruit] = count
-
-            # Load eggs counts from eggs table
-            cursor.execute("SELECT phenotype, COUNT(*) FROM eggs GROUP BY phenotype")
-            rows = cursor.fetchall()
-            for row in rows:
-                phenotype, count = row
-                egg_counts[phenotype] = count
-
-            # Load elixirs into inventory slots
-            cursor.execute("SELECT rgb, image_file, position FROM elixirs")
-            rows = cursor.fetchall()
-            for row in rows:
-                rgb = tuple(map(int, row[0][1:-1].split(', ')))
-                image_file, position = row[1], row[2]
-                inventory_slots[position - 1] = (rgb, image_file)
-
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error loading inventory data: {e}")
-        print(f"SQLite error loading inventory data: {e}")
-    except Exception as e:
-        logging.error(f"Unexpected error loading inventory data: {e}")
-        print(f"Unexpected error loading inventory data: {e}")
-
-    logging.info("Inventory loaded successfully")
-
-def save_inventory_data():
-    logging.info("Saving inventory data to save.db")
-    try:
-        with connect_db('save.db') as conn:
-            cursor = conn.cursor()
-            for fruit, count in inventory.items():
-                cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
-                logging.info(f"Saved {count} of {fruit}")
-
-            for egg, count in egg_counts.items():
-                cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
-                logging.info(f"Saved {count} of {egg} eggs")
-
-            conn.commit()
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error saving inventory data: {e}")
-        print(f"SQLite error saving inventory data: {e}")
-    except Exception as e:
-        logging.error(f"Unexpected error saving inventory data: {e}")
-        print(f"Unexpected error saving inventory data: {e}")
-    logging.info("Inventory saved successfully")
-
 def load_quests(category):
     conn = connect_db('save.db')
     cursor = conn.cursor()
@@ -131,21 +71,7 @@ def complete_daily_quest(quest_id):
     conn.commit()
     conn.close()
 
-def update_inventory(reward_str):
-    rewards = reward_str.split()
-    fruit, amount = rewards[1], int(rewards[0])
-    print(f"Updating inventory: Adding {amount} of {fruit}")
 
-    # Ensure the fruit exists in the inventory before updating
-    if fruit in inventory:
-        inventory[fruit] += amount
-        print(f"New inventory count for {fruit}: {inventory[fruit]}")
-    else:
-        inventory[fruit] = amount
-        print(f"Added new fruit {fruit} with count: {amount}")
-
-    # Save the updated inventory to the database
-    save_inventory_data()
 
 def flag_dragon_aggressive(category):
     print(f"Category {category} is now aggressive!")
@@ -378,9 +304,7 @@ def remove_and_replace_quest(quest_id, category, displayed_quests):
 
 
 def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
-    print(f"Handling quest click for category {category} at position ({mouse_x}, {mouse_y})")
     quests_updated = False  # Flag to track if quests were updated
-    
     button_height = 50
     grid_cols = 3
     grid_rows = 4
@@ -415,7 +339,6 @@ def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
                 if new_quest:
                     displayed_quests[i] = new_quest
                     quests_updated = True  # Set the flag to True when quests are updated
-                    print(f"Replaced quest {quest[0]} with new quest {new_quest[0]}")
                 else:
                     print(f"Failed to replace quest {quest[0]}")
             break
@@ -742,13 +665,13 @@ def game_loop():
                             boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
                             all_quests = load_quests(selected_area)
                             displayed_quests = random.sample(all_quests, min(12, len(all_quests)))  # Randomly select 12 quests or fewer if there are less than 12
-                            print(f"Switched to area screen: {selected_area}, Loaded quests: {displayed_quests}")
+                            #print(f"Switched to area screen: {selected_area}, Loaded quests: {displayed_quests}")
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
-                        print("Switched to hub screen")
+                        #print("Switched to hub screen")
                     elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
@@ -757,7 +680,7 @@ def game_loop():
                         displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
                         if quests_updated:
-                            print(f"Updated quests: {displayed_quests}")
+                            #print(f"Updated quests: {displayed_quests}")
                             draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)  # Redraw gameboard with updated quests
 
         if current_screen == 'hub':
