@@ -259,11 +259,38 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     # Load and draw the fruit images
     gleamberry_image = fruit_images_dict["gleamberry"]
     flamefruit_image = fruit_images_dict["flamefruit"]
+    shimmeringapple_image = fruit_images_dict["shimmeringapple"]
+    etherealpear_image = fruit_images_dict["etherealpear"]
+    moonbeammelon_image = fruit_images_dict["moonbeammelon"]
 
     # Align the images within the box
     screen.blit(gleamberry_image, box_top_left)
     flamefruit_position = (box_top_left[0], box_top_left[1] + box_height - flamefruit_image.get_height())
     screen.blit(flamefruit_image, flamefruit_position)
+
+    # Calculate the position for the right side images
+    shimmeringapple_position = (box_top_left[0] + box_width - shimmeringapple_image.get_width(), box_top_left[1])
+    etherealpear_position = (box_top_left[0] + box_width - etherealpear_image.get_width(), box_top_left[1] + box_height - etherealpear_image.get_height())
+
+    # Draw the right side images
+    screen.blit(shimmeringapple_image, shimmeringapple_position)
+    screen.blit(etherealpear_image, etherealpear_position)
+
+    # Calculate the center position for the moonbeammelon image
+    moonbeammelon_center_x = (flamefruit_position[0] + flamefruit_image.get_width() + shimmeringapple_position[0]) // 2
+    moonbeammelon_center_y = (box_top_left[1] + box_bottom_right[1]) // 2
+    moonbeammelon_position = (
+        moonbeammelon_center_x - moonbeammelon_image.get_width() // 2,
+        moonbeammelon_center_y - moonbeammelon_image.get_height() // 2
+    )
+
+    # Adjust the position to be 10 pixels from the edges of adjacent images
+    moonbeammelon_position = (
+        flamefruit_position[0] + flamefruit_image.get_width() + 10,
+        moonbeammelon_position[1]
+    )
+    
+    screen.blit(moonbeammelon_image, moonbeammelon_position)
 
     quests = load_quests(category)
     button_height = 50
