@@ -49,10 +49,11 @@ background = load_image(background_path, (WIDTH, HEIGHT))
 category_font = pygame.font.Font(None, 60)  # Larger font for category word
 token_font = pygame.font.Font(None, 90)  # Much larger font for player token count
 
-def connect_db(db_name):
+def connect_db(db_name='save.db'):
     db_path = os.path.join(os.path.dirname(__file__), db_name)
     conn = sqlite3.connect(db_path)
     return conn
+
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
@@ -119,27 +120,41 @@ def save_inventory_data():
     logging.info("Inventory saved successfully")
 
 def load_quests(category):
-    conn = connect_db('dragonsedit.db')
+    conn = connect_db('save.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed FROM quests WHERE Category=?", (category,))
+    logging.info(f"Loading quests for category {category}")
+    cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ? AND (reset IS NULL OR reset <= date('now'))", (category,))
     quests = cursor.fetchall()
+    logging.info(f"Loaded quests: {quests}")
     conn.close()
     return quests
 
-def complete_quest(quest_id):
-    conn = connect_db('dragonsedit.db')
+
+def complete_daily_quest(quest_id):
+    conn = connect_db('save.db')
     cursor = conn.cursor()
-    cursor.execute("UPDATE quests SET completed=1 WHERE ID=?", (quest_id,))
+    logging.info(f"Completing daily quest ID {quest_id}")
+    cursor.execute("UPDATE playerquests SET completed = 1, reset = date('now', '+1 day') WHERE ID = ?", (quest_id,))
     conn.commit()
     conn.close()
 
+    
 def update_inventory(reward_str):
     rewards = reward_str.split()
     fruit, amount = rewards[1], int(rewards[0])
-    logging.info(f"Updating inventory: Adding {amount} of {fruit}")
-    inventory[fruit] += amount
-    logging.info(f"New inventory count for {fruit}: {inventory[fruit]}")
+    print(f"Updating inventory: Adding {amount} of {fruit}")
+
+    # Ensure the fruit exists in the inventory before updating
+    if fruit in inventory:
+        inventory[fruit] += amount
+        print(f"New inventory count for {fruit}: {inventory[fruit]}")
+    else:
+        inventory[fruit] = amount
+        print(f"Added new fruit {fruit} with count: {amount}")
+
+    # Save the updated inventory to the database
     save_inventory_data()
+
 
 def flag_dragon_aggressive(category):
     # Placeholder function for flagging dragon as aggressive
@@ -195,44 +210,30 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
+# Then update the game loop or where the quests are displayed to refresh the quests
 def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
-    # Adjust the position of the category title and player token count
-    category_text = category.capitalize()
-    category_pos = (WIDTH // 2 - 10, 80)
+    draw_text(screen, category.capitalize(), category_font, WHITE, (WIDTH // 2 - 50, 80))
     token_text = str(player_tokens[category])
-    token_pos = (WIDTH // 2 , 140)
+    draw_text(screen, token_text, token_font, WHITE, (WIDTH // 2 - 50, 150))
 
-    # Calculate the size of the text surfaces
-    category_surface = category_font.render(category_text, True, WHITE)
-    token_surface = token_font.render(token_text, True, WHITE)
+    box_width, box_height = category_font.size(category.capitalize())
+    s = pygame.Surface((box_width + 20, box_height + 10))
+    s.set_alpha(128)
+    s.fill((0, 0, 0))
+    screen.blit(s, (WIDTH // 2 - 60, 70))
 
-    # Create the semi-transparent boxes
-    category_box = pygame.Rect(category_pos[0] - 10, category_pos[1] - 10, category_surface.get_width() + 20, category_surface.get_height() + 20)
-    token_box = pygame.Rect(token_pos[0] - 10, token_pos[1] - 10, token_surface.get_width() + 20, token_surface.get_height() + 20)
+    box_width, box_height = token_font.size(token_text)
+    s = pygame.Surface((box_width + 20, box_height + 10))
+    s.set_alpha(128)
+    s.fill((0, 0, 0))
+    screen.blit(s, (WIDTH // 2 - 60, 140))
 
-    # Draw the semi-transparent boxes
-    s1 = pygame.Surface((category_box.width, category_box.height))
-    s1.set_alpha(128)  # Alpha level
-    s1.fill((0, 0, 0))  # Fill the surface with color
-    screen.blit(s1, category_box.topleft)
-
-    s2 = pygame.Surface((token_box.width, token_box.height))
-    s2.set_alpha(128)  # Alpha level
-    s2.fill((0, 0, 0))  # Fill the surface with color
-    screen.blit(s2, token_box.topleft)
-
-    # Draw the text
-    draw_text(screen, category_text, category_font, WHITE, category_pos)
-    draw_text(screen, token_text, token_font, WHITE, token_pos)
-
-    # Load and display boss dragon image
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
-
-    # Check and flip boss dragon image if necessary
+    
     conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
     cursor.execute("SELECT facing_direction FROM dragons WHERE filename=?", (boss_dragon_filename,))
@@ -244,21 +245,21 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
 
     screen.blit(boss_dragon_image, (0, 0))
 
-    # Calculate and display boss stats
     boss_hp, boss_damage, boss_defense, boss_dodge = calculate_boss_stats(boss_dragon_stats)
     stats_text = f"HP: {boss_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
     draw_text(screen, stats_text, small_font, WHITE, (10, max_height + 10))
 
-    # Load and display quests
     quests = load_quests(category)
-    button_height = 50  # Fixed height for consistency
+    button_height = 50
     grid_cols = 3
     grid_rows = 4
-    total_grid_height = (HEIGHT - 100) * 0.6  # Exclude bottom 100 pixels for the inventory box
+    total_grid_height = (HEIGHT - 100) * 0.6
     total_grid_width = WIDTH
     grid_height = total_grid_height // grid_rows
     grid_width = total_grid_width // grid_cols
-    start_y = (HEIGHT - 100) * 0.4  # Start the grid at 40% of the adjusted height
+    start_y = (HEIGHT - 100) * 0.4
+
+    logging.info(f"Drawing {len(quests)} quests for category {category}")
 
     for i, quest in enumerate(quests):
         text_surface = small_font.render(quest[2], True, WHITE)
@@ -266,27 +267,24 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
         x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
         y = start_y + (i // grid_cols) * grid_height + (grid_height - button_height) // 2
         color = CATEGORY_INFO.get(quest[1], {}).get('color', BLUE)
-        if quest[5]:  # If completed
+        if quest[5]:
             color = GREY
         rect = pygame.Rect(x, y, button_width, button_height)
         draw_beveled_button(screen, rect, color, quest[2], small_font)
+        logging.info(f"Quest {quest[2]} at ({x}, {y}) with rect {rect}")
 
-    # Draw the inventory
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
-
-    # Draw back to hub button
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
-    # Draw fight button
-    fight_button_rect = pygame.Rect(WIDTH // 2 - 20, 200, 150, 50)  # Adjust position here
+    fight_button_rect = pygame.Rect(WIDTH // 2 - 75, 250, 150, 50)
     draw_beveled_button(screen, fight_button_rect, RED, "Fight!", font)
 
     draw_player_dragon_slots(player_dragons)
-
     pygame.display.flip()
 
-    return fight_button_rect  # Return the rect for fight button click handling
+    return fight_button_rect
+
 
 
 def get_random_dragon():
@@ -361,31 +359,61 @@ def handle_back_to_hub_click(mouse_x, mouse_y):
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
     return back_button_rect.collidepoint(mouse_x, mouse_y)
 
+
+def remove_and_replace_quest(quest_id, category):
+    conn = connect_db('save.db')
+    cursor = conn.cursor()
+    logging.info(f"Removing and replacing quest ID {quest_id} in category {category}")
+    # Increment the tally column
+    cursor.execute("UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
+    # Mark the quest as available
+    cursor.execute("UPDATE playerquests SET completed = 0, reset = NULL WHERE ID = ?", (quest_id,))
+    # Select a new quest from the pool of available quests
+    cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ? AND (reset IS NULL OR reset <= date('now')) ORDER BY RANDOM() LIMIT 1", (category,))
+    new_quest = cursor.fetchone()
+    logging.info(f"Selected new quest: {new_quest}")
+    conn.commit()
+    conn.close()
+    return new_quest
+
+
 def handle_quest_click(category, mouse_x, mouse_y):
+    print(f"Handling quest click for category {category} at position ({mouse_x}, {mouse_y})")
     quests = load_quests(category)
-    total_challenge_rating = 0
+    print(f"Loaded quests: {quests}")
+
     button_height = 50
     grid_cols = 3
     grid_rows = 4
-    grid_width = WIDTH // grid_cols
-    grid_height = (HEIGHT * 0.6) // grid_rows
-    margin_x = (grid_width - button_height) // 2
-    margin_y = (grid_height - button_height) // 2
+    total_grid_height = (HEIGHT - 100) * 0.6
+    total_grid_width = WIDTH
+    grid_height = total_grid_height // grid_rows
+    grid_width = total_grid_width // grid_cols
+    start_y = (HEIGHT - 100) * 0.4
 
     for i, quest in enumerate(quests):
         text_surface = small_font.render(quest[2], True, WHITE)
         button_width = text_surface.get_width() + 20
-        x = margin_x + (i % grid_cols) * (grid_width + margin_x)
-        y = HEIGHT * 0.4 + (i // grid_cols) * grid_height + margin_y
+        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
+        y = start_y + (i // grid_cols) * grid_height + (grid_height - button_height) // 2
         rect = pygame.Rect(x, y, button_width, button_height)
+
+        print(f"Checking quest '{quest[2]}' with button boundaries: top-left ({x}, {y}), size ({button_width}x{button_height})")
+
         if rect.collidepoint(mouse_x, mouse_y):
-            if not quest[5]:  # Only handle if not already completed
-                complete_quest(quest[0])
-                update_inventory(quest[4])
-                total_challenge_rating += quest[3]
-                if total_challenge_rating >= 10:
-                    flag_dragon_aggressive(category)
+            print(f"Quest '{quest[2]}' clicked!")
+            update_inventory(f"{quest[3]} {CATEGORY_INFO[category]['fruit']}")
+            additional_fruits = random.sample(list(CATEGORY_INFO.values()), k=quest[3] // 2)
+            for fruit_info in additional_fruits:
+                update_inventory(f"1 {fruit_info['fruit']}")
+            player_tokens[category] += quest[3]
+            if category == 'daily':
+                complete_daily_quest(quest[0])
+            else:
+                new_quest = remove_and_replace_quest(quest[0], category)
+                quests[i] = new_quest
             break
+
 
 # Calculate dragon stats from traits and save to stats variable
 def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
@@ -724,9 +752,10 @@ def game_loop():
     running = True
     current_screen = 'hub'
     selected_area = None
-    boss_dragon_filename = None  # Store the selected boss dragon filename
-    boss_dragon_stats = None  # Store the selected boss dragon stats
+    boss_dragon_filename = None
+    boss_dragon_stats = None
     player_dragons = initialize_player_dragons()
+    fight_button_rect = pygame.Rect(WIDTH // 2 - 75, 150, 150, 50)
 
     while running:
         for event in pygame.event.get():
@@ -734,38 +763,38 @@ def game_loop():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
+                logging.info(f"Mouse clicked at position ({mouse_x}, {mouse_y})")
                 if current_screen == 'hub':
                     for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
                         dragon_image_file = selected_dragons[i]
                         dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_image_file)
-                        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))  # Resize to fit within 150x150
+                        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
                         image_rect = dragon_image.get_rect(center=pos)
                         if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
-                            boss_dragon_filename = dragon_image_file  # Store the selected boss dragon filename
-                            primary_trait = "Mystical"  # Example primary trait for boss dragon
-                            secondary_traits = ["Distraction", "Courageous", "Fearsome"]  # Example secondary traits for boss dragon
-                            nurture_trait = None  # Example nurture trait for boss dragon, if any
+                            boss_dragon_filename = dragon_image_file
+                            primary_trait = "Mystical"
+                            secondary_traits = ["Distraction", "Courageous", "Fearsome"]
+                            nurture_trait = None
                             boss_dragon_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)  # Apply both trait and tier bonuses
+                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
                             current_screen = 'area'
                             break
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
+                    elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
+                        if player_tokens[selected_area] >= 10:
+                            player_tokens[selected_area] -= 10
+                            combat(player_dragons, boss_dragon_stats)
                     else:
                         handle_quest_click(selected_area, mouse_x, mouse_y)
-                        handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)  # Ensure this is only called in the 'area' screen
-                        fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)
-                        if fight_button_rect.collidepoint(mouse_x, mouse_y):
-                            if player_tokens[selected_area] >= 10:
-                                player_tokens[selected_area] -= 10
-                                combat(player_dragons, boss_dragon_stats)
+                        handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)
+            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)
 
         pygame.display.flip()
 
@@ -775,8 +804,8 @@ def game_loop():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     initialize()
     load_inventory_data()
     game_loop()
     save_inventory_data()
-
