@@ -57,7 +57,7 @@ def connect_db(db_name='save.db'):
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
-    logging.info("Loading inventory data from save.db")
+    #logging.info("Loading inventory data from save.db")
     
     try:
         with connect_db('save.db') as conn:
@@ -69,7 +69,7 @@ def load_inventory_data():
             for row in rows:
                 fruit, count = row
                 inventory[fruit] = count
-                logging.info(f"Loaded {count} of {fruit}")
+                #logging.info(f"Loaded {count} of {fruit}")
 
             # Load eggs counts from eggs table
             cursor.execute("SELECT phenotype, COUNT(*) FROM eggs GROUP BY phenotype")
@@ -86,7 +86,7 @@ def load_inventory_data():
                 rgb = tuple(map(int, row[0][1:-1].split(', ')))
                 image_file, position = row[1], row[2]
                 inventory_slots[position - 1] = (rgb, image_file)
-                logging.info(f"Loaded elixir at position {position}")
+                #logging.info(f"Loaded elixir at position {position}")
 
     except sqlite3.Error as e:
         logging.error(f"SQLite error loading inventory data: {e}")
@@ -122,10 +122,10 @@ def save_inventory_data():
 def load_quests(category):
     conn = connect_db('save.db')
     cursor = conn.cursor()
-    logging.info(f"Loading quests for category {category}")
+    #logging.info(f"Loading quests for category {category}")
     cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ? AND (reset IS NULL OR reset <= date('now'))", (category,))
     quests = cursor.fetchall()
-    logging.info(f"Loaded quests: {quests}")
+    #logging.info(f"Loaded quests: {quests}")
     conn.close()
     return quests
 
@@ -249,6 +249,22 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     stats_text = f"HP: {boss_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
     draw_text(screen, stats_text, small_font, WHITE, (10, max_height + 10))
 
+    # Calculate the rectangle position
+    box_top_left = (WIDTH // 2 - 45, 140)
+    box_bottom_right = (WIDTH - 420, 265)
+    box_width = box_bottom_right[0] - box_top_left[0]
+    box_height = box_bottom_right[1] - box_top_left[1]
+    pygame.draw.rect(screen, WHITE, (*box_top_left, box_width, box_height), 2)
+
+    # Load and draw the fruit images
+    gleamberry_image = fruit_images_dict["gleamberry"]
+    flamefruit_image = fruit_images_dict["flamefruit"]
+
+    # Align the images within the box
+    screen.blit(gleamberry_image, box_top_left)
+    flamefruit_position = (box_top_left[0], box_top_left[1] + box_height - flamefruit_image.get_height())
+    screen.blit(flamefruit_image, flamefruit_position)
+
     quests = load_quests(category)
     button_height = 50
     grid_cols = 3
@@ -258,8 +274,6 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     grid_height = total_grid_height // grid_rows
     grid_width = total_grid_width // grid_cols
     start_y = (HEIGHT - 100) * 0.4
-
-    logging.info(f"Drawing {len(quests)} quests for category {category}")
 
     for i, quest in enumerate(quests):
         text_surface = small_font.render(quest[2], True, WHITE)
@@ -271,7 +285,6 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
             color = GREY
         rect = pygame.Rect(x, y, button_width, button_height)
         draw_beveled_button(screen, rect, color, quest[2], small_font)
-        logging.info(f"Quest {quest[2]} at ({x}, {y}) with rect {rect}")
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
@@ -281,11 +294,10 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     draw_beveled_button(screen, fight_button_rect, RED, "Fight!", font)
 
     draw_player_dragon_slots(player_dragons)
+
     pygame.display.flip()
 
     return fight_button_rect
-
-
 
 def get_random_dragon():
     conn = connect_db('dragonsedit.db')
@@ -323,7 +335,7 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
                 new_height = new_width / aspect_ratio
 
         new_size = (int(new_width), int(new_height))
-        logging.info(f"Loaded and resized image {file_path} to {new_size}")
+        #logging.info(f"Loaded and resized image {file_path} to {new_size}")
         return pygame.transform.scale(image, new_size)
     except pygame.error as e:
         logging.error(f"Error loading image {file_path}: {e}")
@@ -791,7 +803,7 @@ def game_loop():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
-                logging.info(f"Mouse clicked at position ({mouse_x}, {mouse_y})")
+                #logging.info(f"Mouse clicked at position ({mouse_x}, {mouse_y})")
                 if current_screen == 'hub':
                     for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
                         dragon_image_file = selected_dragons[i]
