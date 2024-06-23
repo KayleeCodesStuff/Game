@@ -179,14 +179,40 @@ def calculate_boss_stats(stats):
 
     return int(hp), int(damage), int(stats['defense']), int(stats['dodge'])
 
-def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons):
+def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
+    # Draw the gradient outline
+    outline_rect = rect.inflate(4, 4)
+    pygame.draw.rect(surface, gradient_colors[0], outline_rect, border_radius=10)  # Start of gradient
+    pygame.draw.rect(surface, gradient_colors[1], outline_rect, 2, border_radius=10)  # End of gradient
+
+    # Draw the button
+    pygame.draw.rect(surface, RED, rect, border_radius=10)
+    pygame.draw.rect(surface, WHITE, rect, 2, border_radius=10)  # White outline for the button
+    text_surface = font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect(center=rect.center)
+    surface.blit(text_surface, text_rect)
+
+def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons, fight_button_rect):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
-    draw_text(screen, f"Area Gameboard {category}", font, WHITE, (WIDTH // 2 - 150, 20))
+
+    # Adjust the position of the category title
+    draw_text(screen, category.capitalize(), font, WHITE, (WIDTH // 2 - 10, 80))
 
     # Load and display boss dragon image
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
+    
+    # Check and flip boss dragon image if necessary
+    conn = connect_db('dragonsedit.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT facing_direction FROM dragons WHERE filename=?", (boss_dragon_filename,))
+    facing_direction = cursor.fetchone()
+    conn.close()
+
+    if facing_direction and facing_direction[0] != "right":
+        boss_dragon_image = flip_dragon_image(boss_dragon_image, facing_direction[0], "right")
+
     screen.blit(boss_dragon_image, (0, 0))
 
     # Calculate and display boss stats
@@ -223,9 +249,14 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
+    # Draw fight button
+    fight_button_rect = pygame.Rect((WIDTH // 2-10), 200, 150, 50)  # Moved 100 pixels to the left
+    draw_beveled_button(screen, fight_button_rect, RED, "Fight!", font)
+
     draw_player_dragon_slots(player_dragons)
 
     pygame.display.flip()
+
 
 def get_random_dragon():
     conn = connect_db('dragonsedit.db')
@@ -524,7 +555,7 @@ def load_player_dragon(dragon_id):
 def display_player_dragon_selection(player_dragons):
     conn = connect_db('save.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, bonus_health, bonus_attack, bonus_defense, bonus_dodge, facing_direction FROM hatcheddragons")
+    cursor.execute("SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, facing_direction, bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons")
     rows = cursor.fetchall()
     conn.close()
     
@@ -541,22 +572,25 @@ def display_player_dragon_selection(player_dragons):
             'nurture': row[7],
             'filename': row[8],
             'special_abilities': row[9],
-            'bonus_health': row[10],
-            'bonus_attack': row[11],
-            'bonus_defense': row[12],
-            'bonus_dodge': row[13],
-            'facing_direction': row[14]
+            'facing_direction': row[10],
+            'bonus_health': row[11],
+            'bonus_attack': row[12],
+            'bonus_defense': row[13],
+            'bonus_dodge': row[14]
         }
         secondary_traits = [dragon['secondary1'], dragon['secondary2'], dragon['secondary3']]
         stats = calculate_dragon_stats(dragon['primary_trait'], secondary_traits, dragon['nurture'])
         stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon['id'])
         dragon['stats'] = stats
-        dragons.append(dragon)
+        
+        # Check if dragon is already selected for the board
+        if dragon['id'] not in [d['id'] for d in player_dragons if d is not None]:
+            dragons.append(dragon)
 
     running = True
     selected_dragon_id = None
     while running:
-        screen.fill((50, 50, 50))  # Darker background color
+        screen.fill((30, 30, 30))  # Darken the background color
         draw_text(screen, "Select a Dragon", font, WHITE, (WIDTH // 2 - 100, 20))
 
         for i, dragon in enumerate(dragons):
@@ -619,8 +653,18 @@ def draw_player_dragon_slots(player_dragons):
             max_hp = 100 + int((100 * (dragon['stats']['health'] + dragon['bonus_health'])) / 100)
             damage = 100 + int((100 * (dragon['stats']['attack'] + dragon['bonus_attack'])) / 100)
             stats_text = f"hp {max_hp} dmg {damage}"
-            draw_text(screen, stats_text, small_font, WHITE, (slot_x + 5, slot_y + slot_height - 25))
+            
+            # Create a semi-transparent black box
+            box_width, box_height = small_font.size(stats_text)
+            box_rect = pygame.Rect(slot_x + 5, slot_y + slot_height - 30, box_width + 10, box_height + 5)
+            s = pygame.Surface((box_rect.width, box_rect.height))  # the size of your rect
+            s.set_alpha(128)  # alpha level
+            s.fill((0, 0, 0))  # this fills the entire surface
+            screen.blit(s, box_rect.topleft)  # (0,0) are the top-left coordinates
 
+            draw_text(screen, stats_text, small_font, WHITE, (slot_x + 10, slot_y + slot_height - 25))
+
+            
 def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
     grid_start_x = WIDTH * 0.65
     grid_start_y = 0
@@ -639,11 +683,12 @@ def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
                 player_dragons[i] = load_player_dragon(dragon_id)
             break
 
+        
 def prompt_for_dragon_id():
     # Placeholder function to simulate getting a dragon ID from the user
     return random.randint(1, 100)  # Random ID for demonstration purposes
 
-# Main game loop update with combat integration
+
 def game_loop():
     running = True
     current_screen = 'hub'
@@ -651,6 +696,7 @@ def game_loop():
     boss_dragon_filename = None  # Store the selected boss dragon filename
     boss_dragon_stats = None  # Store the selected boss dragon stats
     player_dragons = initialize_player_dragons()
+    fight_button_rect = pygame.Rect(WIDTH // 2 - 75, 150, 150, 50)  # Define fight_button_rect outside of the draw_area_gameboard function
 
     while running:
         for event in pygame.event.get():
@@ -677,18 +723,18 @@ def game_loop():
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
-                    else:
-                        handle_quest_click(selected_area, mouse_x, mouse_y)
-                        # Check if the player has enough tokens to initiate a boss fight
+                    elif fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
                             combat(player_dragons, boss_dragon_stats)
-                handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
+                    else:
+                        handle_quest_click(selected_area, mouse_x, mouse_y)
+                        handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)  # Ensure this is only called in the 'area' screen
 
         if current_screen == 'hub':
             draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons)  # Pass the boss dragon filename, stats, and player dragons
+            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, fight_button_rect)  # Pass the fight_button_rect as a parameter
 
         pygame.display.flip()
 
@@ -701,3 +747,4 @@ if __name__ == "__main__":
     load_inventory_data()
     game_loop()
     save_inventory_data()
+
