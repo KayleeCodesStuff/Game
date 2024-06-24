@@ -285,17 +285,15 @@ def display_dragon_statistics(dragon, upgrade_dragon_rect):
     }
 
     for fruit, stat in fruit_stat_mapping.items():
-        stat_number = f"{dragon['stats'][stat]}"
+        derived_stat_value = dragon['bonus_' + stat] + dragon['stats'][stat]
         stat_text = f"{stat.capitalize()}"
         stat_pos = positions[stat]
-        draw_text(screen, stat_number, large_font, WHITE, (stat_pos[0] + 10, stat_pos[1] - 60))
+        draw_text(screen, str(derived_stat_value), large_font, WHITE, (stat_pos[0] + 10, stat_pos[1] - 60))
         draw_text(screen, stat_text, reduced_font, WHITE, (stat_pos[0], stat_pos[1] - 20))
 
     # Display current and maximum hitpoints
     hp_text = f"HP: {dragon['current_hitpoints']} / {dragon['maximum_hitpoints']:.0f}"
     draw_text(screen, hp_text, small_font, WHITE, (upgrade_dragon_rect.centerx - small_font.size(hp_text)[0] // 2, upgrade_dragon_rect.y + 10))
-
-
 
 def draw_text(surface, text, font, color, pos):
     text_surface = font.render(text, True, color)
@@ -327,6 +325,7 @@ def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
         stats[stat] += 15
 
     return stats
+
 
 def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
     if is_boss:
@@ -389,19 +388,28 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
 
     if fruit_type in inventory and inventory[fruit_type] > 0:
         stat_to_increase = fruit_to_stat[fruit_type]
-        dragon['stats'][stat_to_increase] += 1
-        inventory[fruit_type] -= 1
+        inventory[fruit_type] -= 1  # Decrease the inventory
 
+        # Update the corresponding bonus stat
         if stat_to_increase == 'health':
             dragon['bonus_health'] += 1
-        
-        # Recalculate maximum hitpoints
+        elif stat_to_increase == 'attack':
+            dragon['bonus_attack'] += 1
+        elif stat_to_increase == 'defense':
+            dragon['bonus_defense'] += 1
+        elif stat_to_increase == 'dodge':
+            dragon['bonus_dodge'] += 1
+
+        # Update current hitpoints if gleamberry is consumed, without overflowing maximum hitpoints
+        if fruit_type == 'gleamberry':
+            dragon['current_hitpoints'] = min(dragon['current_hitpoints'] + 2, dragon['maximum_hitpoints'] + 1)
+
+        # Recalculate maximum hitpoints based on the updated bonus_health
         base_hitpoints = 100 + dragon['bonus_base_hitpoints']
         dragon['maximum_hitpoints'] = base_hitpoints + (dragon['stats']['health'] + dragon['bonus_health']) / 100 * base_hitpoints
 
-        # Update current hitpoints if gleamberry is consumed, prevent overflow
-        if fruit_type == 'gleamberry':
-            dragon['current_hitpoints'] = min(dragon['current_hitpoints'] + 2, dragon['maximum_hitpoints'])
+        # Ensure current hitpoints does not exceed the new maximum hitpoints
+        dragon['current_hitpoints'] = min(dragon['current_hitpoints'], dragon['maximum_hitpoints'])
 
         # Include the hitpoints and bonus base hitpoints in the stats dictionary
         dragon['stats']['current_hitpoints'] = dragon['current_hitpoints']
@@ -411,6 +419,8 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
         update_dragon_stats_in_db(dragon['id'], dragon['stats'])
         return True
     return False
+
+
 
 def update_dragon_stats_in_db(dragon_id, stats):
     conn = connect_db('save.db')
@@ -549,6 +559,7 @@ def load_player_dragon(dragon_id):
 
         return dragon
     return None
+
 
 
 def display_player_dragon_selection(player_dragons):
