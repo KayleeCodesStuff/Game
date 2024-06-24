@@ -326,6 +326,7 @@ def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
 
 
 def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
+    print("Initial stats (before bonuses):", stats)
     if is_boss:
         tier_bonus = tier * 25
         for stat in stats:
@@ -353,8 +354,11 @@ def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
                 stats["dodge"] += row[3]
             
             conn.close()
-
+    
+    print("Final stats (after bonuses):", stats)
     return stats
+
+
 
 
 def handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons):
@@ -727,8 +731,9 @@ def game_loop():
                             primary_trait = "Mystical"
                             secondary_traits = ["Distraction", "Courageous", "Fearsome"]
                             nurture_trait = None
-                            boss_dragon_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
+                            base_boss_stats = {'health': 50, 'attack': 50, 'defense': 50, 'dodge': 50}  # Example stats
+                            boss_dragon_stats = calculate_boss_stats(base_boss_stats)
+                            boss_dragon_stats = apply_bonuses(base_boss_stats, is_boss=True, tier=1)
                             all_quests = load_quests(selected_area)
                             displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
                             current_screen = 'area'
@@ -739,7 +744,7 @@ def game_loop():
                     elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
-                            combat(player_dragons, boss_dragon_stats)
+                            start_combat(player_dragons, boss_dragon_stats)
                     else:
                         displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
@@ -768,6 +773,8 @@ def game_loop():
 
     pygame.quit()
     print("Game loop ended")
+
+
 
 if __name__ == "__main__":
     initialize()

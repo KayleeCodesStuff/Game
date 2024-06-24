@@ -4,10 +4,21 @@ def calculate_boss_stats(stats):
     base_hp = 1000
     base_damage = 100
 
-    hp = base_hp + (base_hp * stats['health'] / 100)
-    damage = base_damage + (base_damage * stats['attack'] / 100)
+    # Convert stats values to integers and print to verify
+    health = int(stats['health'])
+    attack = int(stats['attack'])
+    defense = int(stats['defense'])
+    dodge = int(stats['dodge'])
 
-    return int(hp), int(damage), int(stats['defense']), int(stats['dodge'])
+    print(f"health: {health}, attack: {attack}, defense: {defense}, dodge: {dodge}")
+
+    hp = base_hp + (base_hp * health / 100)
+    damage = base_damage + (base_damage * attack / 100)
+
+    return int(hp), int(damage), defense, dodge
+
+
+
 
 def calculate_damage(attacker_attack, defender_defense, primary_trait_match=False, secondary_traits_match=0):
     base_damage = 100 + (100 * attacker_attack / 100)
@@ -106,12 +117,13 @@ def combat(player_dragons, boss_dragon_stats):
         print("Boss wins!")
     else:
         print("Players win!")
-
+        
 def start_combat(player_dragons, boss_dragon_stats):
-    print("Starting combat...")
+    boss_hp, boss_damage, boss_defense, boss_dodge = boss_dragon_stats
+    print(f"Boss Dragon - HP: {boss_hp}, Attack: {boss_damage}, Defense: {boss_defense}, Dodge: {boss_dodge}")
     for dragon in player_dragons:
         if dragon is not None:
             print(f"{dragon['dragon_name']} - HP: {dragon['current_hitpoints']}, Attack: {dragon['stats']['attack']}, Defense: {dragon['stats']['defense']}, Dodge: {dragon['stats']['dodge']}")
     
-    print(f"Boss Dragon - HP: {boss_dragon_stats[0]}, Attack: {boss_dragon_stats[1]}, Defense: {boss_dragon_stats[2]}, Dodge: {boss_dragon_stats[3]}")
     combat(player_dragons, boss_dragon_stats)
+
