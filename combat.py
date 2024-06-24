@@ -1,3 +1,4 @@
+import random
 
 def calculate_boss_stats(stats):
     base_hp = 1000
@@ -46,13 +47,13 @@ def player_attack_boss(player_dragon, boss_dragon):
     primary_trait_match = player_dragon['primary_trait'] == boss_dragon['primary_trait']
     secondary_traits_match = trait_match_count(player_dragon['secondary_traits'], boss_dragon['secondary_traits'])
     
-    return calculate_damage(player_dragon['attack'], boss_dragon['defense'], primary_trait_match, secondary_traits_match)
+    return calculate_damage(player_dragon['stats']['attack'], boss_dragon['defense'], primary_trait_match, secondary_traits_match)
 
 def boss_attack_player(boss_dragon, player_dragon):
-    if not dodge_attack(player_dragon['dodge'], boss_dragon['dodge']):
+    if not dodge_attack(player_dragon['stats']['dodge'], boss_dragon['dodge']):
         matching_traits = trait_match_count(boss_dragon['secondary_traits'], player_dragon['secondary_traits'])
         base_damage = 100 + (100 * boss_dragon['attack'] / 100)
-        effective_damage = calculate_damage_reduction(base_damage, player_dragon['defense'], matching_traits)
+        effective_damage = calculate_damage_reduction(base_damage, player_dragon['stats']['defense'], matching_traits)
         return effective_damage
     else:
         return 0
@@ -77,19 +78,40 @@ def calculate_damage_reduction(incoming_damage, defender_defense, matching_trait
     return effective_damage
 
 def combat(player_dragons, boss_dragon_stats):
-    # Example combat function, add detailed logic as required
     boss_hp, boss_damage, boss_defense, boss_dodge = boss_dragon_stats
-    while boss_hp > 0 and any(dragon['stats']['health'] > 0 for dragon in player_dragons):
+    boss_dragon = {
+        'primary_trait': 'Boss Primary',  # Placeholder
+        'secondary_traits': ['Boss Secondary 1', 'Boss Secondary 2', 'Boss Secondary 3'],  # Placeholder
+        'attack': boss_damage,
+        'defense': boss_defense,
+        'dodge': boss_dodge
+    }
+
+    while boss_hp > 0 and any(dragon['current_hitpoints'] > 0 for dragon in player_dragons):
         for dragon in player_dragons:
-            if dragon['stats']['health'] > 0:
-                damage_to_boss = player_attack_boss(dragon, boss_dragon_stats)
+            if dragon and dragon['current_hitpoints'] > 0:
+                damage_to_boss = player_attack_boss(dragon, boss_dragon)
                 boss_hp -= damage_to_boss
+                print(f"{dragon['dragon_name']} attacks boss for {damage_to_boss} damage. Boss HP: {boss_hp}")
                 if boss_hp <= 0:
                     print("Boss defeated!")
                     return
-                damage_to_dragon = boss_attack_player(boss_dragon_stats, dragon)
-                dragon['stats']['health'] -= damage_to_dragon
-                if dragon['stats']['health'] <= 0:
-                    print(f"Dragon {dragon['id']} defeated!")
+                damage_to_dragon = boss_attack_player(boss_dragon, dragon)
+                dragon['current_hitpoints'] -= damage_to_dragon
+                print(f"Boss attacks {dragon['dragon_name']} for {damage_to_dragon} damage. {dragon['dragon_name']} HP: {dragon['current_hitpoints']}")
+                if dragon['current_hitpoints'] <= 0:
+                    print(f"{dragon['dragon_name']} defeated!")
+
     if boss_hp > 0:
         print("Boss wins!")
+    else:
+        print("Players win!")
+
+def start_combat(player_dragons, boss_dragon_stats):
+    print("Starting combat...")
+    for dragon in player_dragons:
+        if dragon is not None:
+            print(f"{dragon['dragon_name']} - HP: {dragon['current_hitpoints']}, Attack: {dragon['stats']['attack']}, Defense: {dragon['stats']['defense']}, Dodge: {dragon['stats']['dodge']}")
+    
+    print(f"Boss Dragon - HP: {boss_dragon_stats[0]}, Attack: {boss_dragon_stats[1]}, Defense: {boss_dragon_stats[2]}, Dodge: {boss_dragon_stats[3]}")
+    combat(player_dragons, boss_dragon_stats)
