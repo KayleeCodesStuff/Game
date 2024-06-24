@@ -1,17 +1,21 @@
 import sqlite3
-
-def add_facing_direction_column(db_path):
-    conn = sqlite3.connect(db_path)
+def update_database_schema():
+    conn = connect_db('save.db')
     cursor = conn.cursor()
     
-    # Add the facing_direction column to the hatcheddragons table
-    cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN facing_direction TEXT")
+    # Add new columns if they don't already exist
+    try:
+        cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN current_hitpoints INTEGER DEFAULT 100")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+    
+    try:
+        cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN bonus_base_hitpoints INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     
     conn.commit()
     conn.close()
-    print("Column facing_direction added successfully.")
 
-# Path to your database file
-db_path = 'save.db'  # Adjust the path if necessary
-
-add_facing_direction_column(db_path)
+# Call the function to update the database schema
+update_database_schema()

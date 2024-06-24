@@ -291,6 +291,11 @@ def display_dragon_statistics(dragon, upgrade_dragon_rect):
         draw_text(screen, stat_number, large_font, WHITE, (stat_pos[0] + 10, stat_pos[1] - 60))
         draw_text(screen, stat_text, reduced_font, WHITE, (stat_pos[0], stat_pos[1] - 20))
 
+    # Display current and maximum hitpoints
+    hp_text = f"HP: {dragon['current_hitpoints']} / {dragon['maximum_hitpoints']:.0f}"
+    draw_text(screen, hp_text, small_font, WHITE, (upgrade_dragon_rect.centerx - small_font.size(hp_text)[0] // 2, upgrade_dragon_rect.y + 10))
+
+
 
 def draw_text(surface, text, font, color, pos):
     text_surface = font.render(text, True, color)
@@ -389,12 +394,19 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
 
         if stat_to_increase == 'health':
             dragon['bonus_health'] += 1
-        elif stat_to_increase == 'attack':
-            dragon['bonus_attack'] += 1
-        elif stat_to_increase == 'defense':
-            dragon['bonus_defense'] += 1
-        elif stat_to_increase == 'dodge':
-            dragon['bonus_dodge'] += 1
+        
+        # Recalculate maximum hitpoints
+        base_hitpoints = 100 + dragon['bonus_base_hitpoints']
+        dragon['maximum_hitpoints'] = base_hitpoints + (dragon['stats']['health'] + dragon['bonus_health']) / 100 * base_hitpoints
+
+        # Update current hitpoints if gleamberry is consumed, prevent overflow
+        if fruit_type == 'gleamberry':
+            dragon['current_hitpoints'] = min(dragon['current_hitpoints'] + 2, dragon['maximum_hitpoints'])
+
+        # Include the hitpoints and bonus base hitpoints in the stats dictionary
+        dragon['stats']['current_hitpoints'] = dragon['current_hitpoints']
+        dragon['stats']['bonus_base_hitpoints'] = dragon['bonus_base_hitpoints']
+        dragon['stats']['maximum_hitpoints'] = dragon['maximum_hitpoints']
 
         update_dragon_stats_in_db(dragon['id'], dragon['stats'])
         return True
@@ -405,9 +417,9 @@ def update_dragon_stats_in_db(dragon_id, stats):
     cursor = conn.cursor()
     cursor.execute("""
         UPDATE hatcheddragons 
-        SET bonus_health = ?, bonus_attack = ?, bonus_defense = ?, bonus_dodge = ? 
+        SET bonus_health = ?, bonus_attack = ?, bonus_defense = ?, bonus_dodge = ?, current_hitpoints = ?, bonus_base_hitpoints = ?
         WHERE id = ?
-    """, (stats['health'], stats['attack'], stats['defense'], stats['dodge'], dragon_id))
+    """, (stats['health'], stats['attack'], stats['defense'], stats['dodge'], stats['current_hitpoints'], stats['bonus_base_hitpoints'], dragon_id))
     conn.commit()
     conn.close()
 
@@ -494,7 +506,11 @@ def initialize_player_dragons():
 def load_player_dragon(dragon_id):
     conn = connect_db('save.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, facing_direction, bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
+    cursor.execute("""
+        SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, facing_direction, bonus_health, bonus_attack, bonus_defense, bonus_dodge, current_hitpoints, bonus_base_hitpoints
+        FROM hatcheddragons
+        WHERE id=?
+    """, (dragon_id,))
     row = cursor.fetchone()
     conn.close()
     if row:
@@ -513,14 +529,27 @@ def load_player_dragon(dragon_id):
             'bonus_health': row[11],
             'bonus_attack': row[12],
             'bonus_defense': row[13],
-            'bonus_dodge': row[14]
+            'bonus_dodge': row[14],
+            'current_hitpoints': row[15],
+            'bonus_base_hitpoints': row[16]
         }
         secondary_traits = [dragon['secondary1'], dragon['secondary2'], dragon['secondary3']]
         stats = calculate_dragon_stats(dragon['primary_trait'], secondary_traits, dragon['nurture'])
-        stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon_id)
+        stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon['id'])
         dragon['stats'] = stats
+        
+        # Calculate hitpoints
+        base_hitpoints = 100 + dragon['bonus_base_hitpoints']
+        dragon['maximum_hitpoints'] = base_hitpoints + (stats['health'] + dragon['bonus_health']) / 100 * base_hitpoints
+        dragon['base_hitpoints'] = base_hitpoints
+
+        # Initialize current hitpoints
+        if dragon['current_hitpoints'] == 0:
+            dragon['current_hitpoints'] = dragon['maximum_hitpoints']
+
         return dragon
     return None
+
 
 def display_player_dragon_selection(player_dragons):
     conn = connect_db('save.db')
@@ -651,6 +680,7 @@ def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
 
 def prompt_for_dragon_id():
     return random.randint(1, 100)
+
 
 def game_loop():
     running = True
