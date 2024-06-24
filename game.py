@@ -74,10 +74,10 @@ fruit_images_dict = {
 }
 
 egg_images_dict = {
-    "black": load_image("black_egg.png", (50, 50)),
-    "white": load_image("white_egg.png", (50, 50)),
-    "rainbow": load_image("rainbow_egg.png", (50, 50)),
-    "metallic": load_image("metallic_egg.png", (50, 50))
+    "black": load_image("black_egg.png", (65, 65)),
+    "white": load_image("white_egg.png", (65, 65)),
+    "rainbow": load_image("rainbow_egg.png", (65, 65)),
+    "metallic": load_image("metallic_egg.png", (65, 65))
 }
 
 # Initialize inventory and egg counts
@@ -236,7 +236,7 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         egg_image = egg_images_dict[egg_type]
         surface.blit(egg_image, (x_offset, y_offset))
         draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
-        x_offset += 60
+        x_offset += 70
 
     # Draw the elixirs in the third section
     x_offset = WIDTH - 60 * len(inventory_slots)

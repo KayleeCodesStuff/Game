@@ -125,21 +125,15 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
+    # Create one big semitransparent box covering the top 40% of the screen
+    big_box = pygame.Surface((WIDTH, int(HEIGHT * 0.4)))
+    big_box.set_alpha(128)
+    big_box.fill((0, 0, 0))
+    screen.blit(big_box, (0, 0))
+
     draw_text(screen, category.capitalize(), category_font, WHITE, (WIDTH // 2 - 20, 10))
     token_text = str(player_tokens[category])
     draw_text(screen, token_text, token_font, WHITE, (WIDTH // 2 + 50, 75))
-
-    box_width, box_height = category_font.size(category.capitalize())
-    s = pygame.Surface((box_width + 10, box_height + 10))
-    s.set_alpha(128)
-    s.fill((0, 0, 0))
-    screen.blit(s, (WIDTH // 2 - 25, 5))
-
-    box_width, box_height = token_font.size(token_text)
-    s = pygame.Surface((box_width + 20, box_height + 10))
-    s.set_alpha(128)
-    s.fill((0, 0, 0))
-    screen.blit(s, (WIDTH // 2 + 40, 65))
 
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
@@ -157,13 +151,6 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
 
     boss_hp, boss_damage, boss_defense, boss_dodge = calculate_boss_stats(boss_dragon_stats)
     stats_text = f"HP: {boss_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
-    
-    stats_box_width, stats_box_height = small_font.size(stats_text)
-    stats_box_surface = pygame.Surface((stats_box_width + 20, stats_box_height + 10))
-    stats_box_surface.set_alpha(128)
-    stats_box_surface.fill((0, 0, 0))
-    screen.blit(stats_box_surface, (10, max_height + 10))
-
     draw_text(screen, stats_text, small_font, WHITE, (20, max_height + 15))
 
     box_top_left = (WIDTH // 2 - 45, 140)
@@ -173,11 +160,11 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     button_height = 50
     grid_cols = 3
     grid_rows = 4
-    total_grid_height = (HEIGHT - 100) * 0.6
+    total_grid_height = (HEIGHT - 100) * 0.6 - 20  # Reduce total height slightly to squeeze rows closer together
     total_grid_width = WIDTH
     grid_height = total_grid_height // grid_rows
     grid_width = total_grid_width // grid_cols
-    start_y = (HEIGHT - 100) * 0.4
+    start_y = (HEIGHT - 100) * 0.45
 
     for i, quest in enumerate(quests):
         text_surface = small_font.render(quest[2], True, WHITE)
@@ -191,10 +178,10 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
         draw_beveled_button(screen, rect, color, quest[2], small_font)
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
-    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
 
-    fight_button_rect = pygame.Rect(WIDTH // 2 - 10, 265, 150, 50)
+    fight_button_rect = pygame.Rect(WIDTH // 2 - 10, 285, 150, 50)
     draw_beveled_button(screen, fight_button_rect, RED, "Fight!", small_font)
 
     draw_player_dragon_slots(player_dragons)
@@ -265,7 +252,7 @@ def draw_hub_gameboard():
     pygame.display.flip()
 
 def handle_back_to_hub_click(mouse_x, mouse_y):
-    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 150, 150, 50)
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
     return back_button_rect.collidepoint(mouse_x, mouse_y)
 
 def remove_and_replace_quest(quest_id, category, displayed_quests):
@@ -312,7 +299,7 @@ def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
     total_grid_width = WIDTH
     grid_height = total_grid_height // grid_rows
     grid_width = total_grid_width // grid_cols
-    start_y = (HEIGHT - 100) * 0.4
+    start_y = (HEIGHT - 100) * 0.45
 
     # Only handle clicks within the quest button area
     if mouse_y < start_y or mouse_y > start_y + grid_rows * grid_height:
