@@ -211,7 +211,7 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
                 new_width = new_height * aspect_ratio
         else:
             new_height = max_size[1]
-            new_width = new_height * aspect_ratio
+            new_width = new_height / aspect_ratio
             if new_width > max_size[0]:
                 new_width = max_size[0]
                 new_height = new_width / aspect_ratio
@@ -243,16 +243,15 @@ def draw_hub_gameboard():
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
-    # Increase the height of the Upgrade Dragon rectangle
-    upgrade_dragon_rect = pygame.Rect(WIDTH // 3, HEIGHT - 300, WIDTH // 3, 200)  # Adjusted height
+    upgrade_dragon_rect = pygame.Rect(WIDTH // 3, HEIGHT - 300, WIDTH // 3, 200)
     draw_beveled_button(screen, upgrade_dragon_rect, LIGHT_GREY, "Upgrade Dragon", small_font)
 
-    # Display selected dragon's statistics
     if selected_dragon_for_upgrade:
         display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
 
     pygame.display.flip()
     return upgrade_dragon_rect
+
 
 def display_dragon_statistics(dragon, upgrade_dragon_rect):
     name = dragon['petname'] if dragon['petname'] else dragon['dragon_name']
@@ -400,9 +399,15 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
         elif stat_to_increase == 'dodge':
             dragon['bonus_dodge'] += 1
 
+        # Cap stats at 100
+        dragon['bonus_health'] = min(dragon['bonus_health'], 100)
+        dragon['bonus_attack'] = min(dragon['bonus_attack'], 100)
+        dragon['bonus_defense'] = min(dragon['bonus_defense'], 100)
+        dragon['bonus_dodge'] = min(dragon['bonus_dodge'], 100)
+
         # Update current hitpoints if gleamberry is consumed, without overflowing maximum hitpoints
         if fruit_type == 'gleamberry':
-            dragon['current_hitpoints'] = min(dragon['current_hitpoints'] + 2, dragon['maximum_hitpoints'] + 1)
+            dragon['current_hitpoints'] = min(dragon['current_hitpoints'] + 2, dragon['maximum_hitpoints'])
 
         # Recalculate maximum hitpoints based on the updated bonus_health
         base_hitpoints = 100 + dragon['bonus_base_hitpoints']
@@ -420,9 +425,12 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
         return True
     return False
 
-
-
 def update_dragon_stats_in_db(dragon_id, stats):
+    stats['health'] = min(stats['health'], 100)
+    stats['attack'] = min(stats['attack'], 100)
+    stats['defense'] = min(stats['defense'], 100)
+    stats['dodge'] = min(stats['dodge'], 100)
+    
     conn = connect_db('save.db')
     cursor = conn.cursor()
     cursor.execute("""
@@ -432,7 +440,6 @@ def update_dragon_stats_in_db(dragon_id, stats):
     """, (stats['health'], stats['attack'], stats['defense'], stats['dodge'], stats['current_hitpoints'], stats['bonus_base_hitpoints'], dragon_id))
     conn.commit()
     conn.close()
-
 
 def remove_and_replace_quest(quest_id, category, displayed_quests):
     conn = sqlite3.connect('save.db')
@@ -546,6 +553,13 @@ def load_player_dragon(dragon_id):
         secondary_traits = [dragon['secondary1'], dragon['secondary2'], dragon['secondary3']]
         stats = calculate_dragon_stats(dragon['primary_trait'], secondary_traits, dragon['nurture'])
         stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon['id'])
+        
+        # Cap stats at 100
+        stats['health'] = min(stats['health'], 100)
+        stats['attack'] = min(stats['attack'], 100)
+        stats['defense'] = min(stats['defense'], 100)
+        stats['dodge'] = min(stats['dodge'], 100)
+        
         dragon['stats'] = stats
         
         # Calculate hitpoints
@@ -559,8 +573,6 @@ def load_player_dragon(dragon_id):
 
         return dragon
     return None
-
-
 
 def display_player_dragon_selection(player_dragons):
     conn = connect_db('save.db')
@@ -591,6 +603,13 @@ def display_player_dragon_selection(player_dragons):
         secondary_traits = [dragon['secondary1'], dragon['secondary2'], dragon['secondary3']]
         stats = calculate_dragon_stats(dragon['primary_trait'], secondary_traits, dragon['nurture'])
         stats = apply_bonuses(stats, is_boss=False, dragon_id=dragon['id'])
+        
+        # Cap stats at 100
+        stats['health'] = min(stats['health'], 100)
+        stats['attack'] = min(stats['attack'], 100)
+        stats['defense'] = min(stats['defense'], 100)
+        stats['dodge'] = min(stats['dodge'], 100)
+        
         dragon['stats'] = stats
         
         if dragon['id'] not in [d['id'] for d in player_dragons if d is not None]:
@@ -692,6 +711,9 @@ def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
 def prompt_for_dragon_id():
     return random.randint(1, 100)
 
+def handle_back_to_hub_click(mouse_x, mouse_y):
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
+    return back_button_rect.collidepoint(mouse_x, mouse_y)
 
 def game_loop():
     running = True
@@ -701,8 +723,7 @@ def game_loop():
     boss_dragon_stats = None
     player_dragons = initialize_player_dragons()
     displayed_quests = []  # Initialize an empty list for displayed quests
-    global selected_dragon_for_upgrade
-    
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -710,9 +731,30 @@ def game_loop():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if current_screen == 'hub':
-                    upgrade_dragon_rect = draw_hub_gameboard()
-                    if not handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrade):
+                    upgrade_dragon_rect = draw_hub_gameboard()  # Ensure this function returns the rect for the upgrade button
+                    if upgrade_dragon_rect.collidepoint(mouse_x, mouse_y):
                         selected_dragon_for_upgrade = handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
+                        if selected_dragon_for_upgrade:
+                            display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+                    # Other hub interactions...
+                    else:
+                        for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
+                            dragon_image_file = selected_dragons[i]
+                            dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_image_file)
+                            dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
+                            image_rect = dragon_image.get_rect(center=pos)
+                            if image_rect.collidepoint(mouse_x, mouse_y):
+                                selected_area = list(CATEGORY_INFO.keys())[i]
+                                boss_dragon_filename = dragon_image_file
+                                primary_trait = "Mystical"
+                                secondary_traits = ["Distraction", "Courageous", "Fearsome"]
+                                nurture_trait = None
+                                boss_dragon_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
+                                boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
+                                all_quests = load_quests(selected_area)
+                                displayed_quests = random.sample(all_quests, min(12, len(all_quests)))  # Randomly select 12 quests or fewer if there are less than 12
+                                current_screen = 'area'
+                                break
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
@@ -725,22 +767,9 @@ def game_loop():
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
                         if quests_updated:
                             draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
-            
-            elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
-                if event.key == pygame.K_1:
-                    spend_fruit_and_update_stats('gleamberry', selected_dragon_for_upgrade)
-                elif event.key == pygame.K_2:
-                    spend_fruit_and_update_stats('flamefruit', selected_dragon_for_upgrade)
-                elif event.key == pygame.K_3:
-                    spend_fruit_and_update_stats('shimmeringapple', selected_dragon_for_upgrade)
-                elif event.key == pygame.K_4:
-                    spend_fruit_and_update_stats('etherealpear', selected_dragon_for_upgrade)
-                elif event.key == pygame.K_5:
-                    spend_fruit_and_update_stats('moonbeammelon', selected_dragon_for_upgrade)
-                draw_hub_gameboard()
 
         if current_screen == 'hub':
-            upgrade_dragon_rect = draw_hub_gameboard()
+            draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
             fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
 
