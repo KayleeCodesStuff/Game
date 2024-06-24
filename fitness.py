@@ -4,6 +4,7 @@ import logging
 import os
 import random
 from game import *
+import combat
 
 # Initialize the game
 initialize()
