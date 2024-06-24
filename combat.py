@@ -1,3 +1,4 @@
+
 def calculate_boss_stats(stats):
     base_hp = 1000
     base_damage = 100

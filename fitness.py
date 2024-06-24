@@ -51,6 +51,8 @@ category_font = pygame.font.Font(None, 60)  # Larger font for category word
 token_font = pygame.font.Font(None, 90)  # Much larger font for player token count
 small_font = pygame.font.Font(None, 36)  # Smaller font for button text
 
+selected_dragon_for_upgrade = None  # Global variable to store the selected dragon
+
 def connect_db(db_name='save.db'):
     db_path = os.path.join(os.path.dirname(__file__), db_name)
     conn = sqlite3.connect(db_path)
@@ -71,8 +73,6 @@ def complete_daily_quest(quest_id):
     cursor.execute("UPDATE playerquests SET completed = 1, reset = date('now', '+1 day') WHERE ID = ?", (quest_id,))
     conn.commit()
     conn.close()
-
-
 
 def flag_dragon_aggressive(category):
     print(f"Category {category} is now aggressive!")
@@ -101,7 +101,6 @@ def load_boss_dragon_image(dragon_filename, max_height):
         logging.error(f"Error loading boss dragon image {dragon_image_path}: {e}")
         print(f"Error loading boss dragon image {dragon_image_path}: {e}")
         return pygame.Surface((max_height * aspect_ratio, max_height))  # Return a blank surface as a placeholder
-
 
 def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     outline_rect = rect.inflate(4, 4)
@@ -225,6 +224,7 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
         return pygame.Surface(max_size)
 
 def draw_hub_gameboard():
+    global selected_dragon_for_upgrade
     screen.fill(GREY)
     screen.blit(background, (0, 0))
     draw_text(screen, "Hub Gameboard", category_font, WHITE, (WIDTH // 2 - 100, 20))
@@ -242,87 +242,60 @@ def draw_hub_gameboard():
         draw_text(screen, f"Dragon {i+1}", small_font, WHITE, (pos[0] - 30, pos[1] + 60))
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
+
+    # Increase the height of the Upgrade Dragon rectangle
+    upgrade_dragon_rect = pygame.Rect(WIDTH // 3, HEIGHT - 300, WIDTH // 3, 200)  # Adjusted height
+    draw_beveled_button(screen, upgrade_dragon_rect, LIGHT_GREY, "Upgrade Dragon", small_font)
+
+    # Display selected dragon's statistics
+    if selected_dragon_for_upgrade:
+        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+
     pygame.display.flip()
+    return upgrade_dragon_rect
 
-def handle_back_to_hub_click(mouse_x, mouse_y):
-    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
-    return back_button_rect.collidepoint(mouse_x, mouse_y)
+def display_dragon_statistics(dragon, upgrade_dragon_rect):
+    name = dragon['petname'] if dragon['petname'] else dragon['dragon_name']
+    draw_text(screen, name, small_font, WHITE, (upgrade_dragon_rect.centerx - small_font.size(name)[0] // 2, upgrade_dragon_rect.y - 30))
 
-def remove_and_replace_quest(quest_id, category, displayed_quests):
-    conn = sqlite3.connect('save.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
-        cursor.execute("UPDATE playerquests SET completed = 0, reset = NULL WHERE ID = ?", (quest_id,))
-        
-        displayed_quest_ids = set(q[0] for q in displayed_quests)
-        displayed_quest_descriptions = set(q[2] for q in displayed_quests)
-        
-        cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ?", (category,))
-        all_cleaning_quests = cursor.fetchall()
-        
-        available_quests = [
-            quest for quest in all_cleaning_quests 
-            if quest[0] not in displayed_quest_ids and quest[2] not in displayed_quest_descriptions and quest[0] != quest_id
-        ]
-        
-        if not available_quests:
-            # Fallback to the original quest
-            new_quest = next((q for q in all_cleaning_quests if q[0] == quest_id), None)
-        else:
-            new_quest = random.choice(available_quests)
-        
-        conn.commit()
-    except sqlite3.Error as e:
-        new_quest = None
-    except Exception as e:
-        new_quest = None
-    finally:
-        conn.close()
-    
-    return new_quest
+    # Display dragon image within the upgrade rectangle
+    image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon['filename'])
+    dragon_image = load_and_resize_image_keeping_aspect(image_path, (upgrade_dragon_rect.width, upgrade_dragon_rect.height))
+    image_rect = dragon_image.get_rect(center=upgrade_dragon_rect.center)
+    screen.blit(dragon_image, image_rect.topleft)
+
+    # Display stats above corresponding fruits
+    fruit_stat_mapping = {
+        'gleamberry': 'health',
+        'flamefruit': 'attack',
+        'shimmeringapple': 'defense',
+        'etherealpear': 'dodge',
+        # Add moonbeammelon later if needed
+    }
+
+    reduced_font = pygame.font.Font(None, 24)  # Reduced font size for stat labels
+    large_font = pygame.font.Font(None, 48)  # Larger font size for stat numbers
+
+    # Define positions for the stats
+    positions = {
+        'health': (5, HEIGHT - 110),
+        'attack': (65, HEIGHT - 110),
+        'defense': (125, HEIGHT - 110),
+        'dodge': (200, HEIGHT - 110)
+    }
+
+    for fruit, stat in fruit_stat_mapping.items():
+        stat_number = f"{dragon['stats'][stat]}"
+        stat_text = f"{stat.capitalize()}"
+        stat_pos = positions[stat]
+        draw_text(screen, stat_number, large_font, WHITE, (stat_pos[0] + 10, stat_pos[1] - 60))
+        draw_text(screen, stat_text, reduced_font, WHITE, (stat_pos[0], stat_pos[1] - 20))
 
 
-def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
-    quests_updated = False  # Flag to track if quests were updated
-    button_height = 50
-    grid_cols = 3
-    grid_rows = 4
-    total_grid_height = (HEIGHT - 100) * 0.6
-    total_grid_width = WIDTH
-    grid_height = total_grid_height // grid_rows
-    grid_width = total_grid_width // grid_cols
-    start_y = (HEIGHT - 100) * 0.45
+def draw_text(surface, text, font, color, pos):
+    text_surface = font.render(text, True, color)
+    surface.blit(text_surface, pos)
 
-    # Only handle clicks within the quest button area
-    if mouse_y < start_y or mouse_y > start_y + grid_rows * grid_height:
-        return displayed_quests, quests_updated
-
-    for i, quest in enumerate(displayed_quests):
-        text_surface = small_font.render(quest[2], True, WHITE)
-        button_width = text_surface.get_width() + 20
-        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
-        y = start_y + (i // grid_cols) * grid_height + (grid_height - button_height) // 2
-        rect = pygame.Rect(x, y, button_width, button_height)
-
-        if rect.collidepoint(mouse_x, mouse_y):
-            print(f"Quest '{quest[2]}' clicked!")
-            update_inventory(f"{quest[3]} {CATEGORY_INFO[category]['fruit']}")
-            additional_fruits = random.sample(list(CATEGORY_INFO.values()), k=quest[3] // 2)
-            for fruit_info in additional_fruits:
-                update_inventory(f"1 {fruit_info['fruit']}")
-            player_tokens[category] += quest[3]
-            if category == 'daily':
-                complete_daily_quest(quest[0])
-            else:
-                new_quest = remove_and_replace_quest(quest[0], category, displayed_quests)
-                if new_quest:
-                    displayed_quests[i] = new_quest
-                    quests_updated = True  # Set the flag to True when quests are updated
-                else:
-                    print(f"Failed to replace quest {quest[0]}")
-            break
-    return displayed_quests, quests_updated
 
 def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
     stats = {
@@ -382,6 +355,106 @@ def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
     return stats
 
 
+def handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons):
+    if upgrade_dragon_rect.collidepoint(mouse_x, mouse_y):
+        dragon_id = display_player_dragon_selection(player_dragons)
+        if dragon_id:
+            return load_player_dragon(dragon_id)
+    return None
+
+def spend_fruit_and_update_stats(fruit_type, dragon):
+    if fruit_type in CATEGORY_INFO:
+        trait = CATEGORY_INFO[fruit_type]['fruit']
+        if trait in fruit_traits_with_stats:
+            stat_to_increase = fruit_traits_with_stats[trait]
+            dragon['stats'][stat_to_increase] = min(dragon['stats'][stat_to_increase] + 1, 100)
+            update_dragon_stats_in_db(dragon['id'], dragon['stats'])
+
+def update_dragon_stats_in_db(dragon_id, stats):
+    conn = connect_db('save.db')
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE hatcheddragons 
+        SET bonus_health = ?, bonus_attack = ?, bonus_defense = ?, bonus_dodge = ? 
+        WHERE id = ?
+    """, (stats['health'], stats['attack'], stats['defense'], stats['dodge'], dragon_id))
+    conn.commit()
+    conn.close()
+
+def remove_and_replace_quest(quest_id, category, displayed_quests):
+    conn = sqlite3.connect('save.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute("UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
+        cursor.execute("UPDATE playerquests SET completed = 0, reset = NULL WHERE ID = ?", (quest_id,))
+        
+        displayed_quest_ids = set(q[0] for q in displayed_quests)
+        displayed_quest_descriptions = set(q[2] for q in displayed_quests)
+        
+        cursor.execute("SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ?", (category,))
+        all_cleaning_quests = cursor.fetchall()
+        
+        available_quests = [
+            quest for quest in all_cleaning_quests 
+            if quest[0] not in displayed_quest_ids and quest[2] not in displayed_quest_descriptions and quest[0] != quest_id
+        ]
+        
+        if not available_quests:
+            # Fallback to the original quest
+            new_quest = next((q for q in all_cleaning_quests if q[0] == quest_id), None)
+        else:
+            new_quest = random.choice(available_quests)
+        
+        conn.commit()
+    except sqlite3.Error as e:
+        new_quest = None
+    except Exception as e:
+        new_quest = None
+    finally:
+        conn.close()
+    
+    return new_quest
+
+def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
+    quests_updated = False  # Flag to track if quests were updated
+    button_height = 50
+    grid_cols = 3
+    grid_rows = 4
+    total_grid_height = (HEIGHT - 100) * 0.6
+    total_grid_width = WIDTH
+    grid_height = total_grid_height // grid_rows
+    grid_width = total_grid_width // grid_cols
+    start_y = (HEIGHT - 100) * 0.45
+
+    # Only handle clicks within the quest button area
+    if mouse_y < start_y or mouse_y > start_y + grid_rows * grid_height:
+        return displayed_quests, quests_updated
+
+    for i, quest in enumerate(displayed_quests):
+        text_surface = small_font.render(quest[2], True, WHITE)
+        button_width = text_surface.get_width() + 20
+        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
+        y = start_y + (i // grid_cols) * grid_height + (grid_height - button_height) // 2
+        rect = pygame.Rect(x, y, button_width, button_height)
+
+        if rect.collidepoint(mouse_x, mouse_y):
+            print(f"Quest '{quest[2]}' clicked!")
+            update_inventory(f"{quest[3]} {CATEGORY_INFO[category]['fruit']}")
+            additional_fruits = random.sample(list(CATEGORY_INFO.values()), k=quest[3] // 2)
+            for fruit_info in additional_fruits:
+                update_inventory(f"1 {fruit_info['fruit']}")
+            player_tokens[category] += quest[3]
+            if category == 'daily':
+                complete_daily_quest(quest[0])
+            else:
+                new_quest = remove_and_replace_quest(quest[0], category, displayed_quests)
+                if new_quest:
+                    displayed_quests[i] = new_quest
+                    quests_updated = True  # Set the flag to True when quests are updated
+                else:
+                    print(f"Failed to replace quest {quest[0]}")
+            break
+    return displayed_quests, quests_updated
 
 def initialize_player_dragons():
     player_dragons = [None] * 9
@@ -489,7 +562,7 @@ def flip_dragon_image(image, facing_direction, target_direction):
         return image
     else:
         return pygame.transform.flip(image, True, False)
-    
+
 def draw_player_dragon_slots(player_dragons):
     grid_start_x = WIDTH * 0.65
     grid_start_y = 0
@@ -556,6 +629,7 @@ def game_loop():
     boss_dragon_stats = None
     player_dragons = initialize_player_dragons()
     displayed_quests = []  # Initialize an empty list for displayed quests
+    global selected_dragon_for_upgrade
     
     while running:
         for event in pygame.event.get():
@@ -564,24 +638,8 @@ def game_loop():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if current_screen == 'hub':
-                    for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
-                        dragon_image_file = selected_dragons[i]
-                        dragon_image_path = os.path.join(os.path.dirname(__file__), "dragons", dragon_image_file)
-                        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
-                        image_rect = dragon_image.get_rect(center=pos)
-                        if image_rect.collidepoint(mouse_x, mouse_y):
-                            selected_area = list(CATEGORY_INFO.keys())[i]
-                            boss_dragon_filename = dragon_image_file
-                            primary_trait = "Mystical"
-                            secondary_traits = ["Distraction", "Courageous", "Fearsome"]
-                            nurture_trait = None
-                            boss_dragon_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-                            boss_dragon_stats = apply_bonuses(boss_dragon_stats, is_boss=True, tier=1)
-                            all_quests = load_quests(selected_area)
-                            displayed_quests = random.sample(all_quests, min(12, len(all_quests)))  # Randomly select 12 quests or fewer if there are less than 12
-                            #print(f"Switched to area screen: {selected_area}, Loaded quests: {displayed_quests}")
-                            current_screen = 'area'
-                            break
+                    upgrade_dragon_rect = draw_hub_gameboard()
+                    selected_dragon_for_upgrade = handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
                 elif current_screen == 'area':
                     if handle_back_to_hub_click(mouse_x, mouse_y):
                         current_screen = 'hub'
@@ -595,10 +653,10 @@ def game_loop():
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
                         if quests_updated:
                             #print(f"Updated quests: {displayed_quests}")
-                            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)  # Redraw gameboard with updated quests
+                            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
 
         if current_screen == 'hub':
-            draw_hub_gameboard()
+            upgrade_dragon_rect = draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
             fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
 
