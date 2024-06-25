@@ -1,6 +1,9 @@
 import random
 import sqlite3
 import os
+import time
+
+import pygame
 
 # Primary traits with their associated main and off stats
 primary_traits_with_stats = {
@@ -447,30 +450,9 @@ def calculate_damage_reduction(incoming_damage, defender_defense, matching_trait
 
 
 
-def combat(player_dragons, boss_dragon):
-    while boss_dragon.current_hitpoints > 0 and any(dragon is not None and dragon['current_hitpoints'] > 0 for dragon in player_dragons):
-        for dragon in player_dragons:
-            if dragon and dragon['current_hitpoints'] > 0:
-                damage_to_boss = player_attack_boss(dragon, boss_dragon)
-                boss_dragon.current_hitpoints -= damage_to_boss
-                print(f"{dragon['dragon_name']} attacks boss for {damage_to_boss} damage. Boss HP: {boss_dragon.current_hitpoints}")
-                if boss_dragon.current_hitpoints <= 0:
-                    print("Boss defeated!")
-                    return
-                damage_to_dragon = boss_attack_player(boss_dragon, dragon)
-                dragon['current_hitpoints'] -= damage_to_dragon
-                print(f"Boss attacks {dragon['dragon_name']} for {damage_to_dragon} damage. {dragon['dragon_name']} HP: {dragon['current_hitpoints']}")
-                if dragon['current_hitpoints'] <= 0:
-                    print(f"{dragon['dragon_name']} defeated!")
-
-    if boss_dragon.current_hitpoints > 0:
-        print("Boss wins!")
-    else:
-        print("Players win!")
-
-def start_combat(player_dragons, boss_dragon_stats):
+def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_filename):
     boss_hp, boss_damage, boss_defense, boss_dodge = boss_dragon_stats
-    boss_dragon = BossDragon(filename=None)  # Initialize with proper attributes
+    boss_dragon = BossDragon(filename=boss_dragon_filename)  # Initialize with proper attributes
     boss_dragon.stats = {
         'health': boss_hp,
         'attack': boss_damage,
@@ -489,5 +471,32 @@ def start_combat(player_dragons, boss_dragon_stats):
         print("Error: At least one player dragon must be initialized for combat.")
         return
 
-    combat(player_dragons, boss_dragon)
+    combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_stats)
+
+def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_stats):
+    while boss_dragon.current_hitpoints > 0 and any(dragon is not None and dragon['current_hitpoints'] > 0 for dragon in player_dragons):
+        for dragon in player_dragons:
+            if dragon and dragon['current_hitpoints'] > 0:
+                damage_to_boss = round(player_attack_boss(dragon, boss_dragon))
+                boss_dragon.current_hitpoints = round(boss_dragon.current_hitpoints - damage_to_boss, 2)
+                print(f"{dragon['dragon_name']} attacks boss for {damage_to_boss} damage. Boss HP: {boss_dragon.current_hitpoints}")
+                draw_area_gameboard(selected_area, boss_dragon.filename, player_dragons, displayed_quests, boss_dragon_stats)
+                pygame.display.flip()
+                time.sleep(0.5)
+                if boss_dragon.current_hitpoints <= 0:
+                    print("Boss defeated!")
+                    return
+                damage_to_dragon = round(boss_attack_player(boss_dragon, dragon))
+                dragon['current_hitpoints'] = round(dragon['current_hitpoints'] - damage_to_dragon, 2)
+                print(f"Boss attacks {dragon['dragon_name']} for {damage_to_dragon} damage. {dragon['dragon_name']} HP: {dragon['current_hitpoints']}")
+                draw_area_gameboard(selected_area, boss_dragon.filename, player_dragons, displayed_quests, boss_dragon_stats)
+                pygame.display.flip()
+                time.sleep(0.5)
+                if dragon['current_hitpoints'] <= 0:
+                    print(f"{dragon['dragon_name']} defeated!")
+
+    if boss_dragon.current_hitpoints > 0:
+        print("Boss wins!")
+    else:
+        print("Players win!")
 

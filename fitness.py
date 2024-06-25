@@ -639,7 +639,6 @@ def handle_back_to_hub_click(mouse_x, mouse_y):
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
     return back_button_rect.collidepoint(mouse_x, mouse_y)
 
-
 def game_loop():
     running = True
     current_screen = 'hub'
@@ -680,9 +679,9 @@ def game_loop():
                     elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
-                            # Ensure all player dragons are initialized
+                            # Ensure at least one player dragon is initialized
                             if any(dragon is not None for dragon in player_dragons):
-                                start_combat(player_dragons, boss_dragon_stats)
+                                start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_filename)
                             else:
                                 print("Error: At least one player dragon must be initialized.")
                     else:
