@@ -1,16 +1,17 @@
 import sqlite3
+
 def update_database_schema():
-    conn = connect_db('save.db')
+    conn = connect_db('dragonsedit.db')
     cursor = conn.cursor()
     
     # Add new columns if they don't already exist
     try:
-        cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN current_hitpoints INTEGER DEFAULT 100")
+        cursor.execute("ALTER TABLE dragons ADD COLUMN current_hitpoints INTEGER DEFAULT 1000")
     except sqlite3.OperationalError:
         pass  # Column already exists
     
     try:
-        cursor.execute("ALTER TABLE hatcheddragons ADD COLUMN bonus_base_hitpoints INTEGER DEFAULT 0")
+        cursor.execute("ALTER TABLE dragons ADD COLUMN max_hitpoints INTEGER DEFAULT 1000")
     except sqlite3.OperationalError:
         pass  # Column already exists
     
@@ -19,3 +20,5 @@ def update_database_schema():
 
 # Call the function to update the database schema
 update_database_schema()
+
+

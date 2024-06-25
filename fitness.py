@@ -113,7 +113,8 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
-def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, player_dragons, quests):
+
+def draw_area_gameboard(category, boss_dragon_filename, player_dragons, quests, boss_dragon_stats):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
@@ -129,19 +130,20 @@ def draw_area_gameboard(category, boss_dragon_filename, boss_dragon_stats, playe
     max_height = int(HEIGHT * 0.35)
     boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
 
-    conn = connect_db('dragonsedit.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT facing_direction FROM dragons WHERE filename=?", (boss_dragon_filename,))
-    facing_direction = cursor.fetchone()
-    conn.close()
+    boss_dragon = BossDragon(boss_dragon_filename)
 
-    if facing_direction and facing_direction[0] != "right":
-        boss_dragon_image = flip_dragon_image(boss_dragon_image, facing_direction[0], "right")
+    if boss_dragon.facing_direction != "right":
+        boss_dragon_image = flip_dragon_image(boss_dragon_image, boss_dragon.facing_direction, "right")
 
     screen.blit(boss_dragon_image, (0, 0))
 
-    boss_hp, boss_damage, boss_defense, boss_dodge = calculate_boss_stats(boss_dragon_stats)
-    stats_text = f"HP: {boss_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
+    boss_hp = boss_dragon.current_hitpoints
+    boss_max_hp = boss_dragon.maximum_hitpoints
+    boss_damage = boss_dragon.damage
+    boss_defense = boss_dragon.stats['defense']
+    boss_dodge = boss_dragon.stats['dodge']
+    
+    stats_text = f"HP: {boss_hp} / {boss_max_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
     draw_text(screen, stats_text, small_font, WHITE, (20, max_height + 15))
 
     box_top_left = (WIDTH // 2 - 45, 140)
@@ -252,6 +254,7 @@ def draw_hub_gameboard():
     pygame.display.flip()
     return upgrade_dragon_rect
 
+
 def display_dragon_statistics(dragon, upgrade_dragon_rect):
     name = dragon['petname'] if dragon['petname'] else dragon['dragon_name']
     draw_text(screen, name, small_font, WHITE, (upgrade_dragon_rect.centerx - small_font.size(name)[0] // 2, upgrade_dragon_rect.y - 30))
@@ -296,69 +299,6 @@ def display_dragon_statistics(dragon, upgrade_dragon_rect):
 def draw_text(surface, text, font, color, pos):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, pos)
-
-
-def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
-    stats = {
-        "health": 0,
-        "attack": 0,
-        "defense": 0,
-        "dodge": 0
-    }
-
-    if primary_trait in primary_traits_with_stats:
-        main_stat = primary_traits_with_stats[primary_trait]["main"]
-        off_stat = primary_traits_with_stats[primary_trait]["off"]
-        stats[main_stat] += 10
-        stats[off_stat] += 5
-
-    for trait in secondary_traits:
-        for fruit, traits in fruit_traits_with_stats.items():
-            if trait in traits:
-                stat = traits[trait]
-                stats[stat] += 5
-
-    if nurture_trait and nurture_trait in nurture_traits_with_stats:
-        stat = nurture_traits_with_stats[nurture_trait]
-        stats[stat] += 15
-
-    return stats
-
-
-def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
-    print("Initial stats (before bonuses):", stats)
-    if is_boss:
-        tier_bonus = tier * 25
-        for stat in stats:
-            stats[stat] += tier_bonus
-
-        primary_trait = "Mystical"
-        secondary_traits = ["Distraction", "Courageous", "Fearsome"]
-        nurture_trait = None
-
-        trait_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-        for stat in stats:
-            stats[stat] += trait_stats[stat]
-    else:
-        if dragon_id is not None:
-            conn = sqlite3.connect('save.db')
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
-            row = cursor.fetchone()
-            
-            if row:
-                stats["health"] += row[0]
-                stats["attack"] += row[1]
-                stats["defense"] += row[2]
-                stats["dodge"] += row[3]
-            
-            conn.close()
-    
-    print("Final stats (after bonuses):", stats)
-    return stats
-
-
 
 
 def handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons):
@@ -513,11 +453,12 @@ def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
     return displayed_quests, quests_updated
 
 def initialize_player_dragons():
-    player_dragons = [None] * 9
+    player_dragons = [None] * 9  # Initialize with 9 slots
     return player_dragons
 
+
 def load_player_dragon(dragon_id):
-    conn = connect_db('save.db')
+    conn = sqlite3.connect('save.db')
     cursor = conn.cursor()
     cursor.execute("""
         SELECT id, dragon_name, petname, primary_trait, secondary1, secondary2, secondary3, nurture, filename, special_abilities, facing_direction, bonus_health, bonus_attack, bonus_defense, bonus_dodge, current_hitpoints, bonus_base_hitpoints
@@ -562,7 +503,6 @@ def load_player_dragon(dragon_id):
 
         return dragon
     return None
-
 
 
 def display_player_dragon_selection(player_dragons):
@@ -705,11 +645,11 @@ def game_loop():
     current_screen = 'hub'
     selected_area = None
     boss_dragon_filename = None
-    boss_dragon_stats = None
     player_dragons = initialize_player_dragons()
     displayed_quests = []
     global selected_dragon_for_upgrade
-    
+    boss_dragon_stats = None
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -728,12 +668,8 @@ def game_loop():
                         if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             boss_dragon_filename = dragon_image_file
-                            primary_trait = "Mystical"
-                            secondary_traits = ["Distraction", "Courageous", "Fearsome"]
-                            nurture_trait = None
-                            base_boss_stats = {'health': 50, 'attack': 50, 'defense': 50, 'dodge': 50}  # Example stats
-                            boss_dragon_stats = calculate_boss_stats(base_boss_stats)
-                            boss_dragon_stats = apply_bonuses(base_boss_stats, is_boss=True, tier=1)
+                            boss_dragon = BossDragon(boss_dragon_filename, tier=1)  # Creating instance of BossDragon
+                            boss_dragon_stats = (boss_dragon.stats['health'], boss_dragon.stats['attack'], boss_dragon.stats['defense'], boss_dragon.stats['dodge'])  # Set boss_dragon_stats variable
                             all_quests = load_quests(selected_area)
                             displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
                             current_screen = 'area'
@@ -744,12 +680,16 @@ def game_loop():
                     elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
-                            start_combat(player_dragons, boss_dragon_stats)
+                            # Ensure all player dragons are initialized
+                            if all(dragon is not None for dragon in player_dragons):
+                                start_combat(player_dragons, boss_dragon_stats)
+                            else:
+                                print("Error: Not all player dragons are initialized.")
                     else:
                         displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
                         if quests_updated:
-                            draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
+                            draw_area_gameboard(selected_area, boss_dragon_filename, player_dragons, displayed_quests, boss_dragon_stats)
             
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
                 if event.key == pygame.K_1:
@@ -767,17 +707,16 @@ def game_loop():
         if current_screen == 'hub':
             upgrade_dragon_rect = draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, boss_dragon_stats, player_dragons, displayed_quests)
+            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, player_dragons, displayed_quests, boss_dragon_stats)
 
         pygame.display.flip()
 
     pygame.quit()
     print("Game loop ended")
 
-
-
 if __name__ == "__main__":
     initialize()
     load_inventory_data()
     game_loop()
     save_inventory_data()
+
