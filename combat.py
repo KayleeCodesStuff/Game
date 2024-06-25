@@ -68,158 +68,6 @@ fruit_traits_with_stats = {
     }
 }
  
-
-
-def calculate_boss_stats(stats):
-    base_hp = 1000
-    base_damage = 100
-
-    # Convert stats values to integers and print to verify
-    health = int(stats['health'])
-    attack = int(stats['attack'])
-    defense = int(stats['defense'])
-    dodge = int(stats['dodge'])
-
-    print(f"health: {health}, attack: {attack}, defense: {defense}, dodge: {dodge}")
-
-    hp = base_hp + (base_hp * health / 100)
-    damage = base_damage + (base_damage * attack / 100)
-
-    return int(hp), int(damage), defense, dodge
-
-
-def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
-    stats = {
-        "health": 0,
-        "attack": 0,
-        "defense": 0,
-        "dodge": 0
-    }
-
-    if primary_trait in primary_traits_with_stats:
-        main_stat = primary_traits_with_stats[primary_trait]["main"]
-        off_stat = primary_traits_with_stats[primary_trait]["off"]
-        stats[main_stat] += 10
-        stats[off_stat] += 5
-
-    for trait in secondary_traits:
-        for fruit, traits in fruit_traits_with_stats.items():
-            if trait in traits:
-                stat = traits[trait]
-                stats[stat] += 5
-
-    if nurture_trait and nurture_trait in nurture_traits_with_stats:
-        stat = nurture_traits_with_stats[nurture_trait]
-        stats[stat] += 15
-
-    return stats
-
-
-def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
-    print("Initial stats (before bonuses):", stats)
-    if is_boss:
-        tier_bonus = tier * 25
-        for stat in stats:
-            stats[stat] += tier_bonus
-
-        primary_trait = "Mystical"
-        secondary_traits = ["Distraction", "Courageous", "Fearsome"]
-        nurture_trait = None
-
-        trait_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-        for stat in stats:
-            stats[stat] += trait_stats[stat]
-    else:
-        if dragon_id is not None:
-            conn = sqlite3.connect('save.db')
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
-            row = cursor.fetchone()
-            
-            if row:
-                stats["health"] += row[0]
-                stats["attack"] += row[1]
-                stats["defense"] += row[2]
-                stats["dodge"] += row[3]
-            
-            conn.close()
-    
-    print("Final stats (after bonuses):", stats)
-    return stats
-
-
-
-def calculate_damage(attacker_attack, defender_defense, primary_trait_match=False, secondary_traits_match=0):
-    base_damage = 100 + (100 * attacker_attack / 100)
-    
-    if primary_trait_match:
-        base_damage *= 2
-    
-    variation = random.uniform(0.9, 1.1)
-    base_damage = int(base_damage * variation)
-    
-    if secondary_traits_match == 1:
-        damage_reduction = 0.15
-    elif secondary_traits_match == 2:
-        damage_reduction = 0.30
-    elif secondary_traits_match == 3:
-        damage_reduction = 0.50
-    else:
-        damage_reduction = 0.0
-    
-    final_damage = int(base_damage * (1 - damage_reduction))
-    
-    return final_damage
-
-def calculate_dodge_chance(defender_dodge, attacker_dodge):
-    if defender_dodge == 0 and attacker_dodge == 0:
-        return 0.5
-    return 0.05 + 0.90 * (defender_dodge / (defender_dodge + attacker_dodge))
-
-def dodge_attack(defender_dodge, attacker_dodge):
-    dodge_chance = calculate_dodge_chance(defender_dodge, attacker_dodge)
-    return random.random() < dodge_chance
-
-def trait_match_count(player_traits, boss_traits):
-    return len(set(player_traits).intersection(set(boss_traits)))
-
-def player_attack_boss(player_dragon, boss_dragon):
-    primary_trait_match = player_dragon['primary_trait'] == boss_dragon['primary_trait']
-    secondary_traits_match = trait_match_count(player_dragon['secondary_traits'], boss_dragon['secondary_traits'])
-    
-    return calculate_damage(player_dragon['stats']['attack'], boss_dragon['defense'], primary_trait_match, secondary_traits_match)
-
-def boss_attack_player(boss_dragon, player_dragon):
-    if not dodge_attack(player_dragon['stats']['dodge'], boss_dragon['dodge']):
-        matching_traits = trait_match_count(boss_dragon['secondary_traits'], player_dragon['secondary_traits'])
-        base_damage = 100 + (100 * boss_dragon['attack'] / 100)
-        effective_damage = calculate_damage_reduction(base_damage, player_dragon['stats']['defense'], matching_traits)
-        return effective_damage
-    else:
-        return 0
-
-def calculate_damage_reduction(incoming_damage, defender_defense, matching_traits):
-    defense_reduction = defender_defense / 400
-    
-    if matching_traits == 1:
-        trait_reduction = 0.15
-    elif matching_traits == 2:
-        trait_reduction = 0.30
-    elif matching_traits == 3:
-        trait_reduction = 0.50
-    else:
-        trait_reduction = 0.0
-    
-    total_reduction = defense_reduction + trait_reduction
-    effective_reduction = min(0.75, total_reduction)
-    effective_damage = incoming_damage * (1 - effective_reduction)
-    effective_damage = max(incoming_damage * 0.25, effective_damage)
-    
-    return effective_damage
-
-
-
 class BossDragon:
     def __init__(self, filename, tier=1):
         self.filename = filename
@@ -242,10 +90,11 @@ class BossDragon:
         self.damage = 0
         self.facing_direction = "right"  # Default value
         self.tier = tier
-        self.fetch_data()
-        self.calculate_stats()
-        self.apply_tier_bonus()
-        self.calculate_hitpoints_and_damage()
+        if self.filename:
+            self.fetch_data()
+            self.calculate_stats()
+            self.apply_tier_bonus()
+            self.calculate_hitpoints_and_damage()
 
     def fetch_data(self):
         db_path = os.path.join(os.path.dirname(__file__), 'dragonsedit.db')
@@ -307,6 +156,7 @@ class BossDragon:
 
     def calculate_hitpoints_and_damage(self):
         self.maximum_hitpoints = 1000 + (self.stats['health'] / 100 * 1000)
+        self.current_hitpoints = self.maximum_hitpoints
         self.damage = 100 + (self.stats['attack'] / 100 * 100)
 
     def save_current_hitpoints(self):
@@ -437,23 +287,174 @@ class PlayerDragon:
         conn.close()
 
 
-def combat(player_dragons, boss_dragon_stats):
-    boss_hp, boss_damage, boss_defense, boss_dodge = boss_dragon_stats
-    boss_dragon = {
-        'primary_trait': 'Boss Primary',  # Placeholder
-        'secondary_traits': ['Boss Secondary 1', 'Boss Secondary 2', 'Boss Secondary 3'],  # Placeholder
-        'attack': boss_damage,
-        'defense': boss_defense,
-        'dodge': boss_dodge
+def calculate_boss_stats(stats):
+    base_hp = 1000
+    base_damage = 100
+
+    # Convert stats values to integers and print to verify
+    health = int(stats['health'])
+    attack = int(stats['attack'])
+    defense = int(stats['defense'])
+    dodge = int(stats['dodge'])
+
+    print(f"health: {health}, attack: {attack}, defense: {defense}, dodge: {dodge}")
+
+    hp = base_hp + (base_hp * health / 100)
+    damage = base_damage + (base_damage * attack / 100)
+
+    return int(hp), int(damage), defense, dodge
+
+
+def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
+    stats = {
+        "health": 0,
+        "attack": 0,
+        "defense": 0,
+        "dodge": 0
     }
 
-    while boss_hp > 0 and any(dragon['current_hitpoints'] > 0 for dragon in player_dragons):
+    if primary_trait in primary_traits_with_stats:
+        main_stat = primary_traits_with_stats[primary_trait]["main"]
+        off_stat = primary_traits_with_stats[primary_trait]["off"]
+        stats[main_stat] += 10
+        stats[off_stat] += 5
+
+    for trait in secondary_traits:
+        for fruit, traits in fruit_traits_with_stats.items():
+            if trait in traits:
+                stat = traits[trait]
+                stats[stat] += 5
+
+    if nurture_trait and nurture_trait in nurture_traits_with_stats:
+        stat = nurture_traits_with_stats[nurture_trait]
+        stats[stat] += 15
+
+    return stats
+
+
+def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
+    print("Initial stats (before bonuses):", stats)
+    if is_boss:
+        tier_bonus = tier * 25
+        for stat in stats:
+            stats[stat] += tier_bonus
+
+        primary_trait = "Mystical"
+        secondary_traits = ["Distraction", "Courageous", "Fearsome"]
+        nurture_trait = None
+
+        trait_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
+        for stat in stats:
+            stats[stat] += trait_stats[stat]
+    else:
+        if dragon_id is not None:
+            conn = sqlite3.connect('save.db')
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                stats["health"] += row[0]
+                stats["attack"] += row[1]
+                stats["defense"] += row[2]
+                stats["dodge"] += row[3]
+            
+            conn.close()
+    
+    print("Final stats (after bonuses):", stats)
+    return stats
+
+
+
+def calculate_damage(attacker_attack, defender_defense, primary_trait_match=False, secondary_traits_match=0):
+    base_damage = 100 + (100 * attacker_attack / 100)
+    
+    if primary_trait_match:
+        base_damage *= 2
+    
+    variation = random.uniform(0.9, 1.1)
+    base_damage = int(base_damage * variation)
+    
+    if secondary_traits_match == 1:
+        damage_reduction = 0.15
+    elif secondary_traits_match == 2:
+        damage_reduction = 0.30
+    elif secondary_traits_match == 3:
+        damage_reduction = 0.50
+    else:
+        damage_reduction = 0.0
+    
+    final_damage = int(base_damage * (1 - damage_reduction))
+    
+    return final_damage
+
+def calculate_dodge_chance(defender_dodge, attacker_dodge):
+    if defender_dodge == 0 and attacker_dodge == 0:
+        return 0.5
+    return 0.05 + 0.90 * (defender_dodge / (defender_dodge + attacker_dodge))
+
+def dodge_attack(defender_dodge, attacker_dodge):
+    dodge_chance = calculate_dodge_chance(defender_dodge, attacker_dodge)
+    return random.random() < dodge_chance
+
+def trait_match_count(player_traits, boss_traits):
+    return len(set(player_traits).intersection(set(boss_traits)))
+
+def player_attack_boss(player_dragon, boss_dragon):
+    primary_trait_match = player_dragon['primary_trait'] == boss_dragon.primary_trait
+    secondary_traits_match = trait_match_count(
+        [player_dragon['secondary1'], player_dragon['secondary2'], player_dragon['secondary3']],
+        [boss_dragon.secondary_trait1, boss_dragon.secondary_trait2, boss_dragon.secondary_trait3]
+    )
+    
+    return calculate_damage(player_dragon['stats']['attack'], boss_dragon.stats['defense'], primary_trait_match, secondary_traits_match)
+
+def boss_attack_player(boss_dragon, player_dragon):
+    if not dodge_attack(player_dragon['stats']['dodge'], boss_dragon.stats['dodge']):
+        matching_traits = trait_match_count(
+            [boss_dragon.secondary_trait1, boss_dragon.secondary_trait2, boss_dragon.secondary_trait3],
+            [player_dragon['secondary1'], player_dragon['secondary2'], player_dragon['secondary3']]
+        )
+        base_damage = 100 + (100 * boss_dragon.stats['attack'] / 100)
+        effective_damage = calculate_damage_reduction(base_damage, player_dragon['stats']['defense'], matching_traits)
+        return effective_damage
+    else:
+        return 0
+
+
+
+def calculate_damage_reduction(incoming_damage, defender_defense, matching_traits):
+    defense_reduction = defender_defense / 400
+    
+    if matching_traits == 1:
+        trait_reduction = 0.15
+    elif matching_traits == 2:
+        trait_reduction = 0.30
+    elif matching_traits == 3:
+        trait_reduction = 0.50
+    else:
+        trait_reduction = 0.0
+    
+    total_reduction = defense_reduction + trait_reduction
+    effective_reduction = min(0.75, total_reduction)
+    effective_damage = incoming_damage * (1 - effective_reduction)
+    effective_damage = max(incoming_damage * 0.25, effective_damage)
+    
+    return effective_damage
+
+
+
+
+
+def combat(player_dragons, boss_dragon):
+    while boss_dragon.current_hitpoints > 0 and any(dragon is not None and dragon['current_hitpoints'] > 0 for dragon in player_dragons):
         for dragon in player_dragons:
             if dragon and dragon['current_hitpoints'] > 0:
                 damage_to_boss = player_attack_boss(dragon, boss_dragon)
-                boss_hp -= damage_to_boss
-                print(f"{dragon['dragon_name']} attacks boss for {damage_to_boss} damage. Boss HP: {boss_hp}")
-                if boss_hp <= 0:
+                boss_dragon.current_hitpoints -= damage_to_boss
+                print(f"{dragon['dragon_name']} attacks boss for {damage_to_boss} damage. Boss HP: {boss_dragon.current_hitpoints}")
+                if boss_dragon.current_hitpoints <= 0:
                     print("Boss defeated!")
                     return
                 damage_to_dragon = boss_attack_player(boss_dragon, dragon)
@@ -462,17 +463,31 @@ def combat(player_dragons, boss_dragon_stats):
                 if dragon['current_hitpoints'] <= 0:
                     print(f"{dragon['dragon_name']} defeated!")
 
-    if boss_hp > 0:
+    if boss_dragon.current_hitpoints > 0:
         print("Boss wins!")
     else:
         print("Players win!")
-        
+
 def start_combat(player_dragons, boss_dragon_stats):
     boss_hp, boss_damage, boss_defense, boss_dodge = boss_dragon_stats
-    print(f"Boss Dragon - HP: {boss_hp}, Attack: {boss_damage}, Defense: {boss_defense}, Dodge: {boss_dodge}")
+    boss_dragon = BossDragon(filename=None)  # Initialize with proper attributes
+    boss_dragon.stats = {
+        'health': boss_hp,
+        'attack': boss_damage,
+        'defense': boss_defense,
+        'dodge': boss_dodge
+    }
+    boss_dragon.calculate_hitpoints_and_damage()  # Ensure hitpoints and damage are calculated correctly
+    print(f"Boss Dragon - HP: {boss_dragon.current_hitpoints}, Attack: {boss_dragon.stats['attack']}, Defense: {boss_dragon.stats['defense']}, Dodge: {boss_dragon.stats['dodge']}")
+
     for dragon in player_dragons:
         if dragon is not None:
             print(f"{dragon['dragon_name']} - HP: {dragon['current_hitpoints']}, Attack: {dragon['stats']['attack']}, Defense: {dragon['stats']['defense']}, Dodge: {dragon['stats']['dodge']}")
     
-    combat(player_dragons, boss_dragon_stats)
+    # Ensure at least one player dragon is available for combat
+    if not any(dragon is not None for dragon in player_dragons):
+        print("Error: At least one player dragon must be initialized for combat.")
+        return
+
+    combat(player_dragons, boss_dragon)
 

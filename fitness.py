@@ -451,9 +451,8 @@ def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
                     print(f"Failed to replace quest {quest[0]}")
             break
     return displayed_quests, quests_updated
-
 def initialize_player_dragons():
-    player_dragons = [None] * 9  # Initialize with 9 slots
+    player_dragons = [None] * 9  # Initialize with None
     return player_dragons
 
 
@@ -498,7 +497,7 @@ def load_player_dragon(dragon_id):
         dragon['base_hitpoints'] = base_hitpoints
 
         # Initialize current hitpoints
-        if dragon['current_hitpoints'] == 0:
+        if dragon['current_hitpoints'] is None:
             dragon['current_hitpoints'] = dragon['maximum_hitpoints']
 
         return dragon
@@ -629,8 +628,9 @@ def handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons):
         if rect.collidepoint(mouse_x, mouse_y):
             dragon_id = display_player_dragon_selection(player_dragons)
             if dragon_id:
-                player_dragons[i] = load_player_dragon(dragon_id)
+                player_dragons[i] = load_player_dragon(dragon_id)  # Initialize dragon with data
             break
+
 
 def prompt_for_dragon_id():
     return random.randint(1, 100)
@@ -681,10 +681,10 @@ def game_loop():
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
                             # Ensure all player dragons are initialized
-                            if all(dragon is not None for dragon in player_dragons):
+                            if any(dragon is not None for dragon in player_dragons):
                                 start_combat(player_dragons, boss_dragon_stats)
                             else:
-                                print("Error: Not all player dragons are initialized.")
+                                print("Error: At least one player dragon must be initialized.")
                     else:
                         displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
