@@ -453,6 +453,19 @@ def calculate_damage_reduction(incoming_damage, defender_defense, matching_trait
     
     return effective_damage
 
+def save_player_dragon_hitpoints(dragon):
+    db_path = os.path.join(os.path.dirname(__file__), 'save.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        UPDATE hatcheddragons
+        SET current_hitpoints = ?
+        WHERE id = ?
+    """, (dragon['current_hitpoints'], dragon['id']))
+    
+    conn.commit()
+    conn.close()
 
 def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_filename):
     boss_dragon = BossDragon(filename=boss_dragon_filename)
@@ -462,20 +475,19 @@ def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen,
         'defense': boss_dragon_stats[2],
         'dodge': boss_dragon_stats[3]
     }
-    boss_dragon.calculate_hitpoints_and_damage()  # Calculate maximum_hitpoints based on health stat
+    boss_dragon.calculate_hitpoints_and_damage()
     boss_dragon.current_hitpoints = boss_dragon.maximum_hitpoints  # Set initial current_hitpoints to maximum_hitpoints
     print(f"Boss Dragon - HP: {boss_dragon.current_hitpoints}, Attack: {boss_dragon.stats['attack']}, Defense: {boss_dragon.stats['defense']}, Dodge: {boss_dragon.stats['dodge']}")
 
     for dragon in player_dragons:
         if dragon is not None:
-            print(f"{dragon['dragon_name']} - HP: {dragon['current_hitpoints']}, Attack: {dragon['stats']['attack']}, Defense: {dragon['stats']['defense']}, Dodge: {dragon['stats']['dodge']}")
+            print(f"{dragon['name']} - HP: {dragon['current_hitpoints']}, Attack: {dragon['stats']['attack']}, Defense: {dragon['stats']['defense']}, Dodge: {dragon['stats']['dodge']}")
     
     if not any(dragon is not None for dragon in player_dragons):
         print("Error: At least one player dragon must be initialized for combat.")
         return
 
     combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests)
-
 
 def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests):
     while boss_dragon.current_hitpoints > 0 and any(dragon is not None and dragon['current_hitpoints'] > 0 for dragon in player_dragons):
@@ -493,7 +505,7 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
                 time.sleep(0.5)
                 if boss_dragon.current_hitpoints <= 0:
                     print("Boss defeated!")
-                    return
+                    break
 
                 if dodge_attack(dragon['stats']['dodge'], boss_dragon.stats['dodge']):
                     print(f"{dragon['name']} dodges the attack!")
@@ -512,4 +524,16 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
         print("Boss wins!")
     else:
         print("Players win!")
+
+    # After combat ends, ensure all dragons have at least 1 HP if they reached 0 and save hitpoints
+    for dragon in player_dragons:
+        if dragon:
+            if dragon['current_hitpoints'] <= 0:
+                dragon['current_hitpoints'] = 1
+            save_player_dragon_hitpoints(dragon)
+
+    print(f"Final Boss HP: {boss_dragon.current_hitpoints}")
+    for dragon in player_dragons:
+        if dragon:
+            print(f"Final {dragon['name']} HP: {dragon['current_hitpoints']}")
 
