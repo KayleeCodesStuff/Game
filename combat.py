@@ -93,11 +93,13 @@ class BossDragon:
         self.damage = 0
         self.facing_direction = "right"  # Default value
         self.tier = tier
+        self.initialized = False
         if self.filename:
             self.fetch_data()
             self.calculate_stats()
             self.apply_tier_bonus()
             self.calculate_hitpoints_and_damage()
+            self.initialized = True
 
     def fetch_data(self):
         db_path = os.path.join(os.path.dirname(__file__), 'dragonsedit.db')
@@ -159,8 +161,11 @@ class BossDragon:
 
     def calculate_hitpoints_and_damage(self):
         self.maximum_hitpoints = 1000 + (self.stats['health'] / 100 * 1000)
-        self.current_hitpoints = self.maximum_hitpoints
         self.damage = 100 + (self.stats['attack'] / 100 * 100)
+        
+        # Set current hitpoints to maximum hitpoints only if not already initialized
+        if not self.initialized:
+            self.current_hitpoints = self.maximum_hitpoints
 
     def save_current_hitpoints(self):
         db_path = os.path.join(os.path.dirname(__file__), 'dragonsedit.db')
@@ -336,7 +341,6 @@ def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
 
 
 def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
-    print("Initial stats (before bonuses):", stats)
     if is_boss:
         tier_bonus = tier * 25
         for stat in stats:
@@ -365,8 +369,8 @@ def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
             
             conn.close()
     
-    print("Final stats (after bonuses):", stats)
     return stats
+
 
 
 
@@ -401,6 +405,7 @@ def dodge_attack(defender_dodge, attacker_dodge):
     dodge_chance = calculate_dodge_chance(defender_dodge, attacker_dodge)
     return random.random() < dodge_chance
 
+
 def trait_match_count(player_traits, boss_traits):
     return len(set(player_traits).intersection(set(boss_traits)))
 
@@ -414,7 +419,10 @@ def player_attack_boss(player_dragon, boss_dragon):
     return calculate_damage(player_dragon['stats']['attack'], boss_dragon.stats['defense'], primary_trait_match, secondary_traits_match)
 
 def boss_attack_player(boss_dragon, player_dragon):
-    if not dodge_attack(player_dragon['stats']['dodge'], boss_dragon.stats['dodge']):
+    if dodge_attack(player_dragon['stats']['dodge'], boss_dragon.stats['dodge']):
+        print(f"{player_dragon['dragon_name']} dodges the attack!")
+        return 0
+    else:
         matching_traits = trait_match_count(
             [boss_dragon.secondary_trait1, boss_dragon.secondary_trait2, boss_dragon.secondary_trait3],
             [player_dragon['secondary1'], player_dragon['secondary2'], player_dragon['secondary3']]
@@ -422,8 +430,7 @@ def boss_attack_player(boss_dragon, player_dragon):
         base_damage = 100 + (100 * boss_dragon.stats['attack'] / 100)
         effective_damage = calculate_damage_reduction(base_damage, player_dragon['stats']['defense'], matching_traits)
         return effective_damage
-    else:
-        return 0
+
 
 
 
@@ -447,53 +454,59 @@ def calculate_damage_reduction(incoming_damage, defender_defense, matching_trait
     return effective_damage
 
 
-
-
-
 def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_filename):
-    boss_hp, boss_damage, boss_defense, boss_dodge = boss_dragon_stats
-    boss_dragon = BossDragon(filename=boss_dragon_filename)  # Initialize with proper attributes
+    boss_dragon = BossDragon(filename=boss_dragon_filename)
     boss_dragon.stats = {
-        'health': boss_hp,
-        'attack': boss_damage,
-        'defense': boss_defense,
-        'dodge': boss_dodge
+        'health': boss_dragon_stats[0],
+        'attack': boss_dragon_stats[1],
+        'defense': boss_dragon_stats[2],
+        'dodge': boss_dragon_stats[3]
     }
-    boss_dragon.calculate_hitpoints_and_damage()  # Ensure hitpoints and damage are calculated correctly
+    boss_dragon.calculate_hitpoints_and_damage()  # Calculate maximum_hitpoints based on health stat
+    boss_dragon.current_hitpoints = boss_dragon.maximum_hitpoints  # Set initial current_hitpoints to maximum_hitpoints
     print(f"Boss Dragon - HP: {boss_dragon.current_hitpoints}, Attack: {boss_dragon.stats['attack']}, Defense: {boss_dragon.stats['defense']}, Dodge: {boss_dragon.stats['dodge']}")
 
     for dragon in player_dragons:
         if dragon is not None:
             print(f"{dragon['dragon_name']} - HP: {dragon['current_hitpoints']}, Attack: {dragon['stats']['attack']}, Defense: {dragon['stats']['defense']}, Dodge: {dragon['stats']['dodge']}")
     
-    # Ensure at least one player dragon is available for combat
     if not any(dragon is not None for dragon in player_dragons):
         print("Error: At least one player dragon must be initialized for combat.")
         return
 
-    combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_stats)
+    combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests)
 
-def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_stats):
+
+def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests):
     while boss_dragon.current_hitpoints > 0 and any(dragon is not None and dragon['current_hitpoints'] > 0 for dragon in player_dragons):
         for dragon in player_dragons:
             if dragon and dragon['current_hitpoints'] > 0:
-                damage_to_boss = round(player_attack_boss(dragon, boss_dragon))
-                boss_dragon.current_hitpoints = round(boss_dragon.current_hitpoints - damage_to_boss, 2)
-                print(f"{dragon['dragon_name']} attacks boss for {damage_to_boss} damage. Boss HP: {boss_dragon.current_hitpoints}")
-                draw_area_gameboard(selected_area, boss_dragon.filename, player_dragons, displayed_quests, boss_dragon_stats)
+                if dodge_attack(boss_dragon.stats['dodge'], dragon['stats']['dodge']):
+                    print(f"Boss dodges the attack from {dragon['name']}!")
+                    damage_to_boss = 0
+                else:
+                    damage_to_boss = round(player_attack_boss(dragon, boss_dragon))
+                boss_dragon.current_hitpoints = max(0, round(boss_dragon.current_hitpoints - damage_to_boss, 2))
+                print(f"{dragon['name']} attacks boss for {damage_to_boss} damage. Boss HP: {round(boss_dragon.current_hitpoints)}")
+                draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
                 pygame.display.flip()
                 time.sleep(0.5)
                 if boss_dragon.current_hitpoints <= 0:
                     print("Boss defeated!")
                     return
-                damage_to_dragon = round(boss_attack_player(boss_dragon, dragon))
-                dragon['current_hitpoints'] = round(dragon['current_hitpoints'] - damage_to_dragon, 2)
-                print(f"Boss attacks {dragon['dragon_name']} for {damage_to_dragon} damage. {dragon['dragon_name']} HP: {dragon['current_hitpoints']}")
-                draw_area_gameboard(selected_area, boss_dragon.filename, player_dragons, displayed_quests, boss_dragon_stats)
+
+                if dodge_attack(dragon['stats']['dodge'], boss_dragon.stats['dodge']):
+                    print(f"{dragon['name']} dodges the attack!")
+                    damage_to_dragon = 0
+                else:
+                    damage_to_dragon = round(boss_attack_player(boss_dragon, dragon))
+                dragon['current_hitpoints'] = max(0, round(dragon['current_hitpoints'] - damage_to_dragon, 2))
+                print(f"Boss attacks {dragon['name']} for {damage_to_dragon} damage. {dragon['name']} HP: {round(dragon['current_hitpoints'])}")
+                draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
                 pygame.display.flip()
                 time.sleep(0.5)
                 if dragon['current_hitpoints'] <= 0:
-                    print(f"{dragon['dragon_name']} defeated!")
+                    print(f"{dragon['name']} defeated!")
 
     if boss_dragon.current_hitpoints > 0:
         print("Boss wins!")

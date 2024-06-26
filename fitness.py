@@ -114,7 +114,7 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     surface.blit(text_surface, text_rect)
 
 
-def draw_area_gameboard(category, boss_dragon_filename, player_dragons, quests, boss_dragon_stats):
+def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
@@ -128,9 +128,7 @@ def draw_area_gameboard(category, boss_dragon_filename, player_dragons, quests, 
     draw_text(screen, token_text, token_font, WHITE, (WIDTH // 2 + 50, 75))
 
     max_height = int(HEIGHT * 0.35)
-    boss_dragon_image = load_boss_dragon_image(boss_dragon_filename, max_height)
-
-    boss_dragon = BossDragon(boss_dragon_filename)
+    boss_dragon_image = load_boss_dragon_image(boss_dragon.filename, max_height)
 
     if boss_dragon.facing_direction != "right":
         boss_dragon_image = flip_dragon_image(boss_dragon_image, boss_dragon.facing_direction, "right")
@@ -142,7 +140,7 @@ def draw_area_gameboard(category, boss_dragon_filename, player_dragons, quests, 
     boss_damage = boss_dragon.damage
     boss_defense = boss_dragon.stats['defense']
     boss_dodge = boss_dragon.stats['dodge']
-    
+
     stats_text = f"HP: {boss_hp} / {boss_max_hp}  Damage: {boss_damage}  Defense: {boss_defense}  Dodge: {boss_dodge}"
     draw_text(screen, stats_text, small_font, WHITE, (20, max_height + 15))
 
@@ -499,6 +497,9 @@ def load_player_dragon(dragon_id):
         # Initialize current hitpoints
         if dragon['current_hitpoints'] is None:
             dragon['current_hitpoints'] = dragon['maximum_hitpoints']
+        
+                # Set the name key
+        dragon['name'] = dragon['petname'] if dragon['petname'] else dragon['dragon_name']
 
         return dragon
     return None
@@ -600,9 +601,10 @@ def draw_player_dragon_slots(player_dragons):
             dragon_image = flip_dragon_image(dragon_image, dragon['facing_direction'], "left")
             screen.blit(dragon_image, (slot_x, slot_y))
 
+            current_hp = dragon['current_hitpoints']
             max_hp = 100 + int((100 * (dragon['stats']['health'] + dragon['bonus_health'])) / 100)
             damage = 100 + int((100 * (dragon['stats']['attack'] + dragon['bonus_attack'])) / 100)
-            stats_text = f"hp {max_hp} dmg {damage}"
+            stats_text = f"hp {current_hp} dmg {damage}"
             
             box_width, box_height = small_font.size(stats_text)
             box_rect = pygame.Rect(slot_x + 5, slot_y + slot_height - 30, box_width + 10, box_height + 5)
@@ -688,7 +690,7 @@ def game_loop():
                         displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
                         handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
                         if quests_updated:
-                            draw_area_gameboard(selected_area, boss_dragon_filename, player_dragons, displayed_quests, boss_dragon_stats)
+                            draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
             
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
                 if event.key == pygame.K_1:
@@ -706,8 +708,8 @@ def game_loop():
         if current_screen == 'hub':
             upgrade_dragon_rect = draw_hub_gameboard()
         elif current_screen == 'area' and selected_area is not None:
-            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon_filename, player_dragons, displayed_quests, boss_dragon_stats)
-
+            fight_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+        
         pygame.display.flip()
 
     pygame.quit()

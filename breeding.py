@@ -98,8 +98,6 @@ def initialize_game():
     # Initialization pygame and fonts from Game module
     initialize()
 
-    # Replace custom save_inventory_data with standardized one
-    save_inventory_data()
 
     # Define fonts
     small_font = pygame.font.Font(None, 24)
@@ -297,7 +295,7 @@ def initialize_dragons():
         outline_color = BLUE if dragon_data[12] == "Male" else RED
         dragon_image = outline_image(dragon_image, outline_color)
         
-        initial_speed = 1.5 + (0.5 if "speed" in dragon_data[4].lower() or "Flightspeed" in dragon_data[8] else 0)
+        initial_speed = 1.5 
 
         phenotype = dragon_data[2]
         if phenotype in ["gold", "silver", "metal"]:
@@ -497,7 +495,7 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     outline_color = BLUE if new_dragon_data[12] == "Male" else RED
     dragon_image = outline_image(dragon_image, outline_color)
 
-    initial_speed = 1.5 + (0.5 if "speed" in new_dragon_data[4].lower() or "Flightspeed" in new_dragon_data[8] else 0)
+    initial_speed = 1.5
 
     phenotype = new_dragon_data[2]
     if phenotype in ["gold", "silver", "metal"]:
@@ -758,7 +756,7 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                save_inventory_data(inventory)
+                save_inventory_data()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 x, y = mouse_pos
@@ -782,6 +780,7 @@ def main():
                     if selected_fruit is not None:
                         place_fruit(x, y, selected_fruit)
                         selected_fruit = None
+                        
 
                 # Handle egg collection
                 handle_egg_collection(mouse_pos, egg_counts)
