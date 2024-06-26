@@ -253,7 +253,6 @@ def draw_hub_gameboard():
     return upgrade_dragon_rect
 
 
-
 def display_dragon_statistics(dragon, upgrade_dragon_rect):
     name = dragon.petname if dragon.petname else dragon.dragon_name
     draw_text(screen, name, small_font, WHITE, (upgrade_dragon_rect.centerx - small_font.size(name)[0] // 2, upgrade_dragon_rect.y - 30))
@@ -284,7 +283,7 @@ def display_dragon_statistics(dragon, upgrade_dragon_rect):
     }
 
     for fruit, stat in fruit_stat_mapping.items():
-        derived_stat_value = getattr(dragon, 'bonus_' + stat) + dragon.stats[stat]
+        derived_stat_value = dragon.stats[stat]
         stat_text = f"{stat.capitalize()}"
         stat_pos = positions[stat]
         draw_text(screen, str(derived_stat_value), large_font, WHITE, (stat_pos[0] + 10, stat_pos[1] - 60))
