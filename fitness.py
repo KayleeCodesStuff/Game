@@ -347,7 +347,8 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
 
         # Recalculate maximum hitpoints based on the updated bonus_health
         base_hitpoints = 100 + dragon.bonus_base_hitpoints
-        dragon.maximum_hitpoints = base_hitpoints + (dragon.stats['health'] + dragon.bonus_health) / 100 * base_hitpoints
+        dragon.maximum_hitpoints = base_hitpoints + (dragon.stats['health'] / 100) * base_hitpoints
+
 
         # Ensure current hitpoints does not exceed the new maximum hitpoints
         dragon.current_hitpoints = min(dragon.current_hitpoints, dragon.maximum_hitpoints)
