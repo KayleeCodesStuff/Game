@@ -423,7 +423,12 @@ def handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrad
     for fruit, image in fruit_images_dict.items():
         rect = pygame.Rect(x_offset, y_offset, 50, 50)
         if rect.collidepoint(mouse_x, mouse_y):
-            if spend_fruit_and_update_stats(fruit, selected_dragon_for_upgrade, display_error):
+            print(f"Clicked on fruit: {fruit}")
+            if spend_fruit_and_update_stats(
+                fruit, 
+                selected_dragon_for_upgrade, 
+                lambda msg: display_error(msg, selected_dragon_for_upgrade)
+            ):
                 return True
         x_offset += 60
     return False
@@ -490,14 +495,17 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
     return False
 
 
-def display_error(message):
+import pygame
+import time
+
+def display_error(message, selected_dragon_for_upgrade):
     font = pygame.font.SysFont(None, 72)  # Larger font size
     text = font.render(message, True, pygame.Color('red'))
     text_rect = text.get_rect()
     text_rect.center = (WIDTH // 2, HEIGHT // 2)  # Adjust position as needed
 
-    # Save the current screen content under the text area
-    original_screen_content = screen.subsurface(text_rect).copy()
+    # # Save the current screen content under the text area
+    # original_screen_content = screen.subsurface(text_rect).copy()
     
     start_time = time.time()
 
@@ -508,8 +516,10 @@ def display_error(message):
         pygame.time.delay(100)
 
     # Restore the original screen content
-    screen.blit(original_screen_content, text_rect)
+    # screen.blit(original_screen_content, text_rect)
     pygame.display.update(text_rect)  # Only update the text area
+
+
     
 def update_dragon_stats_in_db(dragon):
     db_path = os.path.join(os.path.dirname(__file__), 'save.db')
