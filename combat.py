@@ -342,41 +342,6 @@ def calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait=None):
 
     return stats
 
-
-# def apply_bonuses(stats, is_boss=False, tier=1, dragon_id=None):
-#     if is_boss:
-#         tier_bonus = tier * 25
-#         for stat in stats:
-#             stats[stat] += tier_bonus
-
-#         primary_trait = "Mystical"
-#         secondary_traits = ["Distraction", "Courageous", "Fearsome"]
-#         nurture_trait = None
-
-#         trait_stats = calculate_dragon_stats(primary_trait, secondary_traits, nurture_trait)
-#         for stat in stats:
-#             stats[stat] += trait_stats[stat]
-#     else:
-#         if dragon_id is not None:
-#             conn = sqlite3.connect('save.db')
-#             cursor = conn.cursor()
-            
-#             cursor.execute("SELECT bonus_health, bonus_attack, bonus_defense, bonus_dodge FROM hatcheddragons WHERE id=?", (dragon_id,))
-#             row = cursor.fetchone()
-            
-#             if row:
-#                 stats["health"] += row[0]
-#                 stats["attack"] += row[1]
-#                 stats["defense"] += row[2]
-#                 stats["dodge"] += row[3]
-            
-#             conn.close()
-    
-#     return stats
-
-
-
-
 def calculate_damage(attacker_attack, defender_defense, primary_trait_match=False, secondary_traits_match=0):
     base_damage = 100 + (100 * attacker_attack / 100)
     
