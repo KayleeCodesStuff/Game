@@ -293,6 +293,7 @@ def display_dragon_statistics(dragon, upgrade_dragon_rect):
     hp_text = f"HP: {dragon.current_hitpoints} / {dragon.maximum_hitpoints:.0f}"
     draw_text(screen, hp_text, small_font, WHITE, (upgrade_dragon_rect.centerx - small_font.size(hp_text)[0] // 2, upgrade_dragon_rect.y + 10))
 
+
 def draw_text(surface, text, font, color, pos):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, pos)
@@ -334,6 +335,7 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
         # Update the corresponding bonus stat
         if stat_to_increase == 'health':
             dragon.bonus_health += 1
+            dragon.current_hitpoints = min(dragon.current_hitpoints + 5, dragon.maximum_hitpoints + 1)
         elif stat_to_increase == 'attack':
             dragon.bonus_attack += 1
         elif stat_to_increase == 'defense':
@@ -341,22 +343,22 @@ def spend_fruit_and_update_stats(fruit_type, dragon):
         elif stat_to_increase == 'dodge':
             dragon.bonus_dodge += 1
 
-        # Update current hitpoints if gleamberry is consumed, without overflowing maximum hitpoints
-        if fruit_type == 'gleamberry':
-            dragon.current_hitpoints = min(dragon.current_hitpoints + 5, dragon.maximum_hitpoints + 1)
-
-        # Recalculate maximum hitpoints based on the updated bonus_health
-        base_hitpoints = 100 + dragon.bonus_base_hitpoints
-        dragon.maximum_hitpoints = base_hitpoints + (dragon.stats['health'] / 100) * base_hitpoints
-
-
-        # Ensure current hitpoints does not exceed the new maximum hitpoints
-        dragon.current_hitpoints = min(dragon.current_hitpoints, dragon.maximum_hitpoints)
+        # Recalculate stats and maximum hitpoints
+        dragon.calculate_and_apply_stats()
+        dragon.calculate_hitpoints_and_damage()
 
         # Update dragon stats in the database
         update_dragon_stats_in_db(dragon)
+
+        # Debugging prints
+        print(f"Updated {stat_to_increase}: {dragon.stats[stat_to_increase]}")
+        print(f"Updated bonus {stat_to_increase}: {getattr(dragon, 'bonus_' + stat_to_increase)}")
+        print(f"New maximum hitpoints: {dragon.maximum_hitpoints}")
+        print(f"New current hitpoints: {dragon.current_hitpoints}")
+
         return True
     return False
+
 
 
 def update_dragon_stats_in_db(dragon):
@@ -624,19 +626,30 @@ def game_loop():
             
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
                 if event.key == pygame.K_1:
-                    spend_fruit_and_update_stats('gleamberry', selected_dragon_for_upgrade)
+                    if spend_fruit_and_update_stats('gleamberry', selected_dragon_for_upgrade):
+                        draw_hub_gameboard()
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_2:
-                    spend_fruit_and_update_stats('flamefruit', selected_dragon_for_upgrade)
+                    if spend_fruit_and_update_stats('flamefruit', selected_dragon_for_upgrade):
+                        draw_hub_gameboard()
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_3:
-                    spend_fruit_and_update_stats('shimmeringapple', selected_dragon_for_upgrade)
+                    if spend_fruit_and_update_stats('shimmeringapple', selected_dragon_for_upgrade):
+                        draw_hub_gameboard()
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_4:
-                    spend_fruit_and_update_stats('etherealpear', selected_dragon_for_upgrade)
+                    if spend_fruit_and_update_stats('etherealpear', selected_dragon_for_upgrade):
+                        draw_hub_gameboard()
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_5:
-                    spend_fruit_and_update_stats('moonbeammelon', selected_dragon_for_upgrade)
-                draw_hub_gameboard()
+                    if spend_fruit_and_update_stats('moonbeammelon', selected_dragon_for_upgrade):
+                        draw_hub_gameboard()
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
 
         if current_screen == 'hub':
             upgrade_dragon_rect = draw_hub_gameboard()
+            if selected_dragon_for_upgrade:
+                display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
         elif current_screen == 'area' and selected_area is not None:
             fight_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
 
