@@ -3,13 +3,6 @@ import random
 import sqlite3
 import logging
 import os
-from firebase_config import db
-
-
-
-
-
-
 
 # Configure logging
 logging.basicConfig(filename='game.log', level=logging.DEBUG,
