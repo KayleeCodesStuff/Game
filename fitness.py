@@ -1,9 +1,11 @@
-import pygame
 import sqlite3
 import logging
 import os
 import random
 import time
+
+import pygame
+
 from game import *
 from combat import *
 
