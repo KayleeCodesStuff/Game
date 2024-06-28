@@ -47,7 +47,7 @@ player_tokens = {
 }
 
 # Load the background image using the existing load_image function from game.py
-background_path = os.path.join(os.path.dirname(__file__), "background.png")
+background_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'background.png')
 background = load_image(background_path, (WIDTH, HEIGHT))
 
 category_font = pygame.font.Font(None, 60)  # Larger font for category word
@@ -113,10 +113,8 @@ def draw_beveled_button(surface, rect, color, text, font):
 
 
 def load_boss_dragon_image(dragon_filename, max_height):
-    dragon_image_path = os.path.join(
-        os.path.dirname(__file__),
-        "dragons",
-        dragon_filename)
+    dragon_image_path = os.path.join(os.path.dirname(__file__), "assets/images/dragons", dragon_filename)
+
     try:
         image = pygame.image.load(dragon_image_path).convert_alpha()
         width, height = image.get_size()
@@ -299,16 +297,15 @@ def draw_hub_gameboard():
 
     for i, pos in enumerate(dragon_positions):
         dragon_image_file = selected_dragons[i]
-        dragon_image_path = os.path.join(
-            os.path.dirname(__file__), "dragons", dragon_image_file)
+        dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
+
         dragon_image = load_and_resize_image_keeping_aspect(
             dragon_image_path, (150, 150))
         image_rect = dragon_image.get_rect(center=pos)
         screen.blit(dragon_image, image_rect.topleft)
         draw_text(
             screen,
-            f"Dragon {
-                i + 1}",
+            f"Dragon {i + 1}",
             small_font,
             WHITE,
             (pos[0] - 30,
@@ -348,10 +345,7 @@ def display_dragon_statistics(dragon, upgrade_dragon_rect):
          30))
 
     # Display dragon image within the upgrade rectangle
-    image_path = os.path.join(
-        os.path.dirname(__file__),
-        "dragons",
-        dragon.filename)
+    image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon.filename)
     dragon_image = load_and_resize_image_keeping_aspect(
         image_path, (upgrade_dragon_rect.width, upgrade_dragon_rect.height))
     image_rect = dragon_image.get_rect(center=upgrade_dragon_rect.center)
@@ -727,8 +721,7 @@ def draw_player_dragon_slots(player_dragons):
                 small_font)
         else:
             dragon = player_dragons[i]
-            image_path = os.path.join(
-                os.path.dirname(__file__), "dragons", dragon.filename)
+            image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon.filename)
             dragon_image = load_and_resize_image_keeping_aspect(
                 image_path, (int(slot_width), int(slot_height)))
             dragon_image = flip_dragon_image(
@@ -811,8 +804,7 @@ def game_loop():
                     for i, pos in enumerate(
                             [(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
                         dragon_image_file = selected_dragons[i]
-                        dragon_image_path = os.path.join(
-                            os.path.dirname(__file__), "dragons", dragon_image_file)
+                        dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
                         dragon_image = load_and_resize_image_keeping_aspect(
                             dragon_image_path, (150, 150))
                         image_rect = dragon_image.get_rect(center=pos)

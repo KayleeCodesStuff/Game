@@ -2,6 +2,7 @@ import pygame
 import random
 import sqlite3
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(filename='game.log', level=logging.DEBUG,
@@ -55,7 +56,11 @@ RED = (255, 0, 0)
 # Load images with error handling
 def load_image(file_name, scale_to):
     try:
-        image = pygame.image.load(file_name).convert_alpha()
+        # Check if 'assets/images' is already in the file_name path
+        if 'assets/images' not in file_name:
+            file_name = os.path.join('assets', 'images', file_name)
+        image_path = os.path.join(os.path.dirname(__file__), file_name)
+        image = pygame.image.load(image_path).convert_alpha()
         logging.info(f"Loaded image {file_name}")
         return pygame.transform.scale(image, scale_to)
     except pygame.error as e:
@@ -63,21 +68,22 @@ def load_image(file_name, scale_to):
         print(f"Error loading image {file_name}: {e}")
         return pygame.Surface(scale_to)  # Return a blank surface as a placeholder
 
-background = load_image("background.png", (WIDTH, HEIGHT))
+
+background = load_image(os.path.join('background.png'), (WIDTH, HEIGHT))
 
 fruit_images_dict = {
-    "gleamberry": load_image("gleamberry.png", (50, 50)),
-    "flamefruit": load_image("flamefruit.png", (50, 50)),
-    "shimmeringapple": load_image("shimmeringapple.png", (50, 50)),
-    "etherealpear": load_image("etherealpear.png", (50, 50)),
-    "moonbeammelon": load_image("moonbeammelon.png", (50, 50))
+"gleamberry": load_image(os.path.join('gleamberry.png'), (50, 50)),
+"flamefruit": load_image(os.path.join('flamefruit.png'), (50, 50)),
+"shimmeringapple": load_image(os.path.join('shimmeringapple.png'), (50, 50)),
+"etherealpear": load_image(os.path.join('etherealpear.png'), (50, 50)),
+"moonbeammelon": load_image(os.path.join('moonbeammelon.png'), (50, 50))
 }
 
 egg_images_dict = {
-    "black": load_image("black_egg.png", (65, 65)),
-    "white": load_image("white_egg.png", (65, 65)),
-    "rainbow": load_image("rainbow_egg.png", (65, 65)),
-    "metallic": load_image("metallic_egg.png", (65, 65))
+"black": load_image(os.path.join('eggs', 'black_egg.png'), (65, 65)),
+"white": load_image(os.path.join('eggs', 'white_egg.png'), (65, 65)),
+"rainbow": load_image(os.path.join('eggs', 'rainbow_egg.png'), (65, 65)),
+"metallic": load_image(os.path.join('eggs', 'metallic_egg.png'), (65, 65))
 }
 
 # Initialize inventory and egg counts
@@ -122,7 +128,9 @@ def define_elixir_data():
         "Angelic", "Unique", "Pure", "Self-righteous"
     ]
 
-    image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
+    image_filenames = [os.path.join('assets', 'images', 'elixirs', f'pb{i}.png') for i in range(1, 13)]
+
+
 
     primary_trait = random.choice(primary_traits)
     secondary_traits = random.sample(secondary_traits_list, 3)
@@ -183,11 +191,13 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         else:
             color, image_filename = slot
             pygame.draw.rect(surface, color, box_rect)
+            # image_filename should already be the correct path
             image = load_image(image_filename, (50, 50))
             surface.blit(image, (x_offset, y_offset))
         x_offset += 60
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)
+
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
