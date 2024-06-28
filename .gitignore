@@ -1,2 +1,11 @@
 *.db
 *.log
+firebase.env.py
+.env
+firestore testing.py
+firestore_test.py
+tasktamer-firebase-admin.json
+Screenshot 2024-06-28 022521.png
+tests.py
+__pycache__/firebase_config.cpython-312.pyc
+

@@ -2,6 +2,14 @@ import pygame
 import random
 import sqlite3
 import logging
+import os
+from firebase_config import db
+
+
+
+
+
+
 
 # Configure logging
 logging.basicConfig(filename='game.log', level=logging.DEBUG,
@@ -55,7 +63,11 @@ RED = (255, 0, 0)
 # Load images with error handling
 def load_image(file_name, scale_to):
     try:
-        image = pygame.image.load(file_name).convert_alpha()
+        # Check if 'assets/images' is already in the file_name path
+        if 'assets/images' not in file_name:
+            file_name = os.path.join('assets', 'images', file_name)
+        image_path = os.path.join(os.path.dirname(__file__), file_name)
+        image = pygame.image.load(image_path).convert_alpha()
         logging.info(f"Loaded image {file_name}")
         return pygame.transform.scale(image, scale_to)
     except pygame.error as e:
@@ -63,21 +75,22 @@ def load_image(file_name, scale_to):
         print(f"Error loading image {file_name}: {e}")
         return pygame.Surface(scale_to)  # Return a blank surface as a placeholder
 
-background = load_image("background.png", (WIDTH, HEIGHT))
+
+background = load_image(os.path.join('background.png'), (WIDTH, HEIGHT))
 
 fruit_images_dict = {
-    "gleamberry": load_image("gleamberry.png", (50, 50)),
-    "flamefruit": load_image("flamefruit.png", (50, 50)),
-    "shimmeringapple": load_image("shimmeringapple.png", (50, 50)),
-    "etherealpear": load_image("etherealpear.png", (50, 50)),
-    "moonbeammelon": load_image("moonbeammelon.png", (50, 50))
+"gleamberry": load_image(os.path.join('gleamberry.png'), (50, 50)),
+"flamefruit": load_image(os.path.join('flamefruit.png'), (50, 50)),
+"shimmeringapple": load_image(os.path.join('shimmeringapple.png'), (50, 50)),
+"etherealpear": load_image(os.path.join('etherealpear.png'), (50, 50)),
+"moonbeammelon": load_image(os.path.join('moonbeammelon.png'), (50, 50))
 }
 
 egg_images_dict = {
-    "black": load_image("black_egg.png", (65, 65)),
-    "white": load_image("white_egg.png", (65, 65)),
-    "rainbow": load_image("rainbow_egg.png", (65, 65)),
-    "metallic": load_image("metallic_egg.png", (65, 65))
+"black": load_image(os.path.join('eggs', 'black_egg.png'), (65, 65)),
+"white": load_image(os.path.join('eggs', 'white_egg.png'), (65, 65)),
+"rainbow": load_image(os.path.join('eggs', 'rainbow_egg.png'), (65, 65)),
+"metallic": load_image(os.path.join('eggs', 'metallic_egg.png'), (65, 65))
 }
 
 # Initialize inventory and egg counts
@@ -122,7 +135,9 @@ def define_elixir_data():
         "Angelic", "Unique", "Pure", "Self-righteous"
     ]
 
-    image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
+    image_filenames = [os.path.join('assets', 'images', 'elixirs', f'pb{i}.png') for i in range(1, 13)]
+
+
 
     primary_trait = random.choice(primary_traits)
     secondary_traits = random.sample(secondary_traits_list, 3)
@@ -183,52 +198,55 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
         else:
             color, image_filename = slot
             pygame.draw.rect(surface, color, box_rect)
+            # image_filename should already be the correct path
             image = load_image(image_filename, (50, 50))
             surface.blit(image, (x_offset, y_offset))
         x_offset += 60
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)
 
+
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
-    # inventory = {fruit: 0 for fruit in fruit_names}
-    # egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
-    # inventory_slots = [None] * 10
+    inventory = {fruit: 0 for fruit in fruit_names}
+    egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
+    inventory_slots = [None] * 10
 
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
+        # Load fruits inventory
+        inventory_ref = db.collection('inventory')
+        docs = inventory_ref.stream()
+        for doc in docs:
+            fruit = doc.id
+            count = doc.to_dict().get('count', 0)
+            inventory[fruit] = count
 
-            # Load fruits inventory
-            cursor.execute("SELECT fruit, count FROM inventory")
-            rows = cursor.fetchall()
-            for row in rows:
-                fruit, count = row
-                inventory[fruit] = count
+        # Load eggs counts from eggs collection
+        eggs_ref = db.collection('eggs')
+        docs = eggs_ref.stream()
+        for doc in docs:
+            phenotype = doc.id
+            count = doc.to_dict().get('count', 0)
+            egg_counts[phenotype] = count
 
-            # Load eggs counts from eggs table
-            cursor.execute("SELECT phenotype, COUNT(*) FROM eggs GROUP BY phenotype")
-            rows = cursor.fetchall()
-            for row in rows:
-                phenotype, count = row
-                egg_counts[phenotype] = count
+        # Load elixirs into inventory slots
+        elixirs_ref = db.collection('elixirs')
+        docs = elixirs_ref.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            rgb = tuple(data.get('rgb', (0, 0, 0)))
+            image_file = data.get('image_file', '')
+            position = data.get('position', 1)
+            inventory_slots[position - 1] = (rgb, image_file)
 
-            # Load elixirs into inventory slots
-            cursor.execute("SELECT rgb, image_file, position FROM elixirs")
-            rows = cursor.fetchall()
-            for row in rows:
-                rgb = tuple(map(int, row[0][1:-1].split(', ')))
-                image_file, position = row[1], row[2]
-                inventory_slots[position - 1] = (rgb, image_file)
-
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error loading inventory data: {e}")
-        print(f"SQLite error loading inventory data: {e}")
+        logging.info("Inventory data loaded successfully")
     except Exception as e:
-        logging.error(f"Unexpected error loading inventory data: {e}")
-        print(f"Unexpected error loading inventory data: {e}")
+        logging.error(f"Error loading inventory data: {e}")
+        print(f"Error loading inventory data: {e}")
 
     return inventory, egg_counts, inventory_slots
+
+
 
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
@@ -306,25 +324,29 @@ def save_elixir_data(elixir_data):
 
 def save_inventory_data():
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            # Update fruits inventory
-            for fruit, count in inventory.items():
-                cursor.execute("UPDATE inventory SET count = ? WHERE fruit = ?", (count, fruit))
+        # Update fruits inventory
+        for fruit, count in inventory.items():
+            db.collection('inventory').document(fruit).set({'count': count})
 
-            # Update egg counts
-            for egg, count in egg_counts.items():
-                cursor.execute("UPDATE egg_inventory SET count = ? WHERE phenotype = ?", (count, egg))
+        # Update egg counts
+        for egg, count in egg_counts.items():
+            db.collection('eggs').document(egg).set({'count': count})
 
-            conn.commit()
-            logging.info("Inventory data saved successfully")
-            print("Inventory data saved successfully")
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error saving inventory data: {e}")
-        print(f"SQLite error saving inventory data: {e}")
+        # Update elixirs
+        for index, slot in enumerate(inventory_slots):
+            if slot is not None:
+                rgb, image_file = slot
+                db.collection('elixirs').document(f'elixir_{index + 1}').set({
+                    'rgb': rgb,
+                    'image_file': image_file,
+                    'position': index + 1
+                })
+
+        logging.info("Inventory data saved successfully")
+        print("Inventory data saved successfully")
     except Exception as e:
-        logging.error(f"Unexpected error saving inventory data: {e}")
-        print(f"Unexpected error saving inventory data: {e}")
+        logging.error(f"Error saving inventory data: {e}")
+        print(f"Error saving inventory data: {e}")
 
 
 def delete_elixir_data(position):

@@ -4,6 +4,7 @@ import os
 import time
 
 import pygame
+from firebase_config import db
 
 # Primary traits with their associated main and off stats
 primary_traits_with_stats = {
