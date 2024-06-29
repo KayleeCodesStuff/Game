@@ -2,6 +2,7 @@ import pygame
 import random
 import sqlite3
 import logging
+from firebase_config import db
 import os
 
 # Configure logging
@@ -90,12 +91,55 @@ egg_images_dict = {
 fruit_names = list(fruit_images_dict.keys())
 inventory = {fruit: 5 for fruit in fruit_names}
 egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
-
+inventory = {}
 # Inventory slots
 inventory_slots = [None] * 10
 
 # Create inventory slots
 inventory_boxes = [pygame.Rect(WIDTH - 600 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
+
+def load_inventory_data():
+    global inventory, egg_counts, inventory_slots
+    # inventory = {fruit: 0 for fruit in fruit_names}
+    egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
+    inventory_slots = [None] * 10
+
+    try:
+        # Load fruits inventory from Firestore
+        inventory_ref = db.collection('inventory')
+        docs = inventory_ref.stream()
+        for doc in docs:
+            fruit = doc.id
+            count = doc.to_dict().get('count', 0)
+            inventory[fruit] = count
+            print(f"Loaded {count} of {fruit}")
+
+        # Load eggs counts from Firestore
+        eggs_ref = db.collection('eggs')
+        docs = eggs_ref.stream()
+        phenotype_counts = {}
+        for doc in docs:
+            phenotype = doc.to_dict().get('phenotype')
+            if phenotype:
+                if phenotype in phenotype_counts:
+                    phenotype_counts[phenotype] += 1
+                else:
+                    phenotype_counts[phenotype] = 1
+
+        for phenotype, count in phenotype_counts.items():
+            egg_counts[phenotype] = count
+            print(f"Loaded {count} of {phenotype} eggs")
+
+        logging.info("Inventory data loaded successfully")
+    except Exception as e:
+        logging.error(f"Error loading inventory data: {e}")
+        print(f"Error loading inventory data: {e}")
+
+    return inventory, egg_counts, inventory_slots
+
+inventory, egg_counts, inventory_slots = load_inventory_data()
+print("Final Inventory:", inventory)
+print("Final Egg Counts:", egg_counts)
 
 # Define traits lists
 primary_traits = [
@@ -157,7 +201,11 @@ def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
     surface.blit(text_surface, position)
 
-def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory_slot=None):
+def draw_inventory(surface, inventory, egg_counts, inventory_slots, selected_inventory_slot=None):
+    print("Drawing Inventory")
+    print("Inventory:", inventory)
+    print("Egg Counts:", egg_counts)
+
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))
 
     y_offset = HEIGHT - 90
@@ -172,9 +220,9 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
     # Draw a separator line
     pygame.draw.line(surface, WHITE, (x_offset, HEIGHT - 100), (x_offset, HEIGHT))
 
-    # Draw the eggs in the second section, even if they might not be used
+    # Draw the eggs in the second section, using egg_counts
     x_offset += 10
-    for egg_type, count in eggs.items():
+    for egg_type, count in egg_counts.items():
         egg_image = egg_images_dict[egg_type]
         surface.blit(egg_image, (x_offset, y_offset))
         draw_text(surface, str(count), small_font, WHITE, (x_offset + 20, y_offset + 45))
@@ -199,47 +247,82 @@ def draw_inventory(surface, inventory, eggs, inventory_slots, selected_inventory
             pygame.draw.rect(surface, RED, box_rect, 3)
 
 
-def load_inventory_data():
-    global inventory, egg_counts, inventory_slots
-    inventory = {fruit: 0 for fruit in fruit_names}
-    egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
-    inventory_slots = [None] * 10
-
+def save_inventory_data():
     try:
-        # Load fruits inventory
-        inventory_ref = db.collection('inventory')
-        docs = inventory_ref.stream()
-        for doc in docs:
-            fruit = doc.id
-            count = doc.to_dict().get('count', 0)
-            inventory[fruit] = count
+        # Update fruits inventory in Firestore
+        for fruit, count in inventory.items():
+            db.collection('inventory').document(fruit).set({'count': count})
+            print(f"Saved {count} of {fruit} to Firestore")
 
-        # Load eggs counts from eggs collection
-        eggs_ref = db.collection('eggs')
-        docs = eggs_ref.stream()
-        for doc in docs:
-            phenotype = doc.id
-            count = doc.to_dict().get('count', 0)
-            egg_counts[phenotype] = count
-
-        # Load elixirs into inventory slots
-        elixirs_ref = db.collection('elixirs')
-        docs = elixirs_ref.stream()
-        for doc in docs:
-            data = doc.to_dict()
-            rgb = tuple(data.get('rgb', (0, 0, 0)))
-            image_file = data.get('image_file', '')
-            position = data.get('position', 1)
-            inventory_slots[position - 1] = (rgb, image_file)
-
-        logging.info("Inventory data loaded successfully")
+        logging.info("Inventory data saved successfully")
+        print("Inventory data saved successfully")
     except Exception as e:
-        logging.error(f"Error loading inventory data: {e}")
-        print(f"Error loading inventory data: {e}")
-
-    return inventory, egg_counts, inventory_slots
+        logging.error(f"Error saving inventory data: {e}")
+        print(f"Error saving inventory data: {e}")
 
 
+
+def save_elixir_data(elixir_data):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            # Log each field explicitly
+            logging.debug(f"RGB: {elixir_data['rgb']}")
+            logging.debug(f"Title: {elixir_data['title']}")
+            logging.debug(f"Primary Trait: {elixir_data['primary_trait']}")
+            logging.debug(f"Secondary Trait 1: {elixir_data['secondary_trait1']}")
+            logging.debug(f"Secondary Trait 2: {elixir_data['secondary_trait2']}")
+            logging.debug(f"Secondary Trait 3: {elixir_data['secondary_trait3']}")
+            logging.debug(f"Image File: {elixir_data['image_file']}")
+            logging.debug(f"Position: {elixir_data['position']}")
+
+            # Save the elixir data
+            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                           (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
+                            elixir_data['secondary_trait1'], elixir_data['secondary_trait2'], elixir_data['secondary_trait3'],
+                            elixir_data['image_file'], elixir_data['position']))
+            conn.commit()
+            logging.info("Elixir data saved successfully")
+            print("Elixir data saved successfully")
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error saving elixir data: {e}")
+        print(f"SQLite error saving elixir data: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error saving elixir data: {e}")
+        print(f"Unexpected error saving elixir data: {e}")
+
+
+def delete_elixir_data(position):
+    try:
+        with sqlite3.connect('save.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM elixirs WHERE position = ?", (position,))
+            conn.commit()
+            logging.info(f"Elixir data at position {position} deleted successfully")
+            print(f"Elixir data at position {position} deleted successfully")
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error deleting elixir data: {e}")
+        print(f"SQLite error deleting elixir data: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error deleting elixir data: {e}")
+        print(f"Unexpected error deleting elixir data: {e}")
+
+#Updae the inventory in the fitness game after 
+def update_inventory(reward_str):
+    rewards = reward_str.split()
+    fruit, amount = rewards[1], int(rewards[0])
+    print(f"Updating inventory: Adding {amount} of {fruit}")
+
+    # Ensure the fruit exists in the inventory before updating
+    if fruit in inventory:
+        inventory[fruit] += amount
+    else:
+        inventory[fruit] = amount
+        
+
+    # Save the updated inventory to the database
+    save_inventory_data()
 
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
@@ -279,100 +362,7 @@ def create_egg(dragon1, dragon2, position):
             cursor.execute("INSERT INTO egg_inventory (phenotype, count) VALUES (?, ?)", (egg_phenotype, 1))
 
         conn.commit()
-
-import sqlite3
-import logging
-
-def save_elixir_data(elixir_data):
-    try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            # Log each field explicitly
-            logging.debug(f"RGB: {elixir_data['rgb']}")
-            logging.debug(f"Title: {elixir_data['title']}")
-            logging.debug(f"Primary Trait: {elixir_data['primary_trait']}")
-            logging.debug(f"Secondary Trait 1: {elixir_data['secondary_trait1']}")
-            logging.debug(f"Secondary Trait 2: {elixir_data['secondary_trait2']}")
-            logging.debug(f"Secondary Trait 3: {elixir_data['secondary_trait3']}")
-            logging.debug(f"Image File: {elixir_data['image_file']}")
-            logging.debug(f"Position: {elixir_data['position']}")
-
-            # Save the elixir data
-            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                           (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                            elixir_data['secondary_trait1'], elixir_data['secondary_trait2'], elixir_data['secondary_trait3'],
-                            elixir_data['image_file'], elixir_data['position']))
-            conn.commit()
-            logging.info("Elixir data saved successfully")
-            print("Elixir data saved successfully")
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error saving elixir data: {e}")
-        print(f"SQLite error saving elixir data: {e}")
-    except Exception as e:
-        logging.error(f"Unexpected error saving elixir data: {e}")
-        print(f"Unexpected error saving elixir data: {e}")
-
-
-
-def save_inventory_data():
-    try:
-        # Update fruits inventory
-        for fruit, count in inventory.items():
-            db.collection('inventory').document(fruit).set({'count': count})
-
-        # Update egg counts
-        for egg, count in egg_counts.items():
-            db.collection('eggs').document(egg).set({'count': count})
-
-        # Update elixirs
-        for index, slot in enumerate(inventory_slots):
-            if slot is not None:
-                rgb, image_file = slot
-                db.collection('elixirs').document(f'elixir_{index + 1}').set({
-                    'rgb': rgb,
-                    'image_file': image_file,
-                    'position': index + 1
-                })
-
-        logging.info("Inventory data saved successfully")
-        print("Inventory data saved successfully")
-    except Exception as e:
-        logging.error(f"Error saving inventory data: {e}")
-        print(f"Error saving inventory data: {e}")
-
-
-def delete_elixir_data(position):
-    try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM elixirs WHERE position = ?", (position,))
-            conn.commit()
-            logging.info(f"Elixir data at position {position} deleted successfully")
-            print(f"Elixir data at position {position} deleted successfully")
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error deleting elixir data: {e}")
-        print(f"SQLite error deleting elixir data: {e}")
-    except Exception as e:
-        logging.error(f"Unexpected error deleting elixir data: {e}")
-        print(f"Unexpected error deleting elixir data: {e}")
-
-#Updae the inventory in the fitness game after 
-def update_inventory(reward_str):
-    rewards = reward_str.split()
-    fruit, amount = rewards[1], int(rewards[0])
-    print(f"Updating inventory: Adding {amount} of {fruit}")
-
-    # Ensure the fruit exists in the inventory before updating
-    if fruit in inventory:
-        inventory[fruit] += amount
-    else:
-        inventory[fruit] = amount
-        
-
-    # Save the updated inventory to the database
-    save_inventory_data()
-         
+       
  #load images in the hatchery
 def load_and_resize_image(file_path, size):
     # Load an image from the given file path and resize it to the specified size.
@@ -434,58 +424,3 @@ def draw_center_fruits(screen, box_top_left, box_bottom_right, fruit_images_dict
     )
 
     screen.blit(moonbeammelon_image, moonbeammelon_position)
-
-
-# Example of handling errors during game loop
-# def game_loop():
-#     running = True
-#     selected_inventory_slot = None
-#     while running:
-#         for event in pygame.event.get():
-#             if event.type == pygame.QUIT:
-#                 running = False
-#             elif event.type == pygame.KEYDOWN:
-#                 if event.key == pygame.K_ESCAPE:
-#                     running = False
-
-#         screen.fill(GREY)
-#         screen.blit(background, (0, 0))
-
-#         # Draw inventory with error handling
-#         try:
-#             draw_inventory(screen, inventory, egg_counts, inventory_slots, selected_inventory_slot)
-#         except pygame.error as e:
-#             logging.error(f"Error drawing inventory: {e}")
-#             print(f"Error drawing inventory: {e}")
-
-#         pygame.display.flip()
-
-#     pygame.quit()
-#     logging.info("Game loop ended")
-#     print("Game loop ended")
-
-# def main():
-#     # Call initialization functions
-#     initialize_pygame()
-#     initialize_fonts()
-    
-#     # Call load_inventory_data with exception handling
-#     try:
-#         load_inventory_data()
-#         logging.info("Initial inventory data loaded successfully")
-#         print("Initial inventory data loaded successfully")
-#     except Exception as e:
-#         logging.error(f"Error loading initial inventory data: {e}")
-#         print(f"Error loading initial inventory data: {e}")
-
-#     # Start the game loop
-#     try:
-#         game_loop()
-#     except Exception as e:
-#         logging.error(f"Error during game loop: {e}")
-#         print(f"Error during game loop: {e}")
-#     finally:
-#         save_inventory_data()
-
-# if __name__ == "__main__":
-#     main()

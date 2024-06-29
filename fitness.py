@@ -461,6 +461,8 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
     }
 
     if fruit_type in inventory and inventory[fruit_type] > 0:
+        print(f"Spending one {fruit_type}. Initial count: {inventory[fruit_type]}")  # Debug print
+
         stat_to_increase = fruit_to_stat[fruit_type]
 
         # Check if the bonus stat is already at the maximum
@@ -470,6 +472,7 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
             return False
 
         inventory[fruit_type] -= 1  # Decrease the inventory
+        print(f"Spent one {fruit_type}. New count: {inventory[fruit_type]}")  # Debug print
 
         # Update the corresponding bonus stat
         if stat_to_increase == 'health':
@@ -491,18 +494,20 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
         # Update dragon stats in the database
         update_dragon_stats_in_db(dragon)
 
-        # Debugging prints
+        # Debugging prints for dragon stats
         print(f"Updated {stat_to_increase}: {dragon.stats[stat_to_increase]}")
         print(f"Updated bonus {stat_to_increase}: {getattr(dragon, 'bonus_' + stat_to_increase)}")
         print(f"New maximum hitpoints: {dragon.maximum_hitpoints}")
         print(f"New current hitpoints: {dragon.current_hitpoints}")
 
+        # Save the updated inventory to the database
+        save_inventory_data()
+
         return True
+    else:
+        print(f"Insufficient {fruit_type} in inventory.")  # Debug print
     return False
 
-
-import pygame
-import time
 
 def display_error(message, selected_dragon_for_upgrade):
     font = pygame.font.SysFont(None, 72)  # Larger font size
@@ -798,6 +803,13 @@ def game_loop():
     displayed_quests = []
     global selected_dragon_for_upgrade
     boss_dragon_stats = None
+
+    # Load inventory data once at the start of the game loop
+    inventory, egg_counts, inventory_slots = load_inventory_data()
+
+    # Debug prints to check initial values
+    print("Initial Inventory:", inventory)
+    print("Initial Egg Counts:", egg_counts)
 
     while running:
         for event in pygame.event.get():
