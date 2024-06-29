@@ -29,8 +29,7 @@ RED = (255, 0, 0)
 # Load images
 background = load_and_resize_image("hatchery.png", (WIDTH, HEIGHT))
 unhatched_egg_image = load_and_resize_image("unhatched.png", (80, 80))
-DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
-
+DRAGON_IMAGE_FOLDER = os.path.join("assets", "images", "dragons")  # Correct folder containing dragon images
 
 # Resize egg images and create egg rectangles with increased spacing
 egg_size = (80, 80)
@@ -43,17 +42,19 @@ egg_selected_from_db = [False] * 10  # Track if eggs have been selected from the
 EGG_PADDING = 200
 
 # Load and resize egg images
+# Load and resize egg images
 egg_images_dict = {
-    "black": load_and_resize_image("black_egg.png", egg_size),
-    "white": load_and_resize_image("white_egg.png", egg_size),
-    "rainbow": load_and_resize_image("rainbow_egg.png", egg_size),
-    "metallic": load_and_resize_image("metallic_egg.png", egg_size)
+    "black": load_and_resize_image(os.path.join("eggs", "black_egg.png"), egg_size),
+    "white": load_and_resize_image(os.path.join("eggs", "white_egg.png"), egg_size),
+    "rainbow": load_and_resize_image(os.path.join("eggs", "rainbow_egg.png"), egg_size),
+    "metallic": load_and_resize_image(os.path.join("eggs", "metallic_egg.png"), egg_size)
 }
+
 
 # Load and resize fruit images
 fruit_size = (50, 50)
 fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
-fruit_images_dict = {name: load_and_resize_image(f"{name}.png", fruit_size) for name in fruit_names}
+fruit_images_dict = {name: load_and_resize_image(os.path.join("fruits", f"{name}.png"), fruit_size) for name in fruit_names}
 
 # Initialize inventory and other variables
 inventory, egg_counts, inventory_slots = load_inventory_data()
@@ -158,10 +159,10 @@ MAX_BABY_DRAGON_WIDTH = 150
 MAX_BABY_DRAGON_HEIGHT = 150
 
 baby_images = {
-    "black": [load_image_with_max_dimensions(os.path.join(base_directory, "baby", f"blackbaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)],
-    "white": [load_image_with_max_dimensions(os.path.join(base_directory, "baby", f"whitebaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)],
-    "rainbow": [load_image_with_max_dimensions(os.path.join(base_directory, "baby", f"rainbowbaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)],
-    "metallic": [load_image_with_max_dimensions(os.path.join(base_directory, "baby", f"metallicbaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)]
+    "black": [load_image_with_max_dimensions(os.path.join(base_directory, "assets/images/baby", f"blackbaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)],
+    "white": [load_image_with_max_dimensions(os.path.join(base_directory, "assets/images/baby", f"whitebaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)],
+    "rainbow": [load_image_with_max_dimensions(os.path.join(base_directory, "assets/images/baby", f"rainbowbaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)],
+    "metallic": [load_image_with_max_dimensions(os.path.join(base_directory, "assets/images/baby", f"metallicbaby{i}.png"), MAX_BABY_DRAGON_WIDTH, MAX_BABY_DRAGON_HEIGHT) for i in range(1, 6)]
 }
 
 
@@ -627,31 +628,22 @@ def load_selected_dragon_images(ddragon_instances):
 
 def load_dragon_image(dragon_filename):
     base_directory = os.path.dirname(__file__)
-    # Corrected the path to point to the "dragons" folder directly under the Game project
-    dragon_image_path = os.path.join(base_directory, "dragons", dragon_filename)
-    
-    # Debug print to check the file path
-    #print(f"Loading image from path: {dragon_image_path}")
+    dragon_image_path = os.path.join(base_directory, "assets/images/dragons", dragon_filename)
 
-    # Check if file exists
     if not os.path.exists(dragon_image_path):
         print(f"File not found: {dragon_image_path}")
-        return unhatched_egg_image  # Return a default image if file not found
+        return unhatched_egg_image
 
     try:
         dragon_image = pygame.image.load(dragon_image_path).convert_alpha()
         width, height = dragon_image.get_size()
-        scale_factor = 80 / min(width, height)  # Adjust the scale to fit the egg size
+        scale_factor = 80 / min(width, height)
         new_size = (int(width * scale_factor), int(height * scale_factor))
         dragon_image = pygame.transform.scale(dragon_image, new_size)
-        
-        # Debug print to confirm the image is loaded
-        #print(f"Image loaded successfully: {dragon_filename}")
-        
         return dragon_image
     except pygame.error as e:
         print(f"Error loading image {dragon_filename}: {e}")
-        return unhatched_egg_image  # Return a default image if loading fails
+        return unhatched_egg_image
 
 
 def get_dragon_image(dragon_id):

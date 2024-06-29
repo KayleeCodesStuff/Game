@@ -56,12 +56,15 @@ RED = (255, 0, 0)
 
 # Load images with error handling
 def load_image(file_name, scale_to):
+    base_path = os.path.join(os.path.dirname(__file__), 'assets', 'images')
+    # Ensure the correct path is used for all images
+    if not os.path.isabs(file_name):
+        file_name = os.path.join(base_path, file_name)
+    elif not file_name.startswith(base_path):
+        file_name = os.path.join(base_path, file_name)
+    
     try:
-        # Check if 'assets/images' is already in the file_name path
-        if 'assets/images' not in file_name:
-            file_name = os.path.join('assets', 'images', file_name)
-        image_path = os.path.join(os.path.dirname(__file__), file_name)
-        image = pygame.image.load(image_path).convert_alpha()
+        image = pygame.image.load(file_name).convert_alpha()
         logging.info(f"Loaded image {file_name}")
         return pygame.transform.scale(image, scale_to)
     except pygame.error as e:
@@ -81,10 +84,10 @@ fruit_images_dict = {
 }
 
 egg_images_dict = {
-"black": load_image(os.path.join('eggs', 'black_egg.png'), (65, 65)),
-"white": load_image(os.path.join('eggs', 'white_egg.png'), (65, 65)),
-"rainbow": load_image(os.path.join('eggs', 'rainbow_egg.png'), (65, 65)),
-"metallic": load_image(os.path.join('eggs', 'metallic_egg.png'), (65, 65))
+    "black": load_image('eggs/black_egg.png', (65, 65)),
+    "white": load_image('eggs/white_egg.png', (65, 65)),
+    "rainbow": load_image('eggs/rainbow_egg.png', (65, 65)),
+    "metallic": load_image('eggs/metallic_egg.png', (65, 65))
 }
 
 # Initialize inventory and egg counts
@@ -269,49 +272,44 @@ def save_inventory_data():
 
 def save_elixir_data(elixir_data):
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            # Log each field explicitly
-            logging.debug(f"RGB: {elixir_data['rgb']}")
-            logging.debug(f"Title: {elixir_data['title']}")
-            logging.debug(f"Primary Trait: {elixir_data['primary_trait']}")
-            logging.debug(f"Secondary Trait 1: {elixir_data['secondary_trait1']}")
-            logging.debug(f"Secondary Trait 2: {elixir_data['secondary_trait2']}")
-            logging.debug(f"Secondary Trait 3: {elixir_data['secondary_trait3']}")
-            logging.debug(f"Image File: {elixir_data['image_file']}")
-            logging.debug(f"Position: {elixir_data['position']}")
+        elixirs_ref = db.collection('elixirs')
+        print(f"Saving elixir data at position {elixir_data['position']}")
 
-            # Save the elixir data
-            cursor.execute('''INSERT INTO elixirs (rgb, title, primary_trait, secondary_trait1, secondary_trait2, secondary_trait3, image_file, position)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                           (str(elixir_data['rgb']), elixir_data['title'], elixir_data['primary_trait'],
-                            elixir_data['secondary_trait1'], elixir_data['secondary_trait2'], elixir_data['secondary_trait3'],
-                            elixir_data['image_file'], elixir_data['position']))
-            conn.commit()
-            logging.info("Elixir data saved successfully")
-            print("Elixir data saved successfully")
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error saving elixir data: {e}")
-        print(f"SQLite error saving elixir data: {e}")
+        # Convert the RGB tuple to a string
+        rgb_str = f"({elixir_data['rgb'][0]}, {elixir_data['rgb'][1]}, {elixir_data['rgb'][2]})"
+
+        elixirs_ref.document(str(elixir_data['position'])).set({
+            'rgb': rgb_str,
+            'title': elixir_data['title'],
+            'primary_trait': elixir_data['primary_trait'],
+            'secondary_trait1': elixir_data['secondary_trait1'],
+            'secondary_trait2': elixir_data['secondary_trait2'],
+            'secondary_trait3': elixir_data['secondary_trait3'],
+            'image_file': elixir_data['image_file'],
+            'position': elixir_data['position']
+        })
+
+        print("Elixir data saved successfully")
     except Exception as e:
-        logging.error(f"Unexpected error saving elixir data: {e}")
-        print(f"Unexpected error saving elixir data: {e}")
-
+        print(f"Error saving elixir data: {e}")
 
 def delete_elixir_data(position):
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM elixirs WHERE position = ?", (position,))
-            conn.commit()
-            logging.info(f"Elixir data at position {position} deleted successfully")
-            print(f"Elixir data at position {position} deleted successfully")
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error deleting elixir data: {e}")
-        print(f"SQLite error deleting elixir data: {e}")
+        elixirs_ref = db.collection('elixirs')
+        query = elixirs_ref.where('position', '==', position).stream()
+        
+        found = False
+        for doc in query:
+            found = True
+            print(f"Attempting to delete elixir data with ID {doc.id} at position {position}")
+            elixirs_ref.document(doc.id).delete()
+            print(f"Elixir data with ID {doc.id} at position {position} deleted successfully")
+        
+        if not found:
+            print(f"No elixir data found at position {position} to delete")
     except Exception as e:
-        logging.error(f"Unexpected error deleting elixir data: {e}")
-        print(f"Unexpected error deleting elixir data: {e}")
+        print(f"Error deleting elixir data: {e}")
+
 
 #Updae the inventory in the fitness game after 
 def update_inventory(reward_str):
@@ -332,47 +330,67 @@ def update_inventory(reward_str):
 def create_egg(dragon1, dragon2, position):
     egg_genotype = get_egg_genotype(dragon1, dragon2)
     egg_phenotype = determine_phenotype(egg_genotype)
-    egg_image = egg_images_dict[egg_phenotype]
-    egg_image_path = os.path.join(DRAGON_IMAGE_FOLDER, f"{egg_phenotype.lower()}_egg.png")
+    egg_image_path = os.path.join('assets', 'images', 'eggs', f"{egg_phenotype.lower()}_egg.png")
     parent1_name = dragon1["name"]
     parent2_name = dragon2["name"]
-    print(f"Created {egg_phenotype} egg with genotype {egg_genotype} at {position} from parents {parent1_name} and {parent2_name}")
+
+    egg_data = {
+        "genotype": egg_genotype,
+        "phenotype": egg_phenotype,
+        "image_file": egg_image_path,
+        "parent1_name": parent1_name,
+        "parent2_name": parent2_name
+    }
+
+    # Save egg data to Firestore
+    try:
+        egg_ref = db.collection('eggs').document()
+        egg_ref.set(egg_data)
+        print(f"Egg data saved successfully with ID: {egg_ref.id}")
+    except Exception as e:
+        print(f"Error saving egg data: {e}")
 
     eggs_on_board.append({
         "genotype": egg_genotype,
         "phenotype": egg_phenotype,
-        "image": egg_image,
-        "rect": egg_image.get_rect(topleft=position)
+        "image": load_image(egg_image_path, (65, 65)),  # Ensure load_image function is defined
+        "rect": load_image(egg_image_path, (65, 65)).get_rect(topleft=position)
     })
 
-    # Database operations
-    with sqlite3.connect(save_file) as conn:
-        cursor = conn.cursor()
-
-        # Insert a new row into the eggs table for the picked up egg
-        cursor.execute("""
-            INSERT INTO eggs (genotype, phenotype, image_file, parent1_name, parent2_name)
-            VALUES (?, ?, ?, ?, ?)
-        """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
-
-        # Check if the phenotype already exists in egg_inventory
-        cursor.execute("SELECT count FROM egg_inventory WHERE phenotype=?", (egg_phenotype,))
-        row = cursor.fetchone()
-        if row:
-            # If it exists, increment the count
-            egg_count = row[0] + 1
-            cursor.execute("UPDATE egg_inventory SET count=? WHERE phenotype=?", (egg_count, egg_phenotype))
+    # Updating the egg counts in Firestore
+    try:
+        egg_inventory_ref = db.collection('egg_inventory').document(egg_phenotype)
+        egg_inventory_doc = egg_inventory_ref.get()
+        if egg_inventory_doc.exists:
+            egg_count = egg_inventory_doc.to_dict().get('count', 0) + 1
+            egg_inventory_ref.update({'count': egg_count})
         else:
-            # If it does not exist, insert a new row with count 1
-            cursor.execute("INSERT INTO egg_inventory (phenotype, count) VALUES (?, ?)", (egg_phenotype, 1))
+            egg_inventory_ref.set({'count': 1})
+        print(f"Egg inventory updated successfully for phenotype: {egg_phenotype}")
+    except Exception as e:
+        print(f"Error updating egg inventory: {e}")
 
-        conn.commit()
+    # Removing SQLite related operations
+    # (This section was responsible for updating SQLite DB, which is now replaced with Firestore operations)
+
        
  #load images in the hatchery
 def load_and_resize_image(file_path, size):
-    # Load an image from the given file path and resize it to the specified size.
-    image = pygame.image.load(file_path).convert_alpha()
-    return pygame.transform.scale(image, size)  
+    base_path = os.path.join(os.path.dirname(__file__), 'assets', 'images')
+    # Ensure the correct path is used for all images
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(base_path, file_path)
+    elif not file_path.startswith(base_path):
+        file_path = os.path.join(base_path, file_path)
+    
+    try:
+        image = pygame.image.load(file_path).convert_alpha()
+        return pygame.transform.scale(image, size)
+    except pygame.error as e:
+        logging.error(f"Error loading image {file_path}: {e}")
+        print(f"Error loading image {file_path}: {e}")
+        return pygame.Surface(size)  # Return a blank surface as a placeholder
+
 
 # Function to check for overlapping rectangles
 def is_overlapping(new_rect, rect_list):

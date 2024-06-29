@@ -14,7 +14,7 @@ from firebase_admin import credentials, firestore, initialize_app
 
 
 # Set the environment variable to the path of your Firebase credentials JSON file
-service_account_path = 'C:\\Users\\kayle\\PycharmProjects\\Game\\tasktamer-firebase-admin.json'
+service_account_path = 'C:\\Users\\kayle\\PycharmProjects\\Game\\taskhatchery-firebase-admin.json'
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = service_account_path
 print("GOOGLE_APPLICATION_CREDENTIALS:", os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
 

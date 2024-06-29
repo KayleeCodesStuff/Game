@@ -12,7 +12,7 @@ BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 WHITE = (255, 255, 255)
 
-DRAGON_IMAGE_FOLDER = "dragons"  # Correct folder containing dragon images
+DRAGON_IMAGE_FOLDER = os.path.join("assets", "images", "dragons")  # Correct folder containing dragon images
 FRUIT_SPEED_MODIFIERS = {
     "gleamberry": -0.5,
     "shimmeringapple": 0.5,

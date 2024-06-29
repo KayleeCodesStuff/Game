@@ -29,20 +29,24 @@ TEXT_HIGHLIGHT = (255, 0, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
+# Ensure the correct path is used for all images
+assets_path = os.path.join(os.path.dirname(__file__), 'assets', 'images')
+
 # Load images
-background = pygame.image.load("potionbackgroundscaled.png").convert_alpha()
-background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-ethereal_pear = pygame.image.load("etherealpear.png")
-flame_fruit = pygame.image.load("flamefruit.png")
-gleam_berry = pygame.image.load("gleamberry.png")
-moonbeam_melon = pygame.image.load("moonbeammelon.png")
-shimmering_apple = pygame.image.load("shimmeringapple.png")
+background = load_and_resize_image(os.path.join(assets_path, "potionbackgroundscaled.png"), (WIDTH, HEIGHT))
+ethereal_pear = load_and_resize_image(os.path.join(assets_path, "etherealpear.png"), (50, 50))
+flame_fruit = load_and_resize_image(os.path.join(assets_path, "flamefruit.png"), (50, 50))
+gleam_berry = load_and_resize_image(os.path.join(assets_path, "gleamberry.png"), (50, 50))
+moonbeam_melon = load_and_resize_image(os.path.join(assets_path, "moonbeammelon.png"), (50, 50))
+shimmering_apple = load_and_resize_image(os.path.join(assets_path, "shimmeringapple.png"), (50, 50))
+
+
 
 # Resize fruit images
 fruit_images = [gleam_berry, flame_fruit, shimmering_apple, ethereal_pear, moonbeam_melon]
-fruit_images = [pygame.transform.scale(fruit, (50, 50)) for fruit in fruit_images]
 fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
 fruit_images_dict = dict(zip(fruit_names, fruit_images))
+
 
 # RGB ranges for each fruit
 fruit_rgb_ranges = {
@@ -81,7 +85,9 @@ bottle_button = pygame.Rect(850, HEIGHT - 150, 120, 40)
 delete_button = pygame.Rect(850, HEIGHT - 200, 120, 40)
 
 # List of image filenames
-image_filenames = ["pb1.png", "pb2.png", "pb3.png", "pb4.png", "pb5.png", "pb6.png", "pb7.png", "pb8.png", "pb9.png", "pb10.png", "pb11.png", "pb12.png"]
+image_filenames = [os.path.join(assets_path, 'pb{}.png'.format(i)) for i in range(1, 13)]
+
+
 
 # Define inventory slots
 #inventory_slots = [None] * 10  # None means empty, else it will store the color and image
@@ -288,7 +294,14 @@ def main():
                     elixir_title = f"{elixir_color_name} {personality_keywords[selections[0]]} Dragon Egg Elixir"
                     # Remove used fruits from inventory
                     for i in range(1, 4):
-                        inventory[fruit_names[selections[i]]] -= 1
+                        fruit_name = fruit_names[selections[i]]
+                        inventory[fruit_name] -= 1
+                        print(f"Reduced {fruit_name} count to {inventory[fruit_name]}")
+
+                    # Save the updated inventory
+                    save_inventory_data()
+                    print("Inventory data saved successfully")
+
 
                     # Assign primary trait and secondary traits separately
                     primary_trait = personality_keywords[selections[0]]

@@ -11,3 +11,6 @@ __pycache__/firebase_config.cpython-312.pyc
 
 __pycache__/game.cpython-312.pyc
 
+node_modules/
+tasktamer-firebase-adminTASKTASK.json
+taskhatchery-firebase-admin.json
