@@ -91,7 +91,7 @@ egg_images_dict = {
 fruit_names = list(fruit_images_dict.keys())
 inventory = {fruit: 5 for fruit in fruit_names}
 egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
-inventory = {}
+
 # Inventory slots
 inventory_slots = [None] * 10
 
@@ -100,7 +100,7 @@ inventory_boxes = [pygame.Rect(WIDTH - 600 + i * 60, HEIGHT - 100, 50, 50) for i
 
 def load_inventory_data():
     global inventory, egg_counts, inventory_slots
-    # inventory = {fruit: 0 for fruit in fruit_names}
+    inventory = {fruit: 0 for fruit in fruit_names}
     egg_counts = {egg: 0 for egg in egg_images_dict.keys()}
     inventory_slots = [None] * 10
 
@@ -112,8 +112,7 @@ def load_inventory_data():
             fruit = doc.id
             count = doc.to_dict().get('count', 0)
             inventory[fruit] = count
-            print(f"Loaded {count} of {fruit}")
-
+            
         # Load eggs counts from Firestore
         eggs_ref = db.collection('eggs')
         docs = eggs_ref.stream()
@@ -128,9 +127,22 @@ def load_inventory_data():
 
         for phenotype, count in phenotype_counts.items():
             egg_counts[phenotype] = count
-            print(f"Loaded {count} of {phenotype} eggs")
+            
+
+        # Load elixirs into inventory slots from Firestore
+        elixirs_ref = db.collection('elixirs')
+        docs = elixirs_ref.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            rgb = tuple(map(int, data.get('rgb', '0,0,0').strip('()').split(', ')))
+            image_file = data.get('image_file')
+            position = data.get('position', 0)
+            if 0 < position <= len(inventory_slots):
+                inventory_slots[position - 1] = (rgb, image_file)
+            print(f"Loaded elixir at position {position}: {rgb}, {image_file}")
 
         logging.info("Inventory data loaded successfully")
+
     except Exception as e:
         logging.error(f"Error loading inventory data: {e}")
         print(f"Error loading inventory data: {e}")
@@ -138,8 +150,7 @@ def load_inventory_data():
     return inventory, egg_counts, inventory_slots
 
 inventory, egg_counts, inventory_slots = load_inventory_data()
-print("Final Inventory:", inventory)
-print("Final Egg Counts:", egg_counts)
+
 
 # Define traits lists
 primary_traits = [
@@ -202,10 +213,6 @@ def draw_text(surface, text, font, color, position):
     surface.blit(text_surface, position)
 
 def draw_inventory(surface, inventory, egg_counts, inventory_slots, selected_inventory_slot=None):
-    print("Drawing Inventory")
-    print("Inventory:", inventory)
-    print("Egg Counts:", egg_counts)
-
     pygame.draw.rect(surface, BLUE, (0, HEIGHT - 100, WIDTH, 100))
 
     y_offset = HEIGHT - 90
@@ -252,9 +259,7 @@ def save_inventory_data():
         # Update fruits inventory in Firestore
         for fruit, count in inventory.items():
             db.collection('inventory').document(fruit).set({'count': count})
-            print(f"Saved {count} of {fruit} to Firestore")
-
-        logging.info("Inventory data saved successfully")
+           
         print("Inventory data saved successfully")
     except Exception as e:
         logging.error(f"Error saving inventory data: {e}")
