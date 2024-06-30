@@ -16,7 +16,7 @@ from firebase_admin import credentials, firestore, initialize_app
 # Set the environment variable to the path of your Firebase credentials JSON file
 service_account_path = 'C:\\Users\\kayle\\PycharmProjects\\Game\\taskhatchery-firebase-admin.json'
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = service_account_path
-print("GOOGLE_APPLICATION_CREDENTIALS:", os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
+#print("GOOGLE_APPLICATION_CREDENTIALS:", os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
 
 
 # Initialize the game
@@ -461,7 +461,7 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
     }
 
     if fruit_type in inventory and inventory[fruit_type] > 0:
-        print(f"Spending one {fruit_type}. Initial count: {inventory[fruit_type]}")  # Debug print
+        #print(f"Spending one {fruit_type}. Initial count: {inventory[fruit_type]}")  # Debug print
 
         stat_to_increase = fruit_to_stat[fruit_type]
 
@@ -808,8 +808,8 @@ def game_loop():
     inventory, egg_counts, inventory_slots = load_inventory_data()
 
     # Debug prints to check initial values
-    print("Initial Inventory:", inventory)
-    print("Initial Egg Counts:", egg_counts)
+    #print("Initial Inventory:", inventory)
+    #print("Initial Egg Counts:", egg_counts)
 
     while running:
         for event in pygame.event.get():

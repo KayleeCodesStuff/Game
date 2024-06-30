@@ -142,7 +142,7 @@ def load_inventory_data():
             position = data.get('position', 0)
             if 0 < position <= len(inventory_slots):
                 inventory_slots[position - 1] = (rgb, image_file)
-            print(f"Loaded elixir at position {position}: {rgb}, {image_file}")
+            #print(f"Loaded elixir at position {position}: {rgb}, {image_file}")
 
         logging.info("Inventory data loaded successfully")
 
@@ -263,7 +263,7 @@ def save_inventory_data():
         for fruit, count in inventory.items():
             db.collection('inventory').document(fruit).set({'count': count})
            
-        print("Inventory data saved successfully")
+        #print("Inventory data saved successfully")
     except Exception as e:
         logging.error(f"Error saving inventory data: {e}")
         print(f"Error saving inventory data: {e}")
@@ -273,7 +273,7 @@ def save_inventory_data():
 def save_elixir_data(elixir_data):
     try:
         elixirs_ref = db.collection('elixirs')
-        print(f"Saving elixir data at position {elixir_data['position']}")
+        #print(f"Saving elixir data at position {elixir_data['position']}")
 
         # Convert the RGB tuple to a string
         rgb_str = f"({elixir_data['rgb'][0]}, {elixir_data['rgb'][1]}, {elixir_data['rgb'][2]})"
@@ -289,7 +289,7 @@ def save_elixir_data(elixir_data):
             'position': elixir_data['position']
         })
 
-        print("Elixir data saved successfully")
+        #print("Elixir data saved successfully")
     except Exception as e:
         print(f"Error saving elixir data: {e}")
 
@@ -301,9 +301,9 @@ def delete_elixir_data(position):
         found = False
         for doc in query:
             found = True
-            print(f"Attempting to delete elixir data with ID {doc.id} at position {position}")
+            #print(f"Attempting to delete elixir data with ID {doc.id} at position {position}")
             elixirs_ref.document(doc.id).delete()
-            print(f"Elixir data with ID {doc.id} at position {position} deleted successfully")
+            #print(f"Elixir data with ID {doc.id} at position {position} deleted successfully")
         
         if not found:
             print(f"No elixir data found at position {position} to delete")
@@ -346,7 +346,7 @@ def create_egg(dragon1, dragon2, position):
     try:
         egg_ref = db.collection('eggs').document()
         egg_ref.set(egg_data)
-        print(f"Egg data saved successfully with ID: {egg_ref.id}")
+        #print(f"Egg data saved successfully with ID: {egg_ref.id}")
     except Exception as e:
         print(f"Error saving egg data: {e}")
 
@@ -366,7 +366,7 @@ def create_egg(dragon1, dragon2, position):
             egg_inventory_ref.update({'count': egg_count})
         else:
             egg_inventory_ref.set({'count': 1})
-        print(f"Egg inventory updated successfully for phenotype: {egg_phenotype}")
+        #print(f"Egg inventory updated successfully for phenotype: {egg_phenotype}")
     except Exception as e:
         print(f"Error updating egg inventory: {e}")
 
