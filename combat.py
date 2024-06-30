@@ -180,8 +180,12 @@ class BossDragon:
 
 
 class PlayerDragon:
-    def __init__(self, dragon_id):
-        self.id = dragon_id
+    def __init__(self, id):
+        if id is None:
+            raise ValueError("The provided ID is None. Cannot fetch data for a None ID.")
+        
+        self.id = str(id).zfill(4)  # Ensure the id is treated as a string with leading zeros
+        self.dragon_id = None  # This will be fetched from the document data
         self.dragon_name = None
         self.primary_trait = None
         self.secondary1 = None
@@ -211,40 +215,36 @@ class PlayerDragon:
         self.calculate_hitpoints_and_damage()
 
     def fetch_data(self):
-        db_path = os.path.join(os.path.dirname(__file__), 'save.db')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        try:
+            print(f"Fetching data for document ID: {self.id}")
+            doc_ref = db.collection('hatcheddragons').document(self.id)
+            doc = doc_ref.get()
+            
+            if doc.exists:
+                data = doc.to_dict()
+                self.dragon_id = data.get('dragon_id')  # Fetch the dragon_id from the document data
+                self.dragon_name = data.get('dragon_name')
+                self.primary_trait = data.get('primary_trait')
+                self.secondary1 = data.get('secondary1')
+                self.secondary2 = data.get('secondary2')
+                self.secondary3 = data.get('secondary3')
+                self.nurture_trait = data.get('nurture')
+                self.special_abilities = data.get('special_abilities')
+                self.petname = data.get('petname')
+                self.filename = data.get('filename')
+                self.facing_direction = data.get('facing_direction')
+                self.current_hitpoints = data.get('current_hitpoints')
+                self.bonus_health = data.get('bonus_health')
+                self.bonus_attack = data.get('bonus_attack')
+                self.bonus_defense = data.get('bonus_defense')
+                self.bonus_dodge = data.get('bonus_dodge')
+                self.bonus_base_hitpoints = data.get('bonus_base_hitpoints')
+                self.name = self.petname if self.petname else self.dragon_name
+            else:
+                raise ValueError("Player dragon not found in the database")
         
-        cursor.execute("""
-            SELECT id, dragon_name, primary_trait, secondary1, secondary2, secondary3, nurture, special_abilities, petname, filename, facing_direction, current_hitpoints, bonus_health, bonus_attack, bonus_defense, bonus_dodge, bonus_base_hitpoints
-            FROM hatcheddragons
-            WHERE id = ?
-        """, (self.id,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row:
-            self.id = row[0]
-            self.dragon_name = row[1]
-            self.primary_trait = row[2]
-            self.secondary1 = row[3]
-            self.secondary2 = row[4]
-            self.secondary3 = row[5]
-            self.nurture_trait = row[6]
-            self.special_abilities = row[7]
-            self.petname = row[8]
-            self.filename = row[9]
-            self.facing_direction = row[10]
-            self.current_hitpoints = row[11]
-            self.bonus_health = row[12]
-            self.bonus_attack = row[13]
-            self.bonus_defense = row[14]
-            self.bonus_dodge = row[15]
-            self.bonus_base_hitpoints = row[16]
-            self.name = self.petname if self.petname else self.dragon_name
-        else:
-            raise ValueError("Player dragon not found in the database")
+        except Exception as e:
+            raise ValueError(f"Error fetching player dragon data: {e}")
 
     def calculate_and_apply_stats(self):
         # Initialize stats
@@ -285,18 +285,14 @@ class PlayerDragon:
         self.damage = 100 + (self.stats['attack'] / 100 * 100)
 
     def save_current_hitpoints(self):
-        db_path = os.path.join(os.path.dirname(__file__), 'save.db')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE hatcheddragons
-            SET current_hitpoints = ?
-            WHERE id = ?
-        """, (self.current_hitpoints, self.id))
-        
-        conn.commit()
-        conn.close()
+        try:
+            doc_ref = db.collection('hatcheddragons').document(self.id)
+            doc_ref.update({
+                'current_hitpoints': self.current_hitpoints
+            })
+        except Exception as e:
+            raise ValueError(f"Error saving current hitpoints: {e}")
+
 
 
 def calculate_boss_stats(stats):
@@ -503,4 +499,3 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
     for dragon in player_dragons:
         if dragon:
             print(f"Final {dragon.name} HP: {dragon.current_hitpoints}")
-

@@ -657,25 +657,24 @@ def load_player_dragon(dragon_id):
 
 
 def display_player_dragon_selection(player_dragons):
-    conn = connect_db('save.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM hatcheddragons")
-    rows = cursor.fetchall()
-    conn.close()
+    # Fetch the documents from the Firestore collection
+    hatcheddragons_ref = db.collection('hatcheddragons')
+    docs = hatcheddragons_ref.stream()
 
     dragons = []
-    for row in rows:
-        dragon_instance = PlayerDragon(row[0])
-        if dragon_instance.id not in [
-                d.id for d in player_dragons if d is not None]:
-            dragons.append(dragon_instance)
+    for doc in docs:
+        data = doc.to_dict()
+        dragon_id = doc.id  # Use Firestore document ID
+        if dragon_id is not None:
+            dragon_instance = PlayerDragon(dragon_id)
+            if dragon_instance.id not in [d.id for d in player_dragons if d is not None]:
+                dragons.append(dragon_instance)
 
     running = True
     selected_dragon_id = None
     while running:
         screen.fill((30, 30, 30))
-        draw_text(screen, "Select a Dragon", small_font,
-                  WHITE, (WIDTH // 2 - 100, 20))
+        draw_text(screen, "Select a Dragon", small_font, WHITE, (WIDTH // 2 - 100, 20))
 
         for i, dragon in enumerate(dragons):
             display_name = dragon.petname if dragon.petname else dragon.dragon_name
@@ -684,8 +683,7 @@ def display_player_dragon_selection(player_dragons):
             defense = dragon.stats['defense']
             dodge = dragon.stats['dodge']
 
-            text = f"{display_name}: HP: {
-                dragon.current_hitpoints}/{max_hp} DMG: {damage} DEF: {defense} DODGE: {dodge}"
+            text = f"{display_name}: HP: {dragon.current_hitpoints}/{max_hp} DMG: {damage} DEF: {defense} DODGE: {dodge}"
             y_pos = 100 + i * 30
             text_surf = small_font.render(text, True, WHITE)
             screen.blit(text_surf, (50, y_pos))
@@ -702,7 +700,11 @@ def display_player_dragon_selection(player_dragons):
             if event.type == pygame.QUIT:
                 running = False
 
-    return selected_dragon_id
+    if selected_dragon_id is not None:
+        return selected_dragon_id
+    else:
+        print("No valid dragon ID selected.")
+        return None
 
 
 def flip_dragon_image(image, facing_direction, target_direction):
