@@ -493,6 +493,8 @@ def delete_egg_from_db(egg_id):
         print(f"Unexpected error deleting egg: {e}")
 
 
+from firebase_config import db
+
 def get_elixir_details(position):
     try:
         elixir_ref = db.collection('elixirs').where('position', '==', position)
@@ -501,14 +503,15 @@ def get_elixir_details(position):
         for elixir_doc in elixir_docs:
             if elixir_doc.exists:
                 elixir_data = elixir_doc.to_dict()
-                # Print out the entire elixir_data for debugging
-                print(f"Elixir data retrieved: {elixir_data}")
-
-                # Ensure 'rgb' is a string
+                
+                # Ensure the rgb is a string and print it for debugging
                 rgb = elixir_data.get('rgb')
+                print(f"Fetched RGB value: {rgb}, type: {type(rgb)}")  # Debugging print
                 if not isinstance(rgb, str):
                     rgb = str(rgb)
-                print(f"RGB value retrieved: {rgb}, type: {type(rgb)}")
+                elixir_data['rgb'] = rgb
+
+                print(f"Elixir data retrieved: {elixir_data}")
 
                 return elixir_data
         return None

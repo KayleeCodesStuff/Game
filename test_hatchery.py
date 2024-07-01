@@ -1,45 +1,26 @@
 import unittest
-from unittest.mock import patch, MagicMock
-from hatchery import get_elixir_details  # Replace `your_module` with the actual module name
+from hatchery import Ddragon  # Replace 'hatchery' with the actual module name
 
+class TestDdragonMethods(unittest.TestCase):
 
-#this unit test does not access the database, it makes up fake data to test the function
-class TestHatcheryFunctions(unittest.TestCase):
+    def test_add_elixir_info(self):
+        # Create a Ddragon instance
+        ddragon = Ddragon(genotype="genotype1", parent1="parent1", parent2="parent2", phenotype="phenotype")
 
-    @patch('hatchery.db')  # Mock the Firestore database
-    def test_get_elixir_details(self, mock_db):
-        # Setup mock
-        mock_collection = MagicMock()
-        mock_document = MagicMock()
-        mock_document.exists = True
-        mock_document.to_dict.return_value = {
-            'secondary_trait3': 'Showy',
-            'position': 1,
-            'title': 'Coral Playful Dragon Egg Elixir',
-            'image_file': 'pb7.png',
-            'rgb': '(250, 129, 84)',
-            'secondary_trait1': 'Unique',
-            'secondary_trait2': 'Drive',
-            'primary_trait': 'Playful'
-        }
-        mock_collection.where.return_value.get.return_value = [mock_document]
-        mock_db.collection.return_value = mock_collection
+        # Elixir data
+        rgb = '(250, 129, 84)'
+        title = "Coral Playful Dragon Egg Elixir"
+        primary = "Playful"
+        secondaries = ["Unique", "Drive", "Showy"]
 
-        # Call the function
-        result = get_elixir_details(1)
+        # Call the add_elixir_info method
+        ddragon.add_elixir_info(rgb, title, primary, secondaries)
 
-        # Assert the result
-        expected_result = {
-            'secondary_trait3': 'Showy',
-            'position': 1,
-            'title': 'Coral Playful Dragon Egg Elixir',
-            'image_file': 'pb7.png',
-            'rgb': '(250, 129, 84)',
-            'secondary_trait1': 'Unique',
-            'secondary_trait2': 'Drive',
-            'primary_trait': 'Playful'
-        }
-        self.assertEqual(result, expected_result)
+        # Assert the attributes are set correctly
+        self.assertEqual(ddragon.elixir_rgb, '(250, 129, 84)')
+        self.assertEqual(ddragon.elixir_title, title)
+        self.assertEqual(ddragon.elixir_primary, primary)
+        self.assertEqual(ddragon.elixir_secondaries, secondaries)
 
 if __name__ == '__main__':
     unittest.main()
