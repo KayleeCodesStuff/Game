@@ -683,15 +683,25 @@ def get_dragon_image(dragon_id):
         return unhatched_egg_image
 
 
+
 # Function to select a dragon from the pool
 def select_dragon_from_pool(filtered_pool, egg_position):
     if not filtered_pool:
         return None
     selected_dragon = random.choice(filtered_pool)
-    dragon_image = get_dragon_image(selected_dragon[0])  # Use the dragon ID
-    egg_index = egg_positions.index(egg_position)  # Find the index of the egg position
-    egg_images[egg_index] = dragon_image  # Update the egg image with the dragon image
-    return selected_dragon
+    print(f"Selected dragon: {selected_dragon}")  # Debugging print
+
+    # Ensure the dragon ID exists in the selected_dragon dictionary
+    dragon_id = selected_dragon.get('id', None)
+    if dragon_id:
+        dragon_image = get_dragon_image(dragon_id)  # Use the dragon ID
+        egg_index = egg_positions.index(egg_position)  # Find the index of the egg position
+        egg_images[egg_index] = dragon_image  # Update the egg image with the dragon image
+        return selected_dragon
+    else:
+        print("Error: selected_dragon does not have an 'id' field")
+        return None
+
 
 
 def get_elixir_details_from_variable():
