@@ -1,5 +1,4 @@
 import pygame
-import sqlite3
 import os
 import random
 import time
@@ -292,14 +291,33 @@ def initialize_dragons():
             assign_genotype(dragon)
             
 def load_hatched_dragons_from_db():
-    conn = sqlite3.connect("save.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, filename, type, petname, primary_trait, secondary1, secondary2, secondary3, special_abilities, dragon_name, rgb_range, nurture, gender
-        FROM hatcheddragons
-    """)
-    hatched_dragons = cursor.fetchall()
-    conn.close()
+    hatched_dragons = []
+    try:
+        # Load hatched dragons data from Firestore
+        hatched_dragons_ref = db.collection('hatcheddragons')
+        docs = hatched_dragons_ref.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            doc_id = int(doc.id)  # Convert Firestore document ID to integer to handle leading zeros
+            print(f"Loaded hatched dragon document ID: {doc_id}, data: {data}")  # Debugging statement
+            hatched_dragons.append((
+                doc_id,  # Use the document ID as the dragon's ID
+                data.get('filename'),
+                data.get('type'),
+                data.get('petname'),
+                data.get('primary_trait'),
+                data.get('secondary1'),
+                data.get('secondary2'),
+                data.get('secondary3'),
+                data.get('special_abilities'),
+                data.get('dragon_name'),
+                data.get('rgb_range'),
+                data.get('nurture'),
+                data.get('gender')
+            ))
+    except Exception as e:
+        print(f"Error loading hatched dragons data: {e}")
+
     return hatched_dragons
 
         
