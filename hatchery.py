@@ -306,16 +306,26 @@ class Ddragon:
         self.petname = petname
 
     def _generate_unique_doc_id(self):
-        while True:
-            new_doc_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
-            doc_ref = db.collection('hatcheddragons').document(new_doc_id)
-            if not doc_ref.get().exists:
-                return new_doc_id
+        try:
+            # Check for available ID from 0000 to 9999
+            for i in range(10000):
+                new_doc_id = f'{i:04d}'  # Format the ID with leading zeros
+                doc_ref = db.collection('hatcheddragons').document(new_doc_id)
+                if not doc_ref.get().exists:
+                    return new_doc_id
+            raise Exception("No available document ID found.")
+        except Exception as e:
+            print(f"Error generating unique document ID: {e}")
+            return None
 
     def save_to_db(self):
         try:
             # Generate a unique doc_id
             self.doc_id = self._generate_unique_doc_id()
+            if not self.doc_id:
+                print("Failed to generate a unique document ID.")
+                return
+
             dragon_ref = db.collection('hatcheddragons').document(self.doc_id)
             
             # Create dragon data dictionary
@@ -343,10 +353,11 @@ class Ddragon:
             
             # Save dragon data to Firestore
             dragon_ref.set(dragon_data)
-            print(f"Dragon with facing_direction: {self.facing_direction} saved successfully to Firestore with doc_id: {self.doc_id}")  # Debugging print
+            print(f"Dragon with facing_direction: {self.facing_direction} saved successfully to Firestore with doc_id: {self.doc_id}")
 
         except Exception as e:
             print(f"Error saving dragon to Firestore: {e}")
+
 
 # Add these lines before the main function
 def draw_text(surface, text, font, color, position):
@@ -367,7 +378,7 @@ while len(egg_positions) < 10:
     if not is_overlapping(new_rect, egg_positions):
         egg_positions.append(new_rect)
 
-def draw_screen(selected_egg_index, active_timers, dragon_images):
+def draw_screen(selected_egg_index, active_timers, dragon_images, petnames):
     screen.fill(BLACK)
     screen.blit(background, (0, 0))
 
@@ -381,12 +392,14 @@ def draw_screen(selected_egg_index, active_timers, dragon_images):
                 screen.blit(egg_images[i], rect.topleft)
 
         if dragon_images[i] is not None:
-            #print(f"Drawing adult dragon image at position: {rect.topleft}")
             screen.blit(dragon_images[i], rect.topleft)
+            # Display pet name if it exists
+            if petnames[i]:
+                petname_text = small_font.render(petnames[i], True, (57, 255, 20))  # Neon green color
+                screen.blit(petname_text, (rect.topleft[0], rect.topleft[1] - 30))
 
         for egg_timer in active_timers:
             if egg_timer.egg_index == i and egg_timer.baby_dragon_image is not None:
-                #print(f"Drawing baby dragon image at position: {egg_timer.egg_position}")
                 screen.blit(egg_timer.baby_dragon_image, egg_timer.egg_position)  # Draw baby dragon at resized size
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
@@ -396,26 +409,35 @@ def draw_screen(selected_egg_index, active_timers, dragon_images):
 
     pygame.display.flip()
 
+
  
 def display_egg_menu(selected_egg_index, eggs):
     running = True
     menu_font = pygame.font.Font(None, 28)
     menu_rects = []
 
+    # Dimensions for the selection window
+    menu_width, menu_height = 600, 400
+    menu_x = (WIDTH - menu_width) // 2
+    menu_y = (HEIGHT - menu_height) // 2
+    menu_surface = pygame.Surface((menu_width, menu_height))
+    menu_surface.fill(GREY)
+    
     while running:
-        screen.fill(GREY)
         menu_rects.clear()  # Clear the list to avoid duplication
+        menu_surface.fill(GREY)  # Clear the menu surface
 
         # Filter out placed eggs
         available_eggs = [egg for egg in eggs if egg['id'] not in placed_egg_ids]
 
         for i, egg in enumerate(available_eggs):
-            item_text = f"{egg['id']}, {egg['phenotype']}, P1: {egg['parent1_name']} & {egg['parent2_name']}"  # Assuming field names
+            item_text = f"{egg['phenotype']}, {egg['parent1_name']} & {egg['parent2_name']}"
             text_surf = menu_font.render(item_text, True, BLACK)
-            text_rect = text_surf.get_rect(center=(WIDTH // 2, 50 + i * 30))
-            screen.blit(text_surf, text_rect)
-            menu_rects.append((text_rect, egg['id']))  # Store the egg ID
+            text_rect = text_surf.get_rect(center=(menu_width // 2, 50 + i * 30))
+            menu_surface.blit(text_surf, text_rect)
+            menu_rects.append((text_rect.move(menu_x, menu_y), egg['id']))  # Store the egg ID with adjusted position
 
+        screen.blit(menu_surface, (menu_x, menu_y))
         pygame.display.flip()
 
         for event in pygame.event.get():
@@ -440,7 +462,6 @@ def display_egg_menu(selected_egg_index, eggs):
                             print(f"Egg selected from menu: {selected_egg['id']}")  # Debug print
                             return selected_egg['id']  # Return the selected egg ID
     return None
-
                       
 
 def fetch_random_nurture_options():
@@ -466,27 +487,39 @@ def display_nurture_options():
 
     running = True
     selected_trait = None
-    
+
+    # Dimensions for the selection window
+    menu_width, menu_height = 800, 600
+    menu_x = (WIDTH - menu_width) // 2
+    menu_y = (HEIGHT - menu_height) // 2
+    menu_surface = pygame.Surface((menu_width, menu_height))
+    menu_surface.fill(GREY)
+
     while running:
-        screen.fill(GREY)
-        
-        for i, (option_key, option_value) in enumerate(options.items()):
-            text_surf = font.render(option_value[0], True, BLACK)
-            text_rect = text_surf.get_rect(center=(WIDTH // 2, 100 + i * 50))
-            screen.blit(text_surf, text_rect)
-            
-            if text_rect.collidepoint(pygame.mouse.get_pos()):
-                pygame.draw.rect(screen, RED, text_rect.inflate(10, 10), 2)
-                if pygame.mouse.get_pressed()[0]:
-                    selected_trait = option_value[0]  # Correctly fetch the trait
-                    running = False
-        
-        pygame.display.flip()
-        
+        menu_surface.fill(GREY)  # Clear the menu surface
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-    
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                for i, (option_key, option_value) in enumerate(options.items()):
+                    text_surf = font.render(option_value[0], True, BLACK)
+                    text_rect = text_surf.get_rect(center=(menu_width // 2, 100 + i * 50))
+                    if text_rect.collidepoint(mouse_pos[0] - menu_x, mouse_pos[1] - menu_y):
+                        selected_trait = option_value[0]
+                        running = False
+
+        for i, (option_key, option_value) in enumerate(options.items()):
+            text_surf = font.render(option_value[0], True, BLACK)
+            text_rect = text_surf.get_rect(center=(menu_width // 2, 100 + i * 50))
+            menu_surface.blit(text_surf, text_rect)
+            if text_rect.collidepoint(pygame.mouse.get_pos()[0] - menu_x, pygame.mouse.get_pos()[1] - menu_y):
+                pygame.draw.rect(menu_surface, RED, text_rect.inflate(10, 10), 2)
+
+        screen.blit(menu_surface, (menu_x, menu_y))
+        pygame.display.flip()
+
     return selected_trait
 
 
@@ -708,16 +741,21 @@ def get_elixir_details_from_variable():
     return current_elixir_details
 
 
-def get_text_input(prompt, font, screen, timeout=10):
-    input_box = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 20, 200, 40)
-    color_inactive = pygame.Color('lightskyblue3')
+def get_text_input(prompt, font, screen, timeout=10, egg_position=(0, 0)):
+    input_width, input_height = 400, 200
+    input_x = (WIDTH - input_width) // 2
+    input_y = (HEIGHT - input_height) // 2
+    input_surface = pygame.Surface((input_width, input_height))
+    input_surface.fill(GREY)
+
+    input_box = pygame.Rect(50, input_height // 2 - 20, 300, 40)
     color_active = pygame.Color('dodgerblue2')
-    color = color_inactive
-    active = False
+    color = color_active
     text = ''
     done = False
 
     start_time = time.time()
+    active = True  # Start with the input box in the selected state
 
     while not done:
         current_time = time.time()
@@ -729,12 +767,6 @@ def get_text_input(prompt, font, screen, timeout=10):
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if input_box.collidepoint(event.pos):
-                    active = not active
-                else:
-                    active = False
-                color = color_active if active else color_inactive
             if event.type == pygame.KEYDOWN:
                 if active:
                     if event.key == pygame.K_RETURN:
@@ -744,53 +776,37 @@ def get_text_input(prompt, font, screen, timeout=10):
                     else:
                         text += event.unicode
 
-        screen.fill((30, 30, 30))
-        txt_surface = font.render(prompt + text, True, color)
+        input_surface.fill(GREY)  # Clear the input surface
+        txt_surface = font.render(prompt + text, True, BLACK)
         width = max(200, txt_surface.get_width() + 10)
         input_box.w = width
-        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
-        pygame.draw.rect(screen, color, input_box, 2)
+        input_surface.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
+        pygame.draw.rect(input_surface, color, input_box, 2)
+
+        screen.blit(input_surface, (input_x, input_y))
+        
+        # Display the entered text over the egg image in neon green
+        text_surface = font.render(text, True, (57, 255, 20))  # Neon green color
+        screen.blit(text_surface, (egg_position[0], egg_position[1] - 30))
+
         pygame.display.flip()
-
-
+        
+        
+    # Ensure the text remains visible over the egg image after input is done
+    text_surface = font.render(text, True, (57, 255, 20))  # Neon green color
+    screen.blit(text_surface, (egg_position[0], egg_position[1] - 30))
+    pygame.display.flip()
+    
+    
     return text
 
 
-def save_all_ddragon_instances(ddragon_list):
+def save_all_ddragon_instances(ddragon_save_list):
     try:
-        for ddragon in ddragon_list:
-            # Generate a unique document ID for each dragon
-            doc_id = ddragon._generate_unique_doc_id()
-            dragon_ref = db.collection('hatcheddragons').document(doc_id)
-            
-            # Create dragon data dictionary
-            dragon_data = {
-                'genotype': ddragon.genotype,
-                'parent1': ddragon.parent1,
-                'parent2': ddragon.parent2,
-                'elixir_rgb': ddragon.elixir_rgb,
-                'elixir_title': ddragon.elixir_title,
-                'dragon_id': ddragon.dragon_id,
-                'dragon_name': ddragon.dragon_name,
-                'primary_trait': ddragon.primary,
-                'secondary1': ddragon.secondary1,
-                'secondary2': ddragon.secondary2,
-                'secondary3': ddragon.secondary3,
-                'nurture': ddragon.nurture,
-                'gender': ddragon.gender,
-                'rgb_range': ddragon.rgb_range,
-                'filename': ddragon.filename,
-                'type': ddragon.type,
-                'special_abilities': ddragon.special_abilities,
-                'petname': ddragon.petname,
-                'facing_direction': ddragon.facing_direction
-            }
-            
-            # Save dragon data to Firestore
-            dragon_ref.set(dragon_data)
-            print(f"Dragon with facing_direction: {ddragon.facing_direction} saved successfully to Firestore with doc_id: {doc_id}")  # Debugging print
+        for ddragon in ddragon_save_list:
+            ddragon.save_to_db()  # Use the updated save_to_db method
 
-        print(f"Saved {len(ddragon_list)} Ddragon instances to Firestore")
+        print(f"Saved {len(ddragon_save_list)} Ddragon instances to Firestore")
     except Exception as e:
         print(f"Error saving ddragon instances to Firestore: {e}")
 
@@ -803,7 +819,7 @@ def main():
     print("Initial selected_egg_index:", selected_egg_index)
     active_timers = []
     elixir_data = None  # Initialize elixir_data
-    current_elixir_details = None  # Go-between variable to store elixir details
+    petnames = [None] * 10  # Initialize petnames array
 
     # Fetch eggs from Firestore
     eggs = fetch_eggs_from_firestore()
@@ -903,7 +919,9 @@ def main():
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
 
                             # Prompt the user for a pet name with a timeout
-                            petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen, timeout=10)
+                            egg_position = egg_positions[egg_timer.egg_index].topleft
+                            petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen, timeout=10, egg_position=egg_positions[egg_timer.egg_index].topleft)
+                            petnames[egg_timer.egg_index] = petname
                             ddragon_instances[egg_timer.egg_index].set_petname(petname)
 
                             # Accumulate the Ddragon instance to save later
@@ -921,7 +939,7 @@ def main():
         # Load the selected dragon images
         dragon_images = load_selected_dragon_images(ddragon_instances)
 
-        draw_screen(selected_egg_index, active_timers, dragon_images)
+        draw_screen(selected_egg_index, active_timers, dragon_images, petnames)  # Include petnames
         pygame.display.flip()  # Force a screen redraw
 
     if elixir_data:
