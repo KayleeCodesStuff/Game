@@ -1,7 +1,6 @@
 # Standard library imports
 import random
 import sys
-import sqlite3
 import time
 import os
 from firebase_config import db
@@ -10,7 +9,7 @@ from firebase_config import db
 import pygame
 
 # Custom imports
-from game import initialize, load_inventory_data, save_inventory_data, save_elixir_data, draw_inventory, load_and_resize_image, is_overlapping
+from game import *
 
 # Initialize pygame and fonts
 initialize()
@@ -98,31 +97,56 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 dragons_db_path = os.path.join(current_dir, 'dragonsedit.db')
 save_db_path = os.path.join(current_dir, 'save.db')
 
-try:
-    dragons_conn = sqlite3.connect(dragons_db_path)
-    dragons_cursor = dragons_conn.cursor()
-    dragons_cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_characteristics, special_abilities, rgb_value_range, Nurture, gender, secondary_trait1, secondary_trait2, secondary_trait3, facing_direction FROM dragons;")
-    dragons = dragons_cursor.fetchall()
-    print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
-except sqlite3.OperationalError as e:
-    print(f"Error opening dragons database: {e}")
-finally:
-    dragons_conn.close()
+def fetch_dragons_from_firestore():
+    try:
+        dragons_ref = db.collection('dragons')
+        dragons_docs = dragons_ref.get()
 
+        dragons = []
+        for dragon_doc in dragons_docs:
+            if dragon_doc.exists:
+                dragon_data = dragon_doc.to_dict()
+                dragons.append(dragon_data)
 
+        print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
+        return dragons
+    except Exception as e:
+        print(f"Firestore error retrieving dragons: {e}")
+        return []
 
-try:
-    save_conn = sqlite3.connect(save_db_path)
-    save_cursor = save_conn.cursor()
-    save_cursor.execute("SELECT * FROM elixirs;")
-    elixirs = save_cursor.fetchall()
-    save_cursor.execute("SELECT * FROM eggs;")
-    eggs = save_cursor.fetchall()
-except sqlite3.OperationalError as e:
-    print(f"Error opening save database: {e}")
-finally:
-    save_conn.close()
+def fetch_elixirs_from_firestore():
+    try:
+        elixirs_ref = db.collection('elixirs')
+        elixirs_docs = elixirs_ref.get()
 
+        elixirs = []
+        for elixir_doc in elixirs_docs:
+            if elixir_doc.exists:
+                elixir_data = elixir_doc.to_dict()
+                elixirs.append(elixir_data)
+
+        return elixirs
+    except Exception as e:
+        print(f"Firestore error retrieving elixirs: {e}")
+        return []
+
+def fetch_eggs_from_firestore():
+    try:
+        eggs_ref = db.collection('eggs')
+        eggs_docs = eggs_ref.get()
+
+        eggs = []
+        for egg_doc in eggs_docs:
+            if egg_doc.exists:
+                egg_data = egg_doc.to_dict()
+                egg_data['id'] = egg_doc.id  # Add the document ID to the egg data
+                eggs.append(egg_data)
+
+        return eggs
+    except Exception as e:
+        print(f"Firestore error retrieving eggs: {e}")
+        return []
+    
 # Define load_image function
 def load_image(file_path):
     try:
@@ -171,8 +195,8 @@ class EggTimer:
     def __init__(self, egg_index, egg_position, egg, duration=10, default_trait="independent"):
         self.egg_index = egg_index
         self.egg_position = egg_position
-        self.egg_id = egg[0]
-        self.egg_phenotype = egg[2]
+        self.egg_id = egg['id']
+        self.egg_phenotype = egg['phenotype']
         self.duration = duration
         self.default_trait = default_trait
         self.start_ticks = pygame.time.get_ticks()
@@ -183,6 +207,7 @@ class EggTimer:
         self.mid_image_loaded = False
         self.hide_egg_rect = False
         self.events = {5: self.mid_timer_event, 0: self.end_timer_event}
+
 
     def update(self):
         seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
@@ -368,27 +393,25 @@ def draw_screen(selected_egg_index, active_timers, dragon_images):
 
     pygame.display.flip()
 
-
-
  
-def display_egg_menu(selected_egg_index):
+def display_egg_menu(selected_egg_index, eggs):
     running = True
     menu_font = pygame.font.Font(None, 28)
     menu_rects = []
-    
+
     while running:
         screen.fill(GREY)
         menu_rects.clear()  # Clear the list to avoid duplication
 
         # Filter out placed eggs
-        available_eggs = [egg for egg in eggs if egg[0] not in placed_egg_ids]
+        available_eggs = [egg for egg in eggs if egg['id'] not in placed_egg_ids]
 
         for i, egg in enumerate(available_eggs):
-            item_text = f"{egg[0]}, {egg[2]}, P1: {egg[4]} & {egg[5]}"  # Assuming egg[0] is the ID, egg[2] is the phenotype, egg[4] is parent 1, and egg[5] is parent 2
+            item_text = f"{egg['id']}, {egg['phenotype']}, P1: {egg['parent1_name']} & {egg['parent2_name']}"  # Assuming field names
             text_surf = menu_font.render(item_text, True, BLACK)
             text_rect = text_surf.get_rect(center=(WIDTH // 2, 50 + i * 30))
             screen.blit(text_surf, text_rect)
-            menu_rects.append((text_rect, egg[0]))  # Store the egg ID
+            menu_rects.append((text_rect, egg['id']))  # Store the egg ID
 
         pygame.display.flip()
 
@@ -399,9 +422,9 @@ def display_egg_menu(selected_egg_index):
                 x, y = event.pos
                 for rect, egg_id in menu_rects:
                     if rect.collidepoint(x, y):
-                        selected_egg = next((egg for egg in available_eggs if egg[0] == egg_id), None)
+                        selected_egg = next((egg for egg in available_eggs if egg['id'] == egg_id), None)
                         if selected_egg:
-                            phenotype = selected_egg[2]
+                            phenotype = selected_egg['phenotype']
                             # Update the egg image based on the phenotype
                             if phenotype in egg_images_dict:
                                 egg_images[selected_egg_index] = egg_images_dict[phenotype]
@@ -409,39 +432,27 @@ def display_egg_menu(selected_egg_index):
                                 egg_images[selected_egg_index] = unhatched_egg_image  # Default image if phenotype not found
 
                             egg_selected_from_db[selected_egg_index] = True  # Mark egg as selected from database
-                            placed_egg_ids.append(selected_egg[0])  # Add egg ID to placed eggs list
+                            placed_egg_ids.append(selected_egg['id'])  # Add egg ID to placed eggs list
                             running = False
-                            print(f"Egg selected from menu: {selected_egg[0]}")  # Debug print
-                            return selected_egg[0]  # Return the selected egg ID
+                            print(f"Egg selected from menu: {selected_egg['id']}")  # Debug print
+                            return selected_egg['id']  # Return the selected egg ID
     return None
 
                       
-def delete_elixir_from_db(elixir_id):
-    try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM elixirs WHERE id = ?", (elixir_id,))
-            conn.commit()
-    except sqlite3.Error as e:
-        print(f"SQLite error deleting elixir: {e}")
-    except Exception as e:
-        print(f"Unexpected error deleting elixir: {e}")
-
 
 def fetch_random_nurture_options():
     try:
-        conn = sqlite3.connect('dragonsedit.db')
-        cursor = conn.cursor()
-        
         options = {}
         for option in ['A', 'B', 'C', 'D']:
-            cursor.execute(f"SELECT text, trait FROM nurture WHERE option = '{option}' ORDER BY RANDOM() LIMIT 1;")
-            options[option] = cursor.fetchone()
-        
-        conn.close()
+            nurture_ref = db.collection('nurture').where('option', '==', option)
+            nurture_docs = nurture_ref.get()
+            nurture_list = list(nurture_docs)
+            if nurture_list:
+                selected_doc = random.choice(nurture_list)
+                options[option] = (selected_doc.get('text'),)  # Fetch only the 'text' field
         return options
     except Exception as e:
-        print(f"Error fetching nurture options: {e}")
+        print(f"Firestore error fetching nurture options: {e}")
         return None
 
 
@@ -464,7 +475,7 @@ def display_nurture_options():
             if text_rect.collidepoint(pygame.mouse.get_pos()):
                 pygame.draw.rect(screen, RED, text_rect.inflate(10, 10), 2)
                 if pygame.mouse.get_pressed()[0]:
-                    selected_trait = option_value[1]
+                    selected_trait = option_value[0]  # Correctly fetch the trait
                     running = False
         
         pygame.display.flip()
@@ -476,24 +487,15 @@ def display_nurture_options():
     return selected_trait
 
 
-# Update the egg deletion function to use egg ID
 def delete_egg_from_db(egg_id):
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM eggs WHERE id = ?", (egg_id,))
-            conn.commit()
-            cursor.execute("SELECT * FROM eggs WHERE id = ?", (egg_id,))
-            result = cursor.fetchone()
-            if result:
-                print(f"Error: Egg with ID {egg_id} was not deleted.")
-    except sqlite3.Error as e:
-        print(f"SQLite error deleting egg: {e}")
+        egg_ref = db.collection('eggs').document(egg_id)
+        egg_ref.delete()
+        print(f"Egg with ID {egg_id} deleted from Firestore.")
     except Exception as e:
-        print(f"Unexpected error deleting egg: {e}")
+        print(f"Firestore error deleting egg: {e}")
 
 
-from firebase_config import db
 
 def get_elixir_details(position):
     try:
@@ -503,16 +505,11 @@ def get_elixir_details(position):
         for elixir_doc in elixir_docs:
             if elixir_doc.exists:
                 elixir_data = elixir_doc.to_dict()
-                
-                # Ensure the rgb is a string and print it for debugging
                 rgb = elixir_data.get('rgb')
-                print(f"Fetched RGB value: {rgb}, type: {type(rgb)}")  # Debugging print
                 if not isinstance(rgb, str):
                     rgb = str(rgb)
                 elixir_data['rgb'] = rgb
-
                 print(f"Elixir data retrieved: {elixir_data}")
-
                 return elixir_data
         return None
     except Exception as e:
@@ -525,28 +522,27 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
 
     elixir_primary = ddragon_instance.elixir_primary if ddragon_instance.elixir_primary is not None else ""
     elixir_secondaries = ddragon_instance.elixir_secondaries if ddragon_instance.elixir_secondaries is not None else []
-    #print(f"Building pool for Ddragon instance with primary: {elixir_primary} and secondaries: {elixir_secondaries}")
     
     for dragon in dragons:
         chances = 0  # Initialize chances for each dragon
 
         # Check for shared primary trait
-        if dragon[4] == elixir_primary:
+        if dragon['primary_trait'] == elixir_primary:
             chances += 1
 
         # Check for shared secondary traits
         for secondary in elixir_secondaries:
-            if secondary == dragon[10]:  # Adjusted indices
+            if secondary == dragon['secondary1']:
                 chances += 1
                 
-            if secondary == dragon[11]:
+            if secondary == dragon['secondary2']:
                 chances += 1
             
-            if secondary == dragon[12]:
+            if secondary == dragon['secondary3']:
                 chances += 1
                      
-        #Adjust chances based on nurture trait
-        if chances > 0 and dragon[7] == selected_trait:  # Only increase if there are already some chances
+        # Adjust chances based on nurture trait
+        if chances > 0 and dragon['nurture'] == selected_trait:  # Only increase if there are already some chances
             chances += 1
 
         if chances > 0:
@@ -554,32 +550,30 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
 
     ddragon_instance.pool = pool  # Assign the pool to the Ddragon instance
 
-        # Print the pool after applying the nurture trait
-    #print(f"Pool after applying nurture trait: {[dragon[0] for dragon in pool]}")
     return pool
+
 
 def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     filtered_pool = []
 
-    egg_phenotype = egg[2]
+    egg_phenotype = egg['phenotype']
     try:
         # Print to debug the elixir_rgb value and its type before eval
         print(f"elixir_rgb received before eval: {elixir_rgb}, type: {type(elixir_rgb)}")
 
         # Ensure elixir_rgb is correctly formatted as a string
         elixir_rgb_value = eval(elixir_rgb)  # Convert string representation of RGB to tuple
-        
+
         print(f"elixir_rgb_value after eval: {elixir_rgb_value}, type: {type(elixir_rgb_value)}")
 
-        # Implement the rest of your filtering logic here
         for dragon in pool:
-            dragon_phenotype = dragon[2]
-            rgb_ranges = dragon[7].strip('()').split(', ')
+            dragon_phenotype = dragon['type']  # Assuming 'type' field represents phenotype
+            rgb_ranges = dragon['rgb_value_range'].strip('()').split(', ')  # Adjusted field name
 
             try:
                 dragon_rgb_range = [(int(r.split('-')[0]), int(r.split('-')[1])) for r in rgb_ranges]
             except ValueError as e:
-                print(f"Error parsing RGB range for dragon {dragon[0]}: {e}")
+                print(f"Error parsing RGB range for dragon {dragon['id']}: {e}")
                 continue
 
             if egg_phenotype == "metallic":
@@ -600,6 +594,7 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
         return filtered_pool
 
     return filtered_pool
+
 
 
 #Load baby dragon images
@@ -664,15 +659,17 @@ def load_dragon_image(dragon_filename):
 
 
 def get_dragon_image(dragon_id):
-    conn = sqlite3.connect('dragonsedit.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT filename FROM dragons WHERE id = ?", (dragon_id,))
-    dragon_filename = cursor.fetchone()
-    conn.close()
-    if dragon_filename:
-        #print(f"Loading image for dragon {dragon_id}: {dragon_filename[0]}")
-        return load_dragon_image(dragon_filename[0])
-    return unhatched_egg_image
+    try:
+        dragon_ref = db.collection('dragons').document(dragon_id)
+        dragon_doc = dragon_ref.get()
+        if dragon_doc.exists:
+            dragon_filename = dragon_doc.to_dict().get('filename')
+            if dragon_filename:
+                return load_dragon_image(dragon_filename)
+        return unhatched_egg_image
+    except Exception as e:
+        print(f"Firestore error retrieving dragon image: {e}")
+        return unhatched_egg_image
 
 
 # Function to select a dragon from the pool
@@ -776,9 +773,9 @@ def save_all_ddragon_instances(ddragon_list):
     except Exception as e:
         print(f"Error saving ddragon instances to Firestore: {e}")
 
-# Main function adjustments
+
 def main():
-    global elixir_color
+    global elixir_color, eggs  # Declare eggs as global if used across functions
     elixir_color = None
     running = True
     selected_egg_index = None  # For egg position on the board
@@ -786,6 +783,9 @@ def main():
     active_timers = []
     elixir_data = None  # Initialize elixir_data
     current_elixir_details = None  # Go-between variable to store elixir details
+
+    # Fetch eggs from Firestore
+    eggs = fetch_eggs_from_firestore()
 
     while running:
         for event in pygame.event.get():
@@ -799,15 +799,15 @@ def main():
                         selected_egg_index = j
                         print("selected_egg_index set to:", selected_egg_index)
                         egg_selected = True
-                        selected_egg_id = display_egg_menu(selected_egg_index)
+                        selected_egg_id = display_egg_menu(selected_egg_index, eggs)
                         if selected_egg_id is not None:
                             # Fetch the selected egg from the database using the selected_egg_id
-                            selected_egg = next((egg for egg in eggs if egg[0] == selected_egg_id), None)
+                            selected_egg = next((egg for egg in eggs if egg['id'] == selected_egg_id), None)
                             print("Selected egg from database:", selected_egg)
                             if selected_egg:
-                                phenotype = selected_egg[2]
+                                phenotype = selected_egg['phenotype']
                                 print("Phenotype from selected egg:", phenotype)
-                                ddragon_instance = Ddragon(selected_egg[1], selected_egg[4], selected_egg[5], phenotype)
+                                ddragon_instance = Ddragon(selected_egg['genotype'], selected_egg['parent1_name'], selected_egg['parent2_name'], phenotype)
                                 ddragon_instances[selected_egg_index] = ddragon_instance
                                 egg_ids_on_board[selected_egg_index] = selected_egg_id
                                 print(f"Created Ddragon instance for egg index {selected_egg_index} with ID {selected_egg_id} and phenotype {phenotype}")
@@ -835,8 +835,8 @@ def main():
 
                                 # Check if timer already exists for this egg
                                 if selected_egg_index not in active_timers_dict:
-                                    selected_egg = next((egg for egg in eggs if egg[0] == egg_id), None)
-                                    new_timer = EggTimer(selected_egg_index, egg_position, selected_egg)  # Pass the egg tuple
+                                    selected_egg = next((egg for egg in eggs if egg['id'] == egg_id), None)
+                                    new_timer = EggTimer(selected_egg_index, egg_position, selected_egg)  # Pass the egg dictionary
                                     active_timers.append(new_timer)
                                     active_timers_dict[selected_egg_index] = new_timer
 
@@ -860,8 +860,9 @@ def main():
                                 # Remove elixir from inventory and delete from database
                                 inventory_slots[i] = None
                                 elixir_color = None
-                                delete_elixir_from_db(elixir['image_file'])
+                                delete_elixir_data(i + 1)  # Use the position argument
                                 break
+
 
         for egg_timer in active_timers[:]:
             selected_trait = egg_timer.display()
@@ -869,11 +870,11 @@ def main():
                 ddragon_instance = ddragon_instances[egg_timer.egg_index]  # Get the correct Ddragon instance
                 if selected_trait and ddragon_instance:
                     # Use the correct egg from the database
-                    selected_egg = next((egg for egg in eggs if egg[0] == egg_ids_on_board[egg_timer.egg_index]), None)
+                    selected_egg = next((egg for egg in eggs if egg['id'] == egg_ids_on_board[egg_timer.egg_index]), None)
                     filtered_pool = filter_pool_by_phenotype_and_rgb(ddragon_instance.pool, selected_egg, ddragon_instance.elixir_rgb)
                     selected_dragon = select_dragon_from_pool(filtered_pool, egg_positions[egg_timer.egg_index])
                     if selected_dragon:
-                        print(f"Selected dragon: {selected_dragon[0]} for egg index {egg_timer.egg_index}")
+                        print(f"Selected dragon: {selected_dragon['id']} for egg index {egg_timer.egg_index}")
                         if ddragon_instances[egg_timer.egg_index] is not None:
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
 
