@@ -100,19 +100,22 @@ save_db_path = os.path.join(current_dir, 'save.db')
 def fetch_dragons_from_firestore():
     try:
         dragons_ref = db.collection('dragons')
-        dragons_docs = dragons_ref.get()
+        dragons_docs = dragons_ref.stream()
 
         dragons = []
         for dragon_doc in dragons_docs:
             if dragon_doc.exists:
                 dragon_data = dragon_doc.to_dict()
+                dragon_data['id'] = dragon_doc.id  # Add the document ID to the dragon data
+                print(f"Dragon data fetched: {dragon_data}")
                 dragons.append(dragon_data)
 
-        print(f"Number of dragons fetched: {len(dragons)}")  # Debugging print statement
+        print(f"Number of dragons fetched: {len(dragons)}")
         return dragons
     except Exception as e:
         print(f"Firestore error retrieving dragons: {e}")
         return []
+
 
 def fetch_elixirs_from_firestore():
     try:
@@ -499,7 +502,7 @@ def delete_egg_from_db(egg_id):
 
 def get_elixir_details(position):
     try:
-        elixir_ref = db.collection('elixirs').where('position', '==', position)
+        elixir_ref = db.collection('elixirs').where(field_path='position', op_string='==', value=position)
         elixir_docs = elixir_ref.get()
 
         for elixir_doc in elixir_docs:
@@ -522,32 +525,38 @@ def get_statistical_pool(ddragon_instance, dragons, selected_trait):
 
     elixir_primary = ddragon_instance.elixir_primary if ddragon_instance.elixir_primary is not None else ""
     elixir_secondaries = ddragon_instance.elixir_secondaries if ddragon_instance.elixir_secondaries is not None else []
-    
+
     for dragon in dragons:
         chances = 0  # Initialize chances for each dragon
 
+        primary_trait = dragon.get('primary_trait') or dragon.get('primary_characteristic')
+        nurture_trait = dragon.get('nurture') or dragon.get('Nurture')
+
+        print(f"Processing dragon: {dragon.get('id', 'No ID')} with traits {primary_trait}, {dragon.get('secondary_trait1')}, {dragon.get('secondary_trait2')}, {dragon.get('secondary_trait3')}, nurture: {nurture_trait}")
+
         # Check for shared primary trait
-        if dragon['primary_trait'] == elixir_primary:
+        if primary_trait == elixir_primary:
             chances += 1
 
         # Check for shared secondary traits
         for secondary in elixir_secondaries:
-            if secondary == dragon['secondary1']:
+            if secondary == dragon.get('secondary_trait1'):
                 chances += 1
-                
-            if secondary == dragon['secondary2']:
+
+            if secondary == dragon.get('secondary_trait2'):
                 chances += 1
-            
-            if secondary == dragon['secondary3']:
+
+            if secondary == dragon.get('secondary_trait3'):
                 chances += 1
-                     
+
         # Adjust chances based on nurture trait
-        if chances > 0 and dragon['nurture'] == selected_trait:  # Only increase if there are already some chances
+        if chances > 0 and nurture_trait == selected_trait:  # Only increase if there are already some chances
             chances += 1
 
         if chances > 0:
             pool.extend([dragon] * chances)
 
+    print(f"Generated pool size: {len(pool)}")
     ddragon_instance.pool = pool  # Assign the pool to the Ddragon instance
 
     return pool
@@ -592,6 +601,8 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     except (SyntaxError, TypeError) as e:
         print(f"Error evaluating elixir_rgb: {elixir_rgb}, type: {type(elixir_rgb)}, error: {e}")
         return filtered_pool
+
+    print(f"Filtered pool size: {len(filtered_pool)}")
 
     return filtered_pool
 
@@ -775,7 +786,7 @@ def save_all_ddragon_instances(ddragon_list):
 
 
 def main():
-    global elixir_color, eggs  # Declare eggs as global if used across functions
+    global elixir_color, eggs, dragons  # Declare dragons as global
     elixir_color = None
     running = True
     selected_egg_index = None  # For egg position on the board
@@ -786,6 +797,9 @@ def main():
 
     # Fetch eggs from Firestore
     eggs = fetch_eggs_from_firestore()
+
+    # Fetch dragons from Firestore
+    dragons = fetch_dragons_from_firestore()
 
     while running:
         for event in pygame.event.get():

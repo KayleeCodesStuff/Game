@@ -295,19 +295,18 @@ def save_elixir_data(elixir_data):
 def delete_elixir_data(position):
     try:
         elixirs_ref = db.collection('elixirs')
-        query = elixirs_ref.where('position', '==', position).stream()
+        query = elixirs_ref.where(field_path='position', op_string='==', value=position).stream()
         
         found = False
         for doc in query:
             found = True
-            #print(f"Attempting to delete elixir data with ID {doc.id} at position {position}")
             elixirs_ref.document(doc.id).delete()
-            #print(f"Elixir data with ID {doc.id} at position {position} deleted successfully")
         
         if not found:
             print(f"No elixir data found at position {position} to delete")
     except Exception as e:
         print(f"Error deleting elixir data: {e}")
+
 
 
 #Updae the inventory in the fitness game after 
