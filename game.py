@@ -1,6 +1,5 @@
 import pygame
 import random
-import sqlite3
 import logging
 from firebase_config import db
 import os
@@ -370,9 +369,7 @@ def create_egg(dragon1, dragon2, position):
     except Exception as e:
         print(f"Error updating egg inventory: {e}")
 
-    # Removing SQLite related operations
-    # (This section was responsible for updating SQLite DB, which is now replaced with Firestore operations)
-
+    
        
  #load images in the hatchery
 def load_and_resize_image(file_path, size):
