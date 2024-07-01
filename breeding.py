@@ -93,57 +93,6 @@ phenotype_to_genotypes = {
     'metallic': [('M', 'M')]
 }
 
-# def initialize_game():
-#     global small_font, large_font, button_font, screen, background, heart_image, hearts_on_board, fruit_images, egg_images, fruit_images_dict, egg_images_dict
-#     global dragons, repulsor_counter, tested_pairs, eggs_on_board, fruits_on_board, inventory, egg_counts, inventory_slots, fruit_personality_keywords, allele_dominance, phenotype_to_genotypes
-
-#     # Initialization pygame and fonts from Game module
-#     initialize()
-
-
-#     # Define fonts
-#     small_font = pygame.font.Font(None, 24)
-#     large_font = pygame.font.Font(None, 36)
-#     button_font = pygame.font.Font(None, 36)
-
-#     # Define screen (surface)
-#     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-#     pygame.display.set_caption("Dragon Breeding Game")
-
-#     # Load images
-#     background = load_and_resize_image("breedingbackground.png", (WIDTH, HEIGHT))
-#     heart_image = load_and_resize_image("heart.png", (30, 30))
-#     hearts_on_board = []
-#     fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
-#     fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
-#     egg_names = ["black", "white", "rainbow", "metallic"]
-#     egg_images = [load_and_resize_image(f"{egg}_egg.png", (70, 70)) for egg in egg_names]
-
-#     # Create a dictionary mapping names to their images
-#     fruit_images_dict = dict(zip(fruit_names, fruit_images))
-#     egg_images_dict = dict(zip(egg_names, egg_images))
-   
-#     # Placeholder for dragons
-#     dragons = []
-#     repulsor_counter = 0
-#     tested_pairs = set()
-#     eggs_on_board = []
-#     fruits_on_board = []
-    
-    
-
-
-# def initialize_eggs_table(conn):
-#     cursor = conn.cursor()
-#     cursor.execute('''CREATE TABLE IF NOT EXISTS eggs (
-#                         id INTEGER PRIMARY KEY,
-#                         genotype TEXT,
-#                         phenotype TEXT,
-#                         image_file TEXT,
-#                         parent1_name TEXT,
-#                         parent2_name TEXT
-#                       )''')
-#     conn.commit()
 
 def draw_hearts(surface):
     current_time = pygame.time.get_ticks()
@@ -373,8 +322,12 @@ def summon_hatched_dragon_by_index(hatched_dragons, index, dragons, summoned_dra
     outline_color = BLUE if new_dragon_data[12] == "Male" else RED
     dragon_image = outline_image(dragon_image, outline_color)
 
-    initial_speed = 1.5 + (0.5 if "speed" in new_dragon_data[4].lower() or "Flightspeed" in new_dragon_data[8] else 0)
-
+    initial_speed = 1.5
+    if new_dragon_data[4] is not None and "speed" in new_dragon_data[4].lower():
+        initial_speed += 0.5
+    if new_dragon_data[8] is not None and "Flightspeed" in new_dragon_data[8]:
+        initial_speed += 0.5
+        
     phenotype = new_dragon_data[2]
     if phenotype in ["gold", "silver", "metal"]:
         phenotype = "metallic"
@@ -704,8 +657,9 @@ def move_dragons():
 
     for dragon in dragons_to_remove:
         if dragon in dragons:
+            if dragon.get("source") == "hatched":
+                delete_hatched_dragon(dragon["id"])  # Delete the hatched dragon from Firestore using document ID
             dragons.remove(dragon)
-
 
 
 def place_fruit(x, y, selected_fruit):
@@ -718,6 +672,16 @@ def place_fruit(x, y, selected_fruit):
         else:
             print(f"Cannot place fruit {selected_fruit}. Inventory: {inventory[selected_fruit] if selected_fruit else 'None'}")
 
+def delete_hatched_dragon(doc_id):
+    try:
+        # Pad the doc_id with leading zeros to ensure it matches the Firestore document ID format
+        padded_doc_id = str(doc_id).zfill(4)
+        # Get the reference to the document with the padded_doc_id
+        hatched_dragons_ref = db.collection('hatcheddragons').document(padded_doc_id)
+        hatched_dragons_ref.delete()
+        print(f"Hatched dragon with document ID {padded_doc_id} deleted successfully from Firestore")
+    except Exception as e:
+        print(f"Error deleting hatched dragon with document ID {padded_doc_id} from Firestore: {e}")
 
 
 # Main game loop with interactivity

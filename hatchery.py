@@ -264,7 +264,7 @@ class Ddragon:
         self.gender = dragon[9]
         self.rgb_range = dragon[7]
         self.filename = dragon[1]
-        self.type = dragon[2]  # Dragon type overrides egg 
+        self.type = dragon[2]  # Dragon type overrides egg
         self.special_abilities = dragon[6]
         self.facing_direction = dragon[13]  # Ensure facing_direction is assigned
         print(f"Assigned facing_direction: {self.facing_direction} for dragon_id: {self.dragon_id}")  # Debugging print
@@ -273,47 +273,46 @@ class Ddragon:
         self.petname = petname
 
     def save_to_db(self):
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS hatcheddragons (
-                    id INTEGER PRIMARY KEY,
-                    genotype TEXT,
-                    parent1 TEXT,
-                    parent2 TEXT,
-                    elixir_rgb TEXT,
-                    elixir_title TEXT,
-                    dragon_id INTEGER,
-                    dragon_name TEXT,
-                    primary_trait TEXT,
-                    secondary1 TEXT,
-                    secondary2 TEXT,
-                    secondary3 TEXT,
-                    nurture TEXT,
-                    gender TEXT,
-                    rgb_range TEXT,
-                    filename TEXT,
-                    type TEXT,
-                    special_abilities TEXT,
-                    petname TEXT,
-                    facing_direction TEXT
-                )
-            ''')
-            print(f"Saving facing_direction: {self.facing_direction} for dragon_id: {self.dragon_id}")  # Debugging print
-        cursor.execute('''
-            INSERT INTO hatcheddragons (
-                genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
-                primary_trait, secondary1, secondary2, secondary3, nurture, gender,
-                rgb_range, filename, type, special_abilities, petname, facing_direction
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            self.genotype, self.parent1, self.parent2, self.elixir_rgb, self.elixir_title, self.dragon_id, self.dragon_name,
-            self.primary, self.secondary1, self.secondary2, self.secondary3, self.nurture, self.gender,
-            self.rgb_range, self.filename, self.type, self.special_abilities, self.petname, self.facing_direction
-        ))
-        print(f"Saving dragon with facing_direction: {self.facing_direction}")  # Debugging print
-        conn.commit()
+        dragon_data = {
+            'genotype': self.genotype,
+            'parent1': self.parent1,
+            'parent2': self.parent2,
+            'elixir_rgb': self.elixir_rgb,
+            'elixir_title': self.elixir_title,
+            'dragon_id': self.dragon_id,
+            'dragon_name': self.dragon_name,
+            'primary_trait': self.primary,
+            'secondary1': self.secondary1,
+            'secondary2': self.secondary2,
+            'secondary3': self.secondary3,
+            'nurture': self.nurture,
+            'gender': self.gender,
+            'rgb_range': self.rgb_range,
+            'filename': self.filename,
+            'type': self.type,
+            'special_abilities': self.special_abilities,
+            'petname': self.petname,
+            'facing_direction': self.facing_direction
+        }
 
+        try:
+            # Start with the initial ID
+            current_id = self.dragon_id
+            # Check if the document with the current ID exists
+            while True:
+                custom_id = f"{current_id:04d}"  # Ensure a 4-digit ID with leading zeros
+                doc_ref = db.collection('hatcheddragons').document(custom_id)
+                if not doc_ref.get().exists:
+                    break  # If the document does not exist, we found our ID
+                current_id += 1
+                if current_id > 9999:
+                    raise ValueError("Exceeded maximum ID range for hatched dragons")
+
+            doc_ref.set(dragon_data)
+            print(f"Dragon with ID {custom_id} saved successfully with facing_direction: {self.facing_direction}")
+        except Exception as e:
+            print(f"Error saving dragon with ID {self.dragon_id} to Firestore: {e}")
+            
 # Add these lines before the main function
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
