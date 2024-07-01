@@ -72,6 +72,8 @@ fruit_traits_with_stats = {
     }
 }
  
+from firebase_admin import firestore
+
 class BossDragon:
     def __init__(self, filename, tier=1):
         self.filename = filename
@@ -102,32 +104,30 @@ class BossDragon:
             self.initialized = True
 
     def fetch_data(self):
-        db_path = os.path.join(os.path.dirname(__file__), 'dragonsedit.db')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT id, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, Nurture, special_abilities, current_hitpoints, facing_direction
-            FROM dragons
-            WHERE filename = ?
-        """, (self.filename,))
-        
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row:
-            self.id = row[0]
-            self.name = row[1]
-            self.primary_trait = row[2]
-            self.secondary_trait1 = row[3]
-            self.secondary_trait2 = row[4]
-            self.secondary_trait3 = row[5]
-            self.nurture_trait = row[6]
-            self.special_abilities = row[7]
-            self.current_hitpoints = row[8]
-            self.facing_direction = row[9]
-        else:
+        try:
+            print(f"Fetching data for dragon with filename: {self.filename}")
+            dragons_ref = db.collection('dragons')
+            query = dragons_ref.where('filename', '==', self.filename)
+            docs = query.stream()
+
+            for doc in docs:
+                data = doc.to_dict()
+                self.id = doc.id  # Use Firestore document ID
+                self.name = data.get('name')
+                self.primary_trait = data.get('primary_characteristic')
+                self.secondary_trait1 = data.get('secondary_trait1')
+                self.secondary_trait2 = data.get('secondary_trait2')
+                self.secondary_trait3 = data.get('secondary_trait3')
+                self.nurture_trait = data.get('Nurture')
+                self.special_abilities = data.get('special_abilities')
+                self.current_hitpoints = data.get('current_hitpoints')
+                self.facing_direction = data.get('facing_direction')
+                return  # Exit after finding the first matching document
+
             raise ValueError("Boss dragon not found in the database")
+        
+        except Exception as e:
+            raise ValueError(f"Error fetching boss dragon data: {e}")
 
     def calculate_and_apply_stats(self):
         # Initialize stats
@@ -165,18 +165,16 @@ class BossDragon:
             self.current_hitpoints = self.maximum_hitpoints
 
     def save_current_hitpoints(self):
-        db_path = os.path.join(os.path.dirname(__file__), 'dragonsedit.db')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE dragons
-            SET current_hitpoints = ?
-            WHERE id = ?
-        """, (self.current_hitpoints, self.id))
-        
-        conn.commit()
-        conn.close()
+        try:
+            print(f"Saving current hitpoints for dragon ID: {self.id}")
+            doc_ref = db.collection('dragons').document(self.id)
+            doc_ref.update({
+                'current_hitpoints': self.current_hitpoints
+            })
+            print(f"Successfully saved current hitpoints: {self.current_hitpoints} for dragon ID: {self.id}")
+        except Exception as e:
+            print(f"Error saving current hitpoints: {e}")
+            raise ValueError(f"Error saving current hitpoints: {e}")
 
 
 class PlayerDragon:

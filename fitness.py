@@ -1,9 +1,9 @@
-import sqlite3
+
 import logging
 import os
 import random
 import time
-
+import datetime
 import pygame
 
 from game import *
@@ -68,44 +68,59 @@ small_font = pygame.font.Font(None, 36)  # Smaller font for button text
 selected_dragon_for_upgrade = None  # Global variable to store the selected dragon
 
 
-def connect_db(db_name='save.db'):
-    db_path = os.path.join(os.path.dirname(__file__), db_name)
-    conn = sqlite3.connect(db_path)
-    return conn
-
-
 def load_quests(category):
-    conn = connect_db('save.db')
-    cursor = conn.cursor()
+    try:
+        quests_ref = db.collection('playerquests')
 
-    # Update the quests that need to be reset
-    cursor.execute("""
-        UPDATE playerquests
-        SET completed = 0, reset = NULL
-        WHERE Category = ? AND reset IS NOT NULL AND reset <= date('now')
-    """, (category,))
-    conn.commit()
+        # Fetch all quests for the category
+        all_quests_query = quests_ref.where('category', '==', category).stream()
+        quests = []
+        for doc in all_quests_query:
+            quest = doc.to_dict()
+            quest_tuple = (
+                doc.id,  # ID
+                quest.get('category'),  # Category
+                quest.get('description'),  # Description
+                quest.get('challenge_rating'),  # ChallengeRating
+                quest.get('reward'),  # Reward
+                quest.get('completed'),  # Completed
+                quest.get('reset'),  # Reset
+                quest.get('tally')  # Tally
+            )
+            quests.append(quest_tuple)
 
-    # Fetch the quests
-    cursor.execute(
-        "SELECT ID, Category, Description, ChallengeRating, Reward, completed, reset, tally FROM playerquests WHERE Category = ?",
-        (category,
-         ))
-    quests = cursor.fetchall()
-    conn.close()
-    return quests
+        if not quests:
+            print("No quests found for the category:", category)
+        else:
+            print(f"Loaded {len(quests)} quests for category {category}")
 
+        return quests
+
+    except Exception as e:
+        print(f"Error loading quests: {e}")
+        return []
 
 def complete_daily_quest(quest_id):
-    conn = connect_db('save.db')
-    cursor = conn.cursor()
-    logging.info(f"Completing daily quest ID {quest_id}")
-    cursor.execute(
-        "UPDATE playerquests SET completed = 1, reset = date('now', '+1 day') WHERE ID = ?",
-        (quest_id,
-         ))
-    conn.commit()
-    conn.close()
+    try:
+        logging.info(f"Completing daily quest ID {quest_id}")
+
+        # Reference to the specific quest document
+        quest_doc_ref = db.collection('playerquests').document(str(quest_id))
+        
+        # Update the quest
+        quest_doc_ref.update({
+            'completed': True,
+            'reset': firestore.SERVER_TIMESTAMP  # Adjust this to match your reset logic
+        })
+
+        logging.info(f"Successfully completed quest ID {quest_id}")
+
+    except Exception as e:
+        print(f"Error completing daily quest: {e}")
+        logging.error(f"Error completing daily quest ID {quest_id}: {e}")
+
+
+
 
 
 def flag_dragon_aggressive(category):
@@ -249,12 +264,21 @@ def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
 
 
 def get_random_dragon():
-    conn = connect_db('dragonsedit.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT filename FROM dragons")
-    dragons = cursor.fetchall()
-    conn.close()
-    return random.choice(dragons)[0]
+    try:
+        dragons_ref = db.collection('dragons')
+
+        # Fetch all dragons
+        dragons_query = dragons_ref.stream()
+        dragons = [doc.to_dict()['filename'] for doc in dragons_query]
+
+        if not dragons:
+            raise ValueError("No dragons found in the database")
+
+        return random.choice(dragons)
+
+    except Exception as e:
+        print(f"Error getting random dragon: {e}")
+        return None
 
 
 selected_dragons = [None] * 5
@@ -533,49 +557,52 @@ def display_error(message, selected_dragon_for_upgrade):
 
     
 def update_dragon_stats_in_db(dragon):
-    db_path = os.path.join(os.path.dirname(__file__), 'save.db')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE hatcheddragons
-        SET bonus_health = ?, bonus_attack = ?, bonus_defense = ?, bonus_dodge = ?, current_hitpoints = ?, bonus_base_hitpoints = ?
-        WHERE id = ?
-    """, (dragon.bonus_health, dragon.bonus_attack, dragon.bonus_defense, dragon.bonus_dodge, dragon.current_hitpoints, dragon.bonus_base_hitpoints, dragon.id))
-    conn.commit()
-    conn.close()
+    try:
+        print(f"Updating Firestore for dragon ID: {dragon.id}")
+        doc_ref = db.collection('hatcheddragons').document(dragon.id)
+        doc_ref.update({
+            'bonus_health': dragon.bonus_health,
+            'bonus_attack': dragon.bonus_attack,
+            'bonus_defense': dragon.bonus_defense,
+            'bonus_dodge': dragon.bonus_dodge,
+            'current_hitpoints': dragon.current_hitpoints,
+            'bonus_base_hitpoints': dragon.bonus_base_hitpoints
+        })
+        print(f"Successfully updated Firestore for dragon ID: {dragon.id}")
+    except Exception as e:
+        print(f"Error updating dragon stats in Firestore: {e}")
+        raise ValueError(f"Error updating dragon stats in Firestore: {e}")
 
 
 def remove_and_replace_quest(quest_id, category, displayed_quests):
-    conn = sqlite3.connect('save.db')
-    cursor = conn.cursor()
     try:
+        # Reference to the playerquests collection
+        quests_ref = db.collection('playerquests')
+
         # Increment the tally of the quest
-        cursor.execute(
-            "UPDATE playerquests SET tally = tally + 1 WHERE ID = ?", (quest_id,))
-        # Set the completion status of the quest
-        cursor.execute(
-            "UPDATE playerquests SET completed = 1, reset = date('now', '+1 day') WHERE ID = ?",
-            (quest_id,
-             ))
+        quest_doc_ref = quests_ref.document(str(quest_id))
+        quest_doc_ref.update({
+            'tally': firestore.Increment(1),
+            'completed': True,
+            'reset': firestore.SERVER_TIMESTAMP  # You may need to adjust this to match your reset logic
+        })
 
         # Get all quests for the category
-        cursor.execute(
-            "SELECT ID, Category, Description, ChallengeRating, Reward, completed, tally FROM playerquests WHERE Category = ?",
-            (category,
-             ))
-        all_quests = cursor.fetchall()
+        all_quests_query = quests_ref.where('Category', '==', category)
+        all_quests_docs = all_quests_query.stream()
+        all_quests = [doc.to_dict() for doc in all_quests_docs]
 
         # Filter out displayed quests and the current quest
-        displayed_quest_ids = set(q[0] for q in displayed_quests)
-        displayed_quest_descriptions = set(q[2] for q in displayed_quests)
+        displayed_quest_ids = set(q['ID'] for q in displayed_quests)
+        displayed_quest_descriptions = set(q['Description'] for q in displayed_quests)
         available_quests = [
             quest for quest in all_quests
-            if quest[0] not in displayed_quest_ids and quest[2] not in displayed_quest_descriptions and quest[0] != quest_id
+            if quest['ID'] not in displayed_quest_ids and quest['Description'] not in displayed_quest_descriptions and quest['ID'] != quest_id
         ]
 
         # Prioritize quests that are not completed
         not_completed_quests = [
-            quest for quest in available_quests if not quest[5]]
+            quest for quest in available_quests if not quest['completed']]
 
         if not_completed_quests:
             new_quest = random.choice(not_completed_quests)
@@ -585,19 +612,13 @@ def remove_and_replace_quest(quest_id, category, displayed_quests):
             else:
                 # Fallback to the original quest
                 new_quest = next(
-                    (q for q in all_quests if q[0] == quest_id), None)
+                    (q for q in all_quests if q['ID'] == quest_id), None)
 
-        conn.commit()
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        new_quest = None
+        return new_quest
+
     except Exception as e:
         print(f"Error: {e}")
-        new_quest = None
-    finally:
-        conn.close()
-
-    return new_quest
+        return None
 
 
 def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
