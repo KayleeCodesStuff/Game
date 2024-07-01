@@ -410,18 +410,22 @@ def calculate_damage_reduction(incoming_damage, defender_defense, matching_trait
     return effective_damage
 
 def save_player_dragon_hitpoints(dragon):
-    db_path = os.path.join(os.path.dirname(__file__), 'save.db')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        UPDATE hatcheddragons
-        SET current_hitpoints = ?
-        WHERE id = ?
-    """, (dragon.current_hitpoints, dragon.id))
-    
-    conn.commit()
-    conn.close()
+    try:
+        # Ensure the ID is correctly formatted with leading zeros if necessary
+        dragon_id = str(dragon.id).zfill(4)
+        
+        # Reference to the specific dragon document
+        dragon_doc_ref = db.collection('hatcheddragons').document(dragon_id)
+        
+        # Update the current hitpoints
+        dragon_doc_ref.update({
+            'current_hitpoints': dragon.current_hitpoints
+        })
+
+        print(f"Successfully updated hitpoints for dragon ID {dragon_id}")
+
+    except Exception as e:
+        print(f"Error saving player dragon hitpoints: {e}")
 
 def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_filename):
     boss_dragon = BossDragon(filename=boss_dragon_filename)

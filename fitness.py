@@ -576,50 +576,57 @@ def update_dragon_stats_in_db(dragon):
 
 def remove_and_replace_quest(quest_id, category, displayed_quests):
     try:
-        # Reference to the playerquests collection
-        quests_ref = db.collection('playerquests')
-
         # Increment the tally of the quest
-        quest_doc_ref = quests_ref.document(str(quest_id))
-        quest_doc_ref.update({
+        quest_ref = db.collection('playerquests').document(quest_id)
+        quest_ref.update({
             'tally': firestore.Increment(1),
-            'completed': True,
-            'reset': firestore.SERVER_TIMESTAMP  # You may need to adjust this to match your reset logic
+            'completed': 1,
+            'reset': firestore.SERVER_TIMESTAMP
         })
 
         # Get all quests for the category
-        all_quests_query = quests_ref.where('Category', '==', category)
-        all_quests_docs = all_quests_query.stream()
-        all_quests = [doc.to_dict() for doc in all_quests_docs]
+        all_quests_query = db.collection('playerquests').where('category', '==', category).stream()
+        all_quests = []
+        for doc in all_quests_query:
+            quest = doc.to_dict()
+            quest_tuple = (
+                doc.id,
+                quest.get('category'),
+                quest.get('description'),
+                quest.get('challenge_rating'),
+                quest.get('reward'),
+                quest.get('completed'),
+                quest.get('reset'),
+                quest.get('tally')
+            )
+            all_quests.append(quest_tuple)
 
         # Filter out displayed quests and the current quest
-        displayed_quest_ids = set(q['ID'] for q in displayed_quests)
-        displayed_quest_descriptions = set(q['Description'] for q in displayed_quests)
+        displayed_quest_ids = set(q[0] for q in displayed_quests)
+        displayed_quest_descriptions = set(q[2] for q in displayed_quests)
         available_quests = [
             quest for quest in all_quests
-            if quest['ID'] not in displayed_quest_ids and quest['Description'] not in displayed_quest_descriptions and quest['ID'] != quest_id
+            if quest[0] not in displayed_quest_ids and quest[2] not in displayed_quest_descriptions and quest[0] != quest_id
         ]
 
         # Prioritize quests that are not completed
         not_completed_quests = [
-            quest for quest in available_quests if not quest['completed']]
+            quest for quest in available_quests if not quest[5]
+        ]
 
         if not_completed_quests:
             new_quest = random.choice(not_completed_quests)
+        elif available_quests:
+            new_quest = random.choice(available_quests)
         else:
-            if available_quests:
-                new_quest = random.choice(available_quests)
-            else:
-                # Fallback to the original quest
-                new_quest = next(
-                    (q for q in all_quests if q['ID'] == quest_id), None)
-
-        return new_quest
+            # Fallback to the original quest
+            new_quest = next((q for q in all_quests if q[0] == quest_id), None)
 
     except Exception as e:
         print(f"Error: {e}")
-        return None
+        new_quest = None
 
+    return new_quest
 
 def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
     quests_updated = False  # Flag to track if quests were updated
