@@ -2,10 +2,13 @@ import pygame
 import sqlite3
 import os
 import random
+import time
+from firebase_config import db
 import math
 from tkinter import Tk, filedialog
 from game import initialize, draw_inventory, load_inventory_data, save_inventory_data, load_and_resize_image, draw_inventory, define_elixir_data
 
+import time
 # Constants
 WIDTH, HEIGHT = 1200, 900
 BLUE = (0, 0, 255)
@@ -91,57 +94,57 @@ phenotype_to_genotypes = {
     'metallic': [('M', 'M')]
 }
 
-def initialize_game():
-    global small_font, large_font, button_font, screen, background, heart_image, hearts_on_board, fruit_images, egg_images, fruit_images_dict, egg_images_dict
-    global dragons, repulsor_counter, tested_pairs, eggs_on_board, fruits_on_board, inventory, egg_counts, inventory_slots, fruit_personality_keywords, allele_dominance, phenotype_to_genotypes
+# def initialize_game():
+#     global small_font, large_font, button_font, screen, background, heart_image, hearts_on_board, fruit_images, egg_images, fruit_images_dict, egg_images_dict
+#     global dragons, repulsor_counter, tested_pairs, eggs_on_board, fruits_on_board, inventory, egg_counts, inventory_slots, fruit_personality_keywords, allele_dominance, phenotype_to_genotypes
 
-    # Initialization pygame and fonts from Game module
-    initialize()
+#     # Initialization pygame and fonts from Game module
+#     initialize()
 
 
-    # Define fonts
-    small_font = pygame.font.Font(None, 24)
-    large_font = pygame.font.Font(None, 36)
-    button_font = pygame.font.Font(None, 36)
+#     # Define fonts
+#     small_font = pygame.font.Font(None, 24)
+#     large_font = pygame.font.Font(None, 36)
+#     button_font = pygame.font.Font(None, 36)
 
-    # Define screen (surface)
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Dragon Breeding Game")
+#     # Define screen (surface)
+#     screen = pygame.display.set_mode((WIDTH, HEIGHT))
+#     pygame.display.set_caption("Dragon Breeding Game")
 
-    # Load images
-    background = load_and_resize_image("breedingbackground.png", (WIDTH, HEIGHT))
-    heart_image = load_and_resize_image("heart.png", (30, 30))
-    hearts_on_board = []
-    fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
-    fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
-    egg_names = ["black", "white", "rainbow", "metallic"]
-    egg_images = [load_and_resize_image(f"{egg}_egg.png", (70, 70)) for egg in egg_names]
+#     # Load images
+#     background = load_and_resize_image("breedingbackground.png", (WIDTH, HEIGHT))
+#     heart_image = load_and_resize_image("heart.png", (30, 30))
+#     hearts_on_board = []
+#     fruit_names = ["gleamberry", "flamefruit", "shimmeringapple", "etherealpear", "moonbeammelon"]
+#     fruit_images = [load_and_resize_image(f"{fruit}.png", (50, 50)) for fruit in fruit_names]
+#     egg_names = ["black", "white", "rainbow", "metallic"]
+#     egg_images = [load_and_resize_image(f"{egg}_egg.png", (70, 70)) for egg in egg_names]
 
-    # Create a dictionary mapping names to their images
-    fruit_images_dict = dict(zip(fruit_names, fruit_images))
-    egg_images_dict = dict(zip(egg_names, egg_images))
+#     # Create a dictionary mapping names to their images
+#     fruit_images_dict = dict(zip(fruit_names, fruit_images))
+#     egg_images_dict = dict(zip(egg_names, egg_images))
    
-    # Placeholder for dragons
-    dragons = []
-    repulsor_counter = 0
-    tested_pairs = set()
-    eggs_on_board = []
-    fruits_on_board = []
+#     # Placeholder for dragons
+#     dragons = []
+#     repulsor_counter = 0
+#     tested_pairs = set()
+#     eggs_on_board = []
+#     fruits_on_board = []
     
     
 
 
-def initialize_eggs_table(conn):
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS eggs (
-                        id INTEGER PRIMARY KEY,
-                        genotype TEXT,
-                        phenotype TEXT,
-                        image_file TEXT,
-                        parent1_name TEXT,
-                        parent2_name TEXT
-                      )''')
-    conn.commit()
+# def initialize_eggs_table(conn):
+#     cursor = conn.cursor()
+#     cursor.execute('''CREATE TABLE IF NOT EXISTS eggs (
+#                         id INTEGER PRIMARY KEY,
+#                         genotype TEXT,
+#                         phenotype TEXT,
+#                         image_file TEXT,
+#                         parent1_name TEXT,
+#                         parent2_name TEXT
+#                       )''')
+#     conn.commit()
 
 def draw_hearts(surface):
     current_time = pygame.time.get_ticks()
@@ -150,57 +153,6 @@ def draw_hearts(surface):
             hearts_on_board.remove(heart)
         else:
             surface.blit(heart_image, heart["position"])
-
-
-
-save_file = os.path.join(os.getcwd(), "save.db")
-if not os.path.exists(save_file):
-    def select_or_create_file():
-        root = Tk()
-        root.withdraw()  # Hide the main tkinter window
-        file_path = filedialog.asksaveasfilename(defaultextension=".db",
-                                                 filetypes=[("SQLite database", "*.db"), ("JSON file", "*.json")],
-                                                 title="Select or Create File")
-        return file_path
-
-    save_file = select_or_create_file()
-    if not save_file:
-        save_file = os.path.join(os.getcwd(), "save.db")
-    
-    def initialize_file(file_path):
-        conn = sqlite3.connect(file_path)
-        cursor = conn.cursor()
-        
-        # Create elixirs table
-        cursor.execute('''CREATE TABLE IF NOT EXISTS elixirs (
-                            id INTEGER PRIMARY KEY,
-                            rgb TEXT,
-                            title TEXT,
-                            primary_trait TEXT,
-                            secondary_trait1 TEXT,
-                            secondary_trait2 TEXT,
-                            secondary_trait3 TEXT,
-                            image_file TEXT,
-                            position INTEGER
-                        )''')
-            
-        # Create inventory table with fruit as UNIQUE
-        cursor.execute('''CREATE TABLE IF NOT EXISTS inventory (
-                            id INTEGER PRIMARY KEY,
-                            fruit TEXT UNIQUE,
-                            count INTEGER
-                        )''')
-        
-        # Initialize the eggs table
-        initialize_eggs_table(conn)
-        
-        conn.commit()
-        conn.close()
-
-    initialize_file(save_file)
-else:
-    conn = sqlite3.connect(save_file)
-    initialize_eggs_table(conn)
 
 
 def create_egg(dragon1, dragon2, position):
@@ -219,43 +171,56 @@ def create_egg(dragon1, dragon2, position):
         "rect": egg_image.get_rect(topleft=position)
     })
 
-    # Database operations
-    with sqlite3.connect(save_file) as conn:
-        cursor = conn.cursor()
+    # Firestore operations
+    egg_data = {
+        'genotype': str(egg_genotype),
+        'phenotype': egg_phenotype,
+        'image_file': egg_image_path,
+        'parent1_name': parent1_name,
+        'parent2_name': parent2_name
+    }
 
-        # Insert a new row into the eggs table for the picked up egg
-        cursor.execute("""
-            INSERT INTO eggs (genotype, phenotype, image_file, parent1_name, parent2_name)
-            VALUES (?, ?, ?, ?, ?)
-        """, (str(egg_genotype), egg_phenotype, egg_image_path, parent1_name, parent2_name))
+    # Generate a custom ID for the document
+    custom_id = f"{parent1_name}{parent2_name}{int(time.time())}"
 
-        # Check if the phenotype already exists in egg_inventory
-        cursor.execute("SELECT count FROM egg_inventory WHERE phenotype=?", (egg_phenotype,))
-        row = cursor.fetchone()
-        if row:
-            # If it exists, increment the count
-            egg_count = row[0] + 1
-            cursor.execute("UPDATE egg_inventory SET count=? WHERE phenotype=?", (egg_count, egg_phenotype))
-        else:
-            # If it does not exist, insert a new row with count 1
-            cursor.execute("INSERT INTO egg_inventory (phenotype, count) VALUES (?, ?)", (egg_phenotype, 1))
+    try:
+        egg_ref = db.collection('eggs').document(custom_id)
+        egg_ref.set(egg_data)
+        print(f"Egg data saved successfully with ID: {egg_ref.id}")
+    except Exception as e:
+        print(f"Error saving egg data: {e}")
 
-        # Delete the hatched dragons from the database if they are used in egg creation
-        for dragon in (dragon1, dragon2):
-            if dragon.get('source') == 'hatched':
-                print(f"Deleting hatched dragon with ID {dragon['id']} from the database")
-                cursor.execute("DELETE FROM hatcheddragons WHERE id=?", (dragon["id"],))
-
-        conn.commit()
-
+  
 
 def load_dragons_from_db():
-    conn = sqlite3.connect("dragonsedit.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
-    all_dragons = cursor.fetchall()
-    conn.close()
+    all_dragons = []
+    try:
+        # Load dragons data from Firestore
+        dragons_ref = db.collection('dragons')
+        docs = dragons_ref.stream()
+        for doc in docs:
+            data = doc.to_dict()
+            #print(f"Loaded dragon data: {data}")  # Debug print to show loaded data
+            all_dragons.append((
+                int(doc.id),  # Convert document ID to integer if needed
+                data.get('filename'),
+                data.get('type'),
+                data.get('name'),
+                data.get('primary_characteristic'),
+                data.get('secondary_trait1'),
+                data.get('secondary_trait2'),
+                data.get('secondary_trait3'),
+                data.get('special_abilities'),
+                data.get('description'),
+                data.get('rgb_value_range'),
+                data.get('Nurture'),
+                data.get('gender')
+            ))
+    except Exception as e:
+        print(f"Error loading dragons data: {e}")
+
     return all_dragons
+
 
 def initialize_dragons():
     all_dragons = load_dragons_from_db()
@@ -467,12 +432,9 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
 
     inventory["moonbeammelon"] -= 10
 
-    # Load dragons from the database
-    conn = sqlite3.connect("dragonsedit.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, filename, type, name, primary_characteristic, secondary_trait1, secondary_trait2, secondary_trait3, special_abilities, description, rgb_value_range, Nurture, gender FROM dragons")
-    all_dragons = cursor.fetchall()
-    conn.close()
+    # Load dragons from Firestore
+    all_dragons = load_dragons_from_db()
+    print(f"All dragons loaded from Firestore: {all_dragons}")  # Debugging statement
 
     if not all_dragons:
         print("No dragons available in the database.")
@@ -480,12 +442,16 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
 
     # Filter out already summoned dragons
     available_dragons = [d for d in all_dragons if d[0] not in summoned_dragon_ids]
+    #print(f"Available dragons after filtering: {available_dragons}")  # Debugging statement
+
     if not available_dragons:
         print("All dragons have already been summoned.")
         return
 
     new_dragon_data = random.choice(available_dragons)
-    dragon_image_path = os.path.join(DRAGON_IMAGE_FOLDER, new_dragon_data[1])
+    #print(f"Selected dragon data: {new_dragon_data}")  # Debugging statement
+    dragon_image_path = os.path.join("assets", "images", "dragons", new_dragon_data[1])
+    #print(f"Dragon image path: {dragon_image_path}")  # Debugging statement
     dragon_image = pygame.image.load(dragon_image_path)
     
     width, height = dragon_image.get_size()
@@ -523,7 +489,8 @@ def summon_new_dragon(inventory, dragons, summoned_dragon_ids):
     new_dragon["target"] = determine_target(new_dragon)  # Immediately determine target
     dragons.append(new_dragon)
     summoned_dragon_ids.add(new_dragon_data[0])
-    print(f"Summoned new dragon: {new_dragon['name']}")
+    #print(f"Summoned new dragon: {new_dragon['name']}")  # Debugging statement
+
 
 
 # Function to draw text
@@ -737,7 +704,7 @@ def place_fruit(x, y, selected_fruit):
 
 # Main game loop with interactivity
 def main():
-    initialize_game()
+    
     initialize_dragons()
 
     running = True

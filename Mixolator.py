@@ -4,8 +4,6 @@ import random
 import sys
 import webcolors
 from webcolors import CSS3_HEX_TO_NAMES, hex_to_rgb
-import sqlite3
-import json
 import tkinter as tk
 from tkinter import filedialog
 from game import *
@@ -244,10 +242,9 @@ def draw_screen(selected_box, selected_inventory_slot):
 
 # Updated main function call
 def main():
-    global elixir_color, elixir_personality, elixir_color_name, elixir_title, file_path, selected_inventory_slot
+    global elixir_color, elixir_personality, elixir_color_name, elixir_title, selected_inventory_slot
     running = True
     selected_box = 0  # Start with the primary trait selection box selected
-    file_path = 'save.db'  # Define the file_path variable
     selected_inventory_slot = None
 
     while running:
