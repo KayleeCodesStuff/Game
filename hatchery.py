@@ -1,5 +1,6 @@
 # Standard library imports
 import random
+import string
 import sys
 import time
 import os
@@ -251,8 +252,6 @@ class EggTimer:
         self.adult_dragon_image = get_dragon_image(self.egg_id)
         print(f"Dragon image loaded for egg index: {self.egg_index}")
 
-import random
-import string
 
 class Ddragon:
     def __init__(self, genotype, parent1, parent2, phenotype):
@@ -278,6 +277,14 @@ class Ddragon:
         self.petname = None
         self.facing_direction = None  # Ensure facing_direction is initialized
         self.doc_id = None  # Add doc_id attribute
+
+        # Initialize bonus stats
+        self.bonus_attack = 0
+        self.bonus_base_hitpoints = 0
+        self.bonus_defense = 0
+        self.bonus_dodge = 0
+        self.bonus_health = 0
+        self.current_hitpoints = 100  # Default starting hitpoints
 
     def add_elixir_info(self, rgb, title, primary, secondaries):
         print(f"Adding elixir info: rgb={rgb}, type={type(rgb)}, title={title}, primary={primary}, secondaries={secondaries}")  # Debugging print
@@ -348,7 +355,13 @@ class Ddragon:
                 'type': self.type,
                 'special_abilities': self.special_abilities,
                 'petname': self.petname,
-                'facing_direction': self.facing_direction
+                'facing_direction': self.facing_direction,
+                'bonus_attack': self.bonus_attack,
+                'bonus_base_hitpoints': self.bonus_base_hitpoints,
+                'bonus_defense': self.bonus_defense,
+                'bonus_dodge': self.bonus_dodge,
+                'bonus_health': self.bonus_health,
+                'current_hitpoints': self.current_hitpoints
             }
             
             # Save dragon data to Firestore
@@ -918,6 +931,14 @@ def main():
                         if ddragon_instances[egg_timer.egg_index] is not None:
                             ddragon_instances[egg_timer.egg_index].add_dragon_info(selected_dragon)
 
+                            # Assign the initial bonus stats and current hitpoints
+                            ddragon_instances[egg_timer.egg_index].bonus_attack = 0
+                            ddragon_instances[egg_timer.egg_index].bonus_base_hitpoints = 0
+                            ddragon_instances[egg_timer.egg_index].bonus_defense = 0
+                            ddragon_instances[egg_timer.egg_index].bonus_dodge = 0
+                            ddragon_instances[egg_timer.egg_index].bonus_health = 0
+                            ddragon_instances[egg_timer.egg_index].current_hitpoints = 100
+
                             # Prompt the user for a pet name with a timeout
                             egg_position = egg_positions[egg_timer.egg_index].topleft
                             petname = get_text_input(f"Enter a pet name for your dragon (Egg Index {egg_timer.egg_index}): ", font, screen, timeout=10, egg_position=egg_positions[egg_timer.egg_index].topleft)
@@ -956,4 +977,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

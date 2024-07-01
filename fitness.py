@@ -3,14 +3,13 @@ import logging
 import os
 import random
 import time
-import datetime
+
 import pygame
 
 from game import *
 from combat import *
 from firebase_config import db
-import firebase_admin
-from firebase_admin import credentials, firestore, initialize_app
+
 
 
 # Set the environment variable to the path of your Firebase credentials JSON file
@@ -91,8 +90,7 @@ def load_quests(category):
 
         if not quests:
             print("No quests found for the category:", category)
-        else:
-            print(f"Loaded {len(quests)} quests for category {category}")
+       
 
         return quests
 
@@ -118,13 +116,6 @@ def complete_daily_quest(quest_id):
     except Exception as e:
         print(f"Error completing daily quest: {e}")
         logging.error(f"Error completing daily quest ID {quest_id}: {e}")
-
-
-
-
-
-def flag_dragon_aggressive(category):
-    print(f"Category {category} is now aggressive!")
 
 
 def draw_beveled_button(surface, rect, color, text, font):
@@ -453,7 +444,7 @@ def handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrad
     for fruit, image in fruit_images_dict.items():
         rect = pygame.Rect(x_offset, y_offset, 50, 50)
         if rect.collidepoint(mouse_x, mouse_y):
-            print(f"Clicked on fruit: {fruit}")
+            
             if spend_fruit_and_update_stats(
                 fruit, 
                 selected_dragon_for_upgrade, 
@@ -496,7 +487,7 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
             return False
 
         inventory[fruit_type] -= 1  # Decrease the inventory
-        print(f"Spent one {fruit_type}. New count: {inventory[fruit_type]}")  # Debug print
+        #print(f"Spent one {fruit_type}. New count: {inventory[fruit_type]}")  # Debug print
 
         # Update the corresponding bonus stat
         if stat_to_increase == 'health':
@@ -518,12 +509,6 @@ def spend_fruit_and_update_stats(fruit_type, dragon, display_error):
         # Update dragon stats in the database
         update_dragon_stats_in_db(dragon)
 
-        # Debugging prints for dragon stats
-        print(f"Updated {stat_to_increase}: {dragon.stats[stat_to_increase]}")
-        print(f"Updated bonus {stat_to_increase}: {getattr(dragon, 'bonus_' + stat_to_increase)}")
-        print(f"New maximum hitpoints: {dragon.maximum_hitpoints}")
-        print(f"New current hitpoints: {dragon.current_hitpoints}")
-
         # Save the updated inventory to the database
         save_inventory_data()
 
@@ -539,9 +524,7 @@ def display_error(message, selected_dragon_for_upgrade):
     text_rect = text.get_rect()
     text_rect.center = (WIDTH // 2, HEIGHT // 2)  # Adjust position as needed
 
-    # # Save the current screen content under the text area
-    # original_screen_content = screen.subsurface(text_rect).copy()
-    
+      
     start_time = time.time()
 
     # Display the message for 3 seconds
@@ -550,15 +533,13 @@ def display_error(message, selected_dragon_for_upgrade):
         pygame.display.update(text_rect)  # Only update the text area
         pygame.time.delay(100)
 
-    # Restore the original screen content
-    # screen.blit(original_screen_content, text_rect)
-    pygame.display.update(text_rect)  # Only update the text area
+        pygame.display.update(text_rect)  # Only update the text area
 
 
     
 def update_dragon_stats_in_db(dragon):
     try:
-        print(f"Updating Firestore for dragon ID: {dragon.id}")
+        #print(f"Updating Firestore for dragon ID: {dragon.id}")
         doc_ref = db.collection('hatcheddragons').document(dragon.id)
         doc_ref.update({
             'bonus_health': dragon.bonus_health,
@@ -568,7 +549,7 @@ def update_dragon_stats_in_db(dragon):
             'current_hitpoints': dragon.current_hitpoints,
             'bonus_base_hitpoints': dragon.bonus_base_hitpoints
         })
-        print(f"Successfully updated Firestore for dragon ID: {dragon.id}")
+        #print(f"Successfully updated Firestore for dragon ID: {dragon.id}")
     except Exception as e:
         print(f"Error updating dragon stats in Firestore: {e}")
         raise ValueError(f"Error updating dragon stats in Firestore: {e}")
@@ -652,7 +633,7 @@ def handle_quest_click(category, mouse_x, mouse_y, displayed_quests):
         rect = pygame.Rect(x, y, button_width, button_height)
 
         if rect.collidepoint(mouse_x, mouse_y):
-            print(f"Quest '{quest[2]}' clicked!")
+            #print(f"Quest '{quest[2]}' clicked!")
 
             update_inventory(f"{quest[3]} {CATEGORY_INFO[category]['fruit']}")
             additional_fruits = random.sample(
@@ -835,11 +816,9 @@ def game_loop():
     boss_dragon_stats = None
 
     # Load inventory data once at the start of the game loop
+    global inventory, egg_counts, inventory_slots
     inventory, egg_counts, inventory_slots = load_inventory_data()
 
-    # Debug prints to check initial values
-    #print("Initial Inventory:", inventory)
-    #print("Initial Egg Counts:", egg_counts)
 
     while running:
         for event in pygame.event.get():

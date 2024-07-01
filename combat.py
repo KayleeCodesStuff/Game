@@ -104,7 +104,7 @@ class BossDragon:
 
     def fetch_data(self):
         try:
-            print(f"Fetching data for dragon with filename: {self.filename}")
+            #print(f"Fetching data for dragon with filename: {self.filename}")
             dragons_ref = db.collection('dragons')
             query = dragons_ref.where('filename', '==', self.filename)
             docs = query.stream()
@@ -213,7 +213,7 @@ class PlayerDragon:
 
     def fetch_data(self):
         try:
-            print(f"Fetching data for document ID: {self.id}")
+            #print(f"Fetching data for document ID: {self.id}")
             doc_ref = db.collection('hatcheddragons').document(self.id)
             doc = doc_ref.get()
             
@@ -231,11 +231,11 @@ class PlayerDragon:
                 self.filename = data.get('filename')
                 self.facing_direction = data.get('facing_direction')
                 self.current_hitpoints = data.get('current_hitpoints')
-                self.bonus_health = data.get('bonus_health')
-                self.bonus_attack = data.get('bonus_attack')
-                self.bonus_defense = data.get('bonus_defense')
-                self.bonus_dodge = data.get('bonus_dodge')
-                self.bonus_base_hitpoints = data.get('bonus_base_hitpoints')
+                self.bonus_health = data.get('bonus_health', 0)  # Default to 0 if None
+                self.bonus_attack = data.get('bonus_attack', 0)  # Default to 0 if None
+                self.bonus_defense = data.get('bonus_defense', 0)  # Default to 0 if None
+                self.bonus_dodge = data.get('bonus_dodge', 0)  # Default to 0 if None
+                self.bonus_base_hitpoints = data.get('bonus_base_hitpoints', 0)  # Default to 0 if None
                 self.name = self.petname if self.petname else self.dragon_name
             else:
                 raise ValueError("Player dragon not found in the database")
@@ -268,16 +268,16 @@ class PlayerDragon:
             stats[nurture_bonus] += 15
 
         # Add bonus stats
-        stats['health'] += self.bonus_health
-        stats['attack'] += self.bonus_attack
-        stats['defense'] += self.bonus_defense
-        stats['dodge'] += self.bonus_dodge
+        stats['health'] += self.bonus_health if self.bonus_health is not None else 0
+        stats['attack'] += self.bonus_attack if self.bonus_attack is not None else 0
+        stats['defense'] += self.bonus_defense if self.bonus_defense is not None else 0
+        stats['dodge'] += self.bonus_dodge if self.bonus_dodge is not None else 0
 
         # Update the stats
         self.stats = stats
 
     def calculate_hitpoints_and_damage(self):
-        base_hitpoints = 100 + self.bonus_base_hitpoints
+        base_hitpoints = 100 + self.bonus_base_hitpoints if self.bonus_base_hitpoints is not None else 0
         self.maximum_hitpoints = base_hitpoints + (self.stats['health'] / 100 * base_hitpoints)
         self.damage = 100 + (self.stats['attack'] / 100 * 100)
 
@@ -289,7 +289,6 @@ class PlayerDragon:
             })
         except Exception as e:
             raise ValueError(f"Error saving current hitpoints: {e}")
-
 
 
 def calculate_boss_stats(stats):
@@ -421,7 +420,7 @@ def save_player_dragon_hitpoints(dragon):
             'current_hitpoints': dragon.current_hitpoints
         })
 
-        print(f"Successfully updated hitpoints for dragon ID {dragon_id}")
+        #print(f"Successfully updated hitpoints for dragon ID {dragon_id}")
 
     except Exception as e:
         print(f"Error saving player dragon hitpoints: {e}")
