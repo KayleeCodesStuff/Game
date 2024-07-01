@@ -4,6 +4,7 @@ import sys
 import sqlite3
 import time
 import os
+from firebase_config import db
 
 # Third-party imports
 import pygame
@@ -222,6 +223,9 @@ class EggTimer:
         self.adult_dragon_image = get_dragon_image(self.egg_id)
         print(f"Dragon image loaded for egg index: {self.egg_index}")
 
+import random
+import string
+
 class Ddragon:
     def __init__(self, genotype, parent1, parent2, phenotype):
         self.genotype = genotype
@@ -244,75 +248,78 @@ class Ddragon:
         self.type = phenotype  # egg phenotype to start
         self.special_abilities = None
         self.petname = None
-        self.pool = []  # Add pool attribute
         self.facing_direction = None  # Ensure facing_direction is initialized
+        self.doc_id = None  # Add doc_id attribute
 
     def add_elixir_info(self, rgb, title, primary, secondaries):
+        print(f"Adding elixir info: rgb={rgb}, type={type(rgb)}, title={title}, primary={primary}, secondaries={secondaries}")  # Debugging print
         self.elixir_rgb = rgb
         self.elixir_title = title
         self.elixir_primary = primary
         self.elixir_secondaries = secondaries
 
-    def add_dragon_info(self, dragon):
-        self.dragon_id = dragon[0]
-        self.dragon_name = dragon[3]
-        self.primary = dragon[4]
-        self.secondary1 = dragon[10]
-        self.secondary2 = dragon[11]
-        self.secondary3 = dragon[12]
-        self.nurture = dragon[8]
-        self.gender = dragon[9]
-        self.rgb_range = dragon[7]
-        self.filename = dragon[1]
-        self.type = dragon[2]  # Dragon type overrides egg
-        self.special_abilities = dragon[6]
-        self.facing_direction = dragon[13]  # Ensure facing_direction is assigned
+    def add_dragon_info(self, dragon_data):
+        self.dragon_id = dragon_data.get('id')
+        self.dragon_name = dragon_data.get('name')
+        self.primary = dragon_data.get('primary_characteristic')
+        self.secondary1 = dragon_data.get('secondary_trait1')
+        self.secondary2 = dragon_data.get('secondary_trait2')
+        self.secondary3 = dragon_data.get('secondary_trait3')
+        self.nurture = dragon_data.get('Nurture')
+        self.gender = dragon_data.get('gender')
+        self.rgb_range = dragon_data.get('rgb_value_range')
+        self.filename = dragon_data.get('filename')
+        self.type = dragon_data.get('type')  # Dragon type overrides egg
+        self.special_abilities = dragon_data.get('special_abilities')
+        self.facing_direction = dragon_data.get('facing_direction', None)  # Ensure facing_direction is assigned
         print(f"Assigned facing_direction: {self.facing_direction} for dragon_id: {self.dragon_id}")  # Debugging print
 
     def set_petname(self, petname):
         self.petname = petname
 
+    def _generate_unique_doc_id(self):
+        while True:
+            new_doc_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
+            doc_ref = db.collection('hatcheddragons').document(new_doc_id)
+            if not doc_ref.get().exists:
+                return new_doc_id
+
     def save_to_db(self):
-        dragon_data = {
-            'genotype': self.genotype,
-            'parent1': self.parent1,
-            'parent2': self.parent2,
-            'elixir_rgb': self.elixir_rgb,
-            'elixir_title': self.elixir_title,
-            'dragon_id': self.dragon_id,
-            'dragon_name': self.dragon_name,
-            'primary_trait': self.primary,
-            'secondary1': self.secondary1,
-            'secondary2': self.secondary2,
-            'secondary3': self.secondary3,
-            'nurture': self.nurture,
-            'gender': self.gender,
-            'rgb_range': self.rgb_range,
-            'filename': self.filename,
-            'type': self.type,
-            'special_abilities': self.special_abilities,
-            'petname': self.petname,
-            'facing_direction': self.facing_direction
-        }
-
         try:
-            # Start with the initial ID
-            current_id = self.dragon_id
-            # Check if the document with the current ID exists
-            while True:
-                custom_id = f"{current_id:04d}"  # Ensure a 4-digit ID with leading zeros
-                doc_ref = db.collection('hatcheddragons').document(custom_id)
-                if not doc_ref.get().exists:
-                    break  # If the document does not exist, we found our ID
-                current_id += 1
-                if current_id > 9999:
-                    raise ValueError("Exceeded maximum ID range for hatched dragons")
-
-            doc_ref.set(dragon_data)
-            print(f"Dragon with ID {custom_id} saved successfully with facing_direction: {self.facing_direction}")
-        except Exception as e:
-            print(f"Error saving dragon with ID {self.dragon_id} to Firestore: {e}")
+            # Generate a unique doc_id
+            self.doc_id = self._generate_unique_doc_id()
+            dragon_ref = db.collection('hatcheddragons').document(self.doc_id)
             
+            # Create dragon data dictionary
+            dragon_data = {
+                'genotype': self.genotype,
+                'parent1': self.parent1,
+                'parent2': self.parent2,
+                'elixir_rgb': self.elixir_rgb,
+                'elixir_title': self.elixir_title,
+                'dragon_id': self.dragon_id,
+                'dragon_name': self.dragon_name,
+                'primary_trait': self.primary,
+                'secondary1': self.secondary1,
+                'secondary2': self.secondary2,
+                'secondary3': self.secondary3,
+                'nurture': self.nurture,
+                'gender': self.gender,
+                'rgb_range': self.rgb_range,
+                'filename': self.filename,
+                'type': self.type,
+                'special_abilities': self.special_abilities,
+                'petname': self.petname,
+                'facing_direction': self.facing_direction
+            }
+            
+            # Save dragon data to Firestore
+            dragon_ref.set(dragon_data)
+            print(f"Dragon with facing_direction: {self.facing_direction} saved successfully to Firestore with doc_id: {self.doc_id}")  # Debugging print
+
+        except Exception as e:
+            print(f"Error saving dragon to Firestore: {e}")
+
 # Add these lines before the main function
 def draw_text(surface, text, font, color, position):
     text_surface = font.render(text, True, color)
@@ -488,14 +495,25 @@ def delete_egg_from_db(egg_id):
 
 def get_elixir_details(position):
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM elixirs WHERE position = ?", (position,))
-            elixir = cursor.fetchone()
-           
-            return elixir
-    except sqlite3.Error as e:
-        print(f"SQLite error retrieving elixir details: {e}")
+        elixir_ref = db.collection('elixirs').where('position', '==', position)
+        elixir_docs = elixir_ref.get()
+
+        for elixir_doc in elixir_docs:
+            if elixir_doc.exists:
+                elixir_data = elixir_doc.to_dict()
+                # Print out the entire elixir_data for debugging
+                print(f"Elixir data retrieved: {elixir_data}")
+
+                # Ensure 'rgb' is a string
+                rgb = elixir_data.get('rgb')
+                if not isinstance(rgb, str):
+                    rgb = str(rgb)
+                print(f"RGB value retrieved: {rgb}, type: {type(rgb)}")
+
+                return elixir_data
+        return None
+    except Exception as e:
+        print(f"Firestore error retrieving elixir details: {e}")
         return None
 
 
@@ -541,48 +559,45 @@ def filter_pool_by_phenotype_and_rgb(pool, egg, elixir_rgb):
     filtered_pool = []
 
     egg_phenotype = egg[2]
-    elixir_rgb_value = eval(elixir_rgb)  # Convert string representation of RGB to tuple
+    try:
+        # Print to debug the elixir_rgb value and its type before eval
+        print(f"elixir_rgb received before eval: {elixir_rgb}, type: {type(elixir_rgb)}")
 
-    #print("Egg Phenotype:", egg_phenotype)
-    #print("Elixir RGB Value:", elixir_rgb_value)
+        # Ensure elixir_rgb is correctly formatted as a string
+        elixir_rgb_value = eval(elixir_rgb)  # Convert string representation of RGB to tuple
+        
+        print(f"elixir_rgb_value after eval: {elixir_rgb_value}, type: {type(elixir_rgb_value)}")
 
-    for dragon in pool:
-        dragon_phenotype = dragon[2]
-        rgb_ranges = dragon[7].strip('()').split(', ')  # Adjusted index
+        # Implement the rest of your filtering logic here
+        for dragon in pool:
+            dragon_phenotype = dragon[2]
+            rgb_ranges = dragon[7].strip('()').split(', ')
 
-        try:
-            dragon_rgb_range = [(int(r.split('-')[0]), int(r.split('-')[1])) for r in rgb_ranges]
-        except ValueError as e:
-            print(f"Error parsing RGB range for dragon {dragon[0]}: {e}")
-            continue
-
-        #print("Processing Dragon:", dragon[0])
-        #print("Dragon Phenotype:", dragon_phenotype)
-        #print("Dragon RGB Range:", dragon_rgb_range)
-
-        # Check phenotype with special handling for Metallic cases
-        if egg_phenotype == "metallic":
-            if dragon_phenotype not in ["gold", "silver", "metal"]:
-                #print("Skipping due to phenotype mismatch (Metallic case)")
+            try:
+                dragon_rgb_range = [(int(r.split('-')[0]), int(r.split('-')[1])) for r in rgb_ranges]
+            except ValueError as e:
+                print(f"Error parsing RGB range for dragon {dragon[0]}: {e}")
                 continue
-        elif egg_phenotype != dragon_phenotype:
-            #print("Skipping due to phenotype mismatch")
-            continue
 
-        # Check RGB range
-        if not (dragon_rgb_range[0][0] <= elixir_rgb_value[0] <= dragon_rgb_range[0][1] and
-                dragon_rgb_range[1][0] <= elixir_rgb_value[1] <= dragon_rgb_range[1][1] and
-                dragon_rgb_range[2][0] <= elixir_rgb_value[2] <= dragon_rgb_range[2][1]):
-            #print("Skipping due to RGB range mismatch")
-            continue
+            if egg_phenotype == "metallic":
+                if dragon_phenotype not in ["gold", "silver", "metal"]:
+                    continue
+            elif egg_phenotype != dragon_phenotype:
+                continue
 
-        filtered_pool.append(dragon)
-        #print("Added Dragon:", dragon[0])
+            if not (dragon_rgb_range[0][0] <= elixir_rgb_value[0] <= dragon_rgb_range[0][1] and
+                    dragon_rgb_range[1][0] <= elixir_rgb_value[1] <= dragon_rgb_range[1][1] and
+                    dragon_rgb_range[2][0] <= elixir_rgb_value[2] <= dragon_rgb_range[2][1]):
+                continue
 
-    dragon_types = [dragon[2] for dragon in filtered_pool]
-    print("Filtered Pool Dragon Types:", dragon_types)
+            filtered_pool.append(dragon)
+
+    except (SyntaxError, TypeError) as e:
+        print(f"Error evaluating elixir_rgb: {elixir_rgb}, type: {type(elixir_rgb)}, error: {e}")
+        return filtered_pool
 
     return filtered_pool
+
 
 #Load baby dragon images
 def load_image(file_path):
@@ -722,52 +737,41 @@ def get_text_input(prompt, font, screen, timeout=10):
 
 def save_all_ddragon_instances(ddragon_list):
     try:
-        with sqlite3.connect('save.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS hatcheddragons (
-                    id INTEGER PRIMARY KEY,
-                    genotype TEXT,
-                    parent1 TEXT,
-                    parent2 TEXT,
-                    elixir_rgb TEXT,
-                    elixir_title TEXT,
-                    dragon_id INTEGER,
-                    dragon_name TEXT,
-                    primary_trait TEXT,
-                    secondary1 TEXT,
-                    secondary2 TEXT,
-                    secondary3 TEXT,
-                    nurture TEXT,
-                    gender TEXT,
-                    rgb_range TEXT,
-                    filename TEXT,
-                    type TEXT,
-                    special_abilities TEXT,
-                    petname TEXT,
-                    facing_direction TEXT
-                )
-            ''')
-            for ddragon in ddragon_list:
-                cursor.execute('''
-                    INSERT INTO hatcheddragons (
-                        genotype, parent1, parent2, elixir_rgb, elixir_title, dragon_id, dragon_name,
-                        primary_trait, secondary1, secondary2, secondary3, nurture, gender,
-                        rgb_range, filename, type, special_abilities, petname, facing_direction
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    ddragon.genotype, ddragon.parent1, ddragon.parent2, ddragon.elixir_rgb, ddragon.elixir_title, ddragon.dragon_id, ddragon.dragon_name,
-                    ddragon.primary, ddragon.secondary1, ddragon.secondary2, ddragon.secondary3, ddragon.nurture, ddragon.gender,
-                    ddragon.rgb_range, ddragon.filename, ddragon.type, ddragon.special_abilities, ddragon.petname, ddragon.facing_direction
-                ))
-                print(f"Saving dragon with facing_direction: {ddragon.facing_direction}")  # Debugging print
-            conn.commit()
-            print(f"Saved {len(ddragon_list)} Ddragon instances to the database")
-    except sqlite3.Error as e:
-        print(f"SQLite error saving ddragon instances: {e}")
-    except Exception as e:
-        print(f"Unexpected error saving ddragon instances: {e}")
+        for ddragon in ddragon_list:
+            # Generate a unique document ID for each dragon
+            doc_id = ddragon._generate_unique_doc_id()
+            dragon_ref = db.collection('hatcheddragons').document(doc_id)
+            
+            # Create dragon data dictionary
+            dragon_data = {
+                'genotype': ddragon.genotype,
+                'parent1': ddragon.parent1,
+                'parent2': ddragon.parent2,
+                'elixir_rgb': ddragon.elixir_rgb,
+                'elixir_title': ddragon.elixir_title,
+                'dragon_id': ddragon.dragon_id,
+                'dragon_name': ddragon.dragon_name,
+                'primary_trait': ddragon.primary,
+                'secondary1': ddragon.secondary1,
+                'secondary2': ddragon.secondary2,
+                'secondary3': ddragon.secondary3,
+                'nurture': ddragon.nurture,
+                'gender': ddragon.gender,
+                'rgb_range': ddragon.rgb_range,
+                'filename': ddragon.filename,
+                'type': ddragon.type,
+                'special_abilities': ddragon.special_abilities,
+                'petname': ddragon.petname,
+                'facing_direction': ddragon.facing_direction
+            }
+            
+            # Save dragon data to Firestore
+            dragon_ref.set(dragon_data)
+            print(f"Dragon with facing_direction: {ddragon.facing_direction} saved successfully to Firestore with doc_id: {doc_id}")  # Debugging print
 
+        print(f"Saved {len(ddragon_list)} Ddragon instances to Firestore")
+    except Exception as e:
+        print(f"Error saving ddragon instances to Firestore: {e}")
 
 # Main function adjustments
 def main():
@@ -835,7 +839,12 @@ def main():
 
                                 # Update the Ddragon instance with elixir information
                                 if ddragon_instances[selected_egg_index] is not None:
-                                    ddragon_instances[selected_egg_index].add_elixir_info(elixir[1], elixir[2], elixir[3], elixir[4:7])
+                                    ddragon_instances[selected_egg_index].add_elixir_info(
+                                        elixir['rgb'],
+                                        elixir['title'],
+                                        elixir['primary_trait'],
+                                        [elixir['secondary_trait1'], elixir['secondary_trait2'], elixir['secondary_trait3']]
+                                    )
 
                                     # Display nurture options and update the Ddragon instance
                                     selected_trait = display_nurture_options()
@@ -848,7 +857,7 @@ def main():
                                 # Remove elixir from inventory and delete from database
                                 inventory_slots[i] = None
                                 elixir_color = None
-                                delete_elixir_from_db(elixir[0])
+                                delete_elixir_from_db(elixir['image_file'])
                                 break
 
         for egg_timer in active_timers[:]:
