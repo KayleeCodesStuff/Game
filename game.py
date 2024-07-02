@@ -255,6 +255,21 @@ def draw_inventory(surface, inventory, egg_counts, inventory_slots, selected_inv
         if i == selected_inventory_slot:
             pygame.draw.rect(surface, RED, box_rect, 3)
 
+def draw_back_to_hub_button():
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 570, 150, 50)
+    color = RED
+    text = "Back to Hub"
+    
+    # Draw the button with beveled edges
+    pygame.draw.rect(screen, color, back_button_rect, border_radius=10)
+    # Outline with white color
+    pygame.draw.rect(screen, WHITE, back_button_rect, 2, border_radius=10)
+    text_surface = small_font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect(center=back_button_rect.center)
+    screen.blit(text_surface, text_rect)
+    
+    return back_button_rect
+
 
 def save_inventory_data():
     try:

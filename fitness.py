@@ -9,7 +9,9 @@ import pygame
 from game import *
 from combat import *
 from firebase_config import db
-
+import Mixolator
+import breeding
+import hatchery
 
 
 # Set the environment variable to the path of your Firebase credentials JSON file
@@ -172,6 +174,10 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
+def draw_back_to_hub_button():
+    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 570, 150, 50)
+    draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
+    return back_button_rect
 
 def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
     screen.fill(GREY)
@@ -236,13 +242,7 @@ def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
         draw_beveled_button(screen, rect, color, quest[2], small_font)
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
-    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
-    draw_beveled_button(
-        screen,
-        back_button_rect,
-        RED,
-        "Back to Hub",
-        small_font)
+    back_button_rect = draw_back_to_hub_button()  # Updated to use the new function
 
     fight_button_rect = pygame.Rect(WIDTH // 2 - 10, 285, 150, 50)
     draw_beveled_button(screen, fight_button_rect, RED, "Fight!", small_font)
@@ -251,7 +251,8 @@ def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
 
     pygame.display.flip()
 
-    return fight_button_rect
+    return fight_button_rect, back_button_rect  # Updated to return the new button rect
+
 
 
 def get_random_dragon():
@@ -307,53 +308,54 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
         print(f"Error loading image {file_path}: {e}")
         return pygame.Surface(max_size)
 
+def draw_mixolator_button():
+    mixolator_button_rect = pygame.Rect(WIDTH // 2 - 375, HEIGHT - 500, 150, 50)
+    draw_beveled_button(screen, mixolator_button_rect, BLUE, "Mixolator", small_font)
+    return mixolator_button_rect
+
+def draw_breedery_button():
+    breedery_button_rect = pygame.Rect(WIDTH // 2 - 75, HEIGHT - 500, 150, 50)
+    draw_beveled_button(screen, breedery_button_rect, BLUE, "Breedery", small_font)
+    return breedery_button_rect
+
+def draw_hatchery_button():
+    hatchery_button_rect = pygame.Rect(WIDTH // 2 + 225, HEIGHT - 500, 150, 50)
+    draw_beveled_button(screen, hatchery_button_rect, BLUE, "Hatchery", small_font)
+    return hatchery_button_rect
 
 def draw_hub_gameboard():
     global selected_dragon_for_upgrade
     screen.fill(GREY)
     screen.blit(background, (0, 0))
-    draw_text(screen, "Hub Gameboard", category_font,
-              WHITE, (WIDTH // 2 - 100, 20))
-
+    draw_text(screen, "Hub Gameboard", category_font, WHITE, (WIDTH // 2 - 100, 20))
     initialize_dragons()
 
-    dragon_positions = [(100, 200), (300, 200),
-                        (500, 200), (700, 200), (900, 200)]
-
+    dragon_positions = [(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]
     for i, pos in enumerate(dragon_positions):
         dragon_image_file = selected_dragons[i]
         dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
-
-        dragon_image = load_and_resize_image_keeping_aspect(
-            dragon_image_path, (150, 150))
+        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
         image_rect = dragon_image.get_rect(center=pos)
         screen.blit(dragon_image, image_rect.topleft)
-        draw_text(
-            screen,
-            f"Dragon {i + 1}",
-            small_font,
-            WHITE,
-            (pos[0] - 30,
-             pos[1] + 60))
+        draw_text(screen, f"Dragon {i + 1}", small_font, WHITE, (pos[0] - 30, pos[1] + 60))
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
-    upgrade_dragon_rect = pygame.Rect(
-        WIDTH // 3, HEIGHT - 300, WIDTH // 3, 200)
-    draw_beveled_button(
-        screen,
-        upgrade_dragon_rect,
-        LIGHT_GREY,
-        "Upgrade Dragon",
-        small_font)
+    upgrade_dragon_rect = pygame.Rect(WIDTH // 3, HEIGHT - 300, WIDTH // 3, 200)
+    draw_beveled_button(screen, upgrade_dragon_rect, LIGHT_GREY, "Upgrade Dragon", small_font)
+
+    mixolator_button_rect = draw_mixolator_button()
+    breedery_button_rect = draw_breedery_button()
+    hatchery_button_rect = draw_hatchery_button()
 
     if selected_dragon_for_upgrade:
-        display_dragon_statistics(
-            selected_dragon_for_upgrade,
-            upgrade_dragon_rect)
+        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+
+    back_button_rect = draw_back_to_hub_button()  # Draw the "Back to Hub" button
 
     pygame.display.flip()
-    return upgrade_dragon_rect
+    return upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect  # Updated to return the new button rect
+
 
 
 def display_dragon_statistics(dragon, upgrade_dragon_rect):
@@ -815,10 +817,8 @@ def game_loop():
     global selected_dragon_for_upgrade
     boss_dragon_stats = None
 
-    # Load inventory data once at the start of the game loop
     global inventory, egg_counts, inventory_slots
     inventory, egg_counts, inventory_slots = load_inventory_data()
-
 
     while running:
         for event in pygame.event.get():
@@ -827,108 +827,83 @@ def game_loop():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = event.pos
                 if current_screen == 'hub':
-                    upgrade_dragon_rect = draw_hub_gameboard()
-                    if not handle_fruit_click_in_inventory(
-                            mouse_x, mouse_y, selected_dragon_for_upgrade):
+                    upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect = draw_hub_gameboard()
+                    if not handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrade):
                         selected_dragon_for_upgrade = handle_upgrade_dragon_click(
                             mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
-                    for i, pos in enumerate(
-                            [(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
+                    for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
                         dragon_image_file = selected_dragons[i]
                         dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
-                        dragon_image = load_and_resize_image_keeping_aspect(
-                            dragon_image_path, (150, 150))
+                        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
                         image_rect = dragon_image.get_rect(center=pos)
                         if image_rect.collidepoint(mouse_x, mouse_y):
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             boss_dragon_filename = dragon_image_file
-                            boss_dragon = BossDragon(
-                                boss_dragon_filename, tier=1)  # Creating instance of BossDragon
-                            boss_dragon_stats = (
-                                boss_dragon.stats['health'],
-                                boss_dragon.stats['attack'],
-                                boss_dragon.stats['defense'],
-                                boss_dragon.stats['dodge'])  # Set boss_dragon_stats variable
+                            boss_dragon = BossDragon(boss_dragon_filename, tier=1)
+                            boss_dragon_stats = (boss_dragon.stats['health'], boss_dragon.stats['attack'],
+                                                 boss_dragon.stats['defense'], boss_dragon.stats['dodge'])
                             all_quests = load_quests(selected_area)
-                            displayed_quests = random.sample(
-                                all_quests, min(12, len(all_quests)))
+                            displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
                             current_screen = 'area'
                             break
+                    if mixolator_button_rect.collidepoint(mouse_x, mouse_y):
+                        Mixolator.main()
+                    if breedery_button_rect.collidepoint(mouse_x, mouse_y):
+                        breeding.main()
+                    if hatchery_button_rect.collidepoint(mouse_x, mouse_y):
+                        hatchery.main()
                 elif current_screen == 'area':
-                    if handle_back_to_hub_click(mouse_x, mouse_y):
+                    fight_button_rect, back_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+                    if back_button_rect.collidepoint(mouse_x, mouse_y):
                         current_screen = 'hub'
                     elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
                         if player_tokens[selected_area] >= 10:
                             player_tokens[selected_area] -= 10
-                            # Ensure at least one player dragon is initialized
-                            if any(
-                                    dragon is not None for dragon in player_dragons):
-                                start_combat(
-                                    player_dragons,
-                                    boss_dragon_stats,
-                                    draw_area_gameboard,
-                                    screen,
-                                    selected_area,
-                                    player_tokens,
-                                    displayed_quests,
-                                    boss_dragon_filename)  # Include boss_dragon_filename here
+                            if any(dragon is not None for dragon in player_dragons):
+                                start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen,
+                                             selected_area, player_tokens, displayed_quests, boss_dragon_filename)
                             else:
-                                print(
-                                    "Error: At least one player dragon must be initialized.")
+                                print("Error: At least one player dragon must be initialized.")
                     else:
-                        displayed_quests, quests_updated = handle_quest_click(
-                            selected_area, mouse_x, mouse_y, displayed_quests)
-                        handle_player_dragon_slot_click(
-                            mouse_x, mouse_y, player_dragons)
+                        displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y,
+                                                                              displayed_quests)
+                        handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
                         if quests_updated:
-                            draw_area_gameboard(
-                                selected_area, boss_dragon, player_dragons, displayed_quests)
-
+                            draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
                 if event.key == pygame.K_1:
-                    if spend_fruit_and_update_stats(
-                            'gleamberry', selected_dragon_for_upgrade):
+                    if spend_fruit_and_update_stats('gleamberry', selected_dragon_for_upgrade):
                         draw_hub_gameboard()
-                        display_dragon_statistics(
-                            selected_dragon_for_upgrade, upgrade_dragon_rect)
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_2:
-                    if spend_fruit_and_update_stats(
-                            'flamefruit', selected_dragon_for_upgrade):
+                    if spend_fruit_and_update_stats('flamefruit', selected_dragon_for_upgrade):
                         draw_hub_gameboard()
-                        display_dragon_statistics(
-                            selected_dragon_for_upgrade, upgrade_dragon_rect)
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_3:
-                    if spend_fruit_and_update_stats(
-                            'shimmeringapple', selected_dragon_for_upgrade):
+                    if spend_fruit_and_update_stats('shimmeringapple', selected_dragon_for_upgrade):
                         draw_hub_gameboard()
-                        display_dragon_statistics(
-                            selected_dragon_for_upgrade, upgrade_dragon_rect)
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_4:
-                    if spend_fruit_and_update_stats(
-                            'etherealpear', selected_dragon_for_upgrade):
+                    if spend_fruit_and_update_stats('etherealpear', selected_dragon_for_upgrade):
                         draw_hub_gameboard()
-                        display_dragon_statistics(
-                            selected_dragon_for_upgrade, upgrade_dragon_rect)
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
                 elif event.key == pygame.K_5:
-                    if spend_fruit_and_update_stats(
-                            'moonbeammelon', selected_dragon_for_upgrade):
+                    if spend_fruit_and_update_stats('moonbeammelon', selected_dragon_for_upgrade):
                         draw_hub_gameboard()
-                        display_dragon_statistics(
-                            selected_dragon_for_upgrade, upgrade_dragon_rect)
+                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
 
         if current_screen == 'hub':
-            upgrade_dragon_rect = draw_hub_gameboard()
+            upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect = draw_hub_gameboard()
             if selected_dragon_for_upgrade:
-                display_dragon_statistics(
-                    selected_dragon_for_upgrade, upgrade_dragon_rect)
+                display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
         elif current_screen == 'area' and selected_area is not None:
-            fight_button_rect = draw_area_gameboard(
-                selected_area, boss_dragon, player_dragons, displayed_quests)
+            fight_button_rect, back_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
 
         pygame.display.flip()
 
     pygame.quit()
     print("Game loop ended")
+
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import filedialog
 from game import *
 
+
 pygame.init()
 
 # Screen dimensions
@@ -119,8 +120,35 @@ elixir_personality = None
 elixir_color_name = None
 elixir_title = None
 
-# Inventory
-#inventory = {fruit: 5 for fruit in fruit_names}
+def draw_delete_button():
+    delete_button_rect = pygame.Rect(850, HEIGHT - 200, 120, 40)
+    color = RED
+    text = "Delete"
+    
+    # Draw the button with beveled edges
+    pygame.draw.rect(screen, color, delete_button_rect, border_radius=10)
+    # Outline with white color
+    pygame.draw.rect(screen, WHITE, delete_button_rect, 2, border_radius=10)
+    text_surface = small_font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect(center=delete_button_rect.center)
+    screen.blit(text_surface, text_rect)
+    
+    return delete_button_rect
+
+def draw_bottle_button():
+    bottle_button_rect = pygame.Rect(850, HEIGHT - 150, 120, 40)
+    color = RED
+    text = "Bottle"
+    
+    # Draw the button with beveled edges
+    pygame.draw.rect(screen, color, bottle_button_rect, border_radius=10)
+    # Outline with white color
+    pygame.draw.rect(screen, WHITE, bottle_button_rect, 2, border_radius=10)
+    text_surface = small_font.render(text, True, WHITE)
+    text_rect = text_surface.get_rect(center=bottle_button_rect.center)
+    screen.blit(text_surface, text_rect)
+    
+    return bottle_button_rect
 
 def closest_color(requested_color):
     min_colors = {}
@@ -234,18 +262,27 @@ def draw_screen(selected_box, selected_inventory_slot):
         draw_beveled_button(screen, bottle_button, GREY, "Bottle", font)  # Same style as Mixalate button
         draw_beveled_button(screen, delete_button, GREY, "Delete", font)
 
+    # Draw buttons
+    back_button_rect = draw_back_to_hub_button()  # Draw the "Back to Hub" button
+    delete_button_rect = draw_delete_button()  # Draw the "Delete" button
+    bottle_button_rect = draw_bottle_button()  # Draw the "Bottle" button
+
     # Draw the inventory
     draw_inventory(screen, inventory, egg_counts, inventory_slots, selected_inventory_slot)
 
-
     pygame.display.flip()
 
-# Updated main function call
+
 def main():
     global elixir_color, elixir_personality, elixir_color_name, elixir_title, selected_inventory_slot
     running = True
     selected_box = 0  # Start with the primary trait selection box selected
     selected_inventory_slot = None
+
+    # Declare button rects at the beginning
+    back_button_rect = None
+    delete_button_rect = None
+    bottle_button_rect = None
 
     while running:
         for event in pygame.event.get():
@@ -316,7 +353,7 @@ def main():
                     }
                     logging.debug(f"Elixir data created: {elixir_data}")
 
-                if elixir_color and bottle_button.collidepoint(x, y):
+                if elixir_color and bottle_button_rect.collidepoint(x, y):
                     try:
                         # Save the elixir data when the "Bottle" button is clicked
                         elixir_data['position'] = next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
@@ -345,17 +382,29 @@ def main():
                         selected_inventory_slot = i
 
                 # Handle delete button press
-                if delete_button.collidepoint(x, y) and selected_inventory_slot is not None:
+                if delete_button_rect.collidepoint(x, y) and selected_inventory_slot is not None:
                     delete_elixir_data(selected_inventory_slot + 1)
                     inventory_slots[selected_inventory_slot] = None
                     save_inventory_data()
                     selected_inventory_slot = None
 
-        draw_screen(selected_box, selected_inventory_slot)  # Pass selected_inventory_slot to draw_screen()
+                # Handle "Back to Hub" button press
+                if back_button_rect.collidepoint(x, y):
+                    running = False  # Exit the current loop to return to the hub
+
+        # Draw the screen
+        draw_screen(selected_box, selected_inventory_slot)
+
+        # Update button rects
+        back_button_rect = draw_back_to_hub_button()  # Draw the "Back to Hub" button
+        delete_button_rect = draw_delete_button()  # Draw the "Delete" button
+        bottle_button_rect = draw_bottle_button()  # Draw the "Bottle" button
+
+        # Update the display
+        pygame.display.flip()
 
     pygame.quit()
     sys.exit()
-
 
 if __name__ == "__main__":
     main()
