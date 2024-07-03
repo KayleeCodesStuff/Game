@@ -248,7 +248,7 @@ def load_hatched_dragons_from_db():
         for doc in docs:
             data = doc.to_dict()
             doc_id = int(doc.id)  # Convert Firestore document ID to integer to handle leading zeros
-            print(f"Loaded hatched dragon document ID: {doc_id}, data: {data}")  # Debugging statement
+            #print(f"Loaded hatched dragon document ID: {doc_id}, data: {data}")  # Debugging statement
             hatched_dragons.append((
                 doc_id,  # Use the document ID as the dragon's ID
                 data.get('filename'),
@@ -669,8 +669,7 @@ def place_fruit(x, y, selected_fruit):
         for dragon in dragons:
             if not dragon["holding_fruit"]:
                 dragon["target"] = determine_target(dragon)
-        else:
-            print(f"Cannot place fruit {selected_fruit}. Inventory: {inventory[selected_fruit] if selected_fruit else 'None'}")
+        
 
 def delete_hatched_dragon(doc_id):
     try:

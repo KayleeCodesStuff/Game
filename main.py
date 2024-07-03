@@ -9,7 +9,7 @@ import pygame
 from game import *
 from combat import *
 from firebase_config import db
-import Mixolator
+from Mixolator import main
 import breeding
 import hatchery
 
@@ -74,7 +74,7 @@ def load_quests(category):
         quests_ref = db.collection('playerquests')
 
         # Fetch all quests for the category
-        all_quests_query = quests_ref.where('category', '==', category).stream()
+        all_quests_query = quests_ref.where(field_path='category', op_string='==', value=category).stream()
         quests = []
         for doc in all_quests_query:
             quest = doc.to_dict()
@@ -174,10 +174,10 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
-def draw_back_to_hub_button():
-    back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 570, 150, 50)
-    draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
-    return back_button_rect
+# def draw_back_to_hub_button():
+#     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 570, 150, 50)
+#     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
+#     return back_button_rect
 
 def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
     screen.fill(GREY)
@@ -568,7 +568,7 @@ def remove_and_replace_quest(quest_id, category, displayed_quests):
         })
 
         # Get all quests for the category
-        all_quests_query = db.collection('playerquests').where('category', '==', category).stream()
+        all_quests_query = db.collection('playerquests').where(field_path='category', op_string='==', value=category).stream()
         all_quests = []
         for doc in all_quests_query:
             quest = doc.to_dict()
@@ -847,7 +847,7 @@ def game_loop():
                             current_screen = 'area'
                             break
                     if mixolator_button_rect.collidepoint(mouse_x, mouse_y):
-                        Mixolator.main()
+                        main()
                     if breedery_button_rect.collidepoint(mouse_x, mouse_y):
                         breeding.main()
                     if hatchery_button_rect.collidepoint(mouse_x, mouse_y):

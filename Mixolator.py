@@ -86,11 +86,6 @@ delete_button = pygame.Rect(850, HEIGHT - 200, 120, 40)
 # List of image filenames
 image_filenames = [os.path.join(assets_path, 'pb{}.png'.format(i)) for i in range(1, 13)]
 
-
-
-# Define inventory slots
-#inventory_slots = [None] * 10  # None means empty, else it will store the color and image
-
 # Create inventory slots
 inventory_boxes = [pygame.Rect(20 + i * 60, HEIGHT - 100, 50, 50) for i in range(10)]
 
@@ -391,6 +386,7 @@ def main():
                 # Handle "Back to Hub" button press
                 if back_button_rect.collidepoint(x, y):
                     running = False  # Exit the current loop to return to the hub
+                   
 
         # Draw the screen
         draw_screen(selected_box, selected_inventory_slot)
