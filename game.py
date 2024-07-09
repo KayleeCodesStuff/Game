@@ -53,10 +53,13 @@ GREY = (200, 200, 200)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
 
-# Load images with error handling
+image_cache = {}  # Add this at the beginning of your module
+
 def load_image(file_name, scale_to):
+    if file_name in image_cache:
+        return pygame.transform.scale(image_cache[file_name], scale_to)
+
     base_path = os.path.join(os.path.dirname(__file__), 'assets', 'images')
-    # Ensure the correct path is used for all images
     if not os.path.isabs(file_name):
         file_name = os.path.join(base_path, file_name)
     elif not file_name.startswith(base_path):
@@ -64,12 +67,33 @@ def load_image(file_name, scale_to):
     
     try:
         image = pygame.image.load(file_name).convert_alpha()
+        image_cache[file_name] = image  # Cache the image
         logging.info(f"Loaded image {file_name}")
         return pygame.transform.scale(image, scale_to)
     except pygame.error as e:
         logging.error(f"Error loading image {file_name}: {e}")
         print(f"Error loading image {file_name}: {e}")
-        return pygame.Surface(scale_to)  # Return a blank surface as a placeholder
+        return pygame.Surface(scale_to)
+
+def load_and_resize_image(file_path, size):
+    if file_path in image_cache:
+        return pygame.transform.scale(image_cache[file_path], size)
+    
+    base_path = os.path.join(os.path.dirname(__file__), 'assets', 'images')
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(base_path, file_path)
+    elif not file_path.startswith(base_path):
+        file_path = os.path.join(base_path, file_path)
+    
+    try:
+        image = pygame.image.load(file_path).convert_alpha()
+        image_cache[file_path] = image  # Cache the image
+        return pygame.transform.scale(image, size)
+    except pygame.error as e:
+        logging.error(f"Error loading image {file_path}: {e}")
+        print(f"Error loading image {file_path}: {e}")
+        return pygame.Surface(size)
+
 
 
 background = load_image(os.path.join('background.png'), (WIDTH, HEIGHT))
@@ -107,42 +131,41 @@ def load_inventory_data():
     inventory_slots = [None] * 10
 
     try:
-        # Load fruits inventory from Firestore
-        inventory_ref = db.collection('inventory')
-        docs = inventory_ref.stream()
-        for doc in docs:
+        # Batch read Firestore data
+        batch_refs = [
+            db.collection('inventory'),
+            db.collection('eggs'),
+            db.collection('elixirs')
+        ]
+        batch_docs = [ref.stream() for ref in batch_refs]
+
+        # Load fruits inventory
+        for doc in batch_docs[0]:
             fruit = doc.id
             count = doc.to_dict().get('count', 0)
             inventory[fruit] = count
             
-        # Load eggs counts from Firestore
-        eggs_ref = db.collection('eggs')
-        docs = eggs_ref.stream()
+        # Load eggs counts
         phenotype_counts = {}
-        for doc in docs:
+        for doc in batch_docs[1]:
             phenotype = doc.to_dict().get('phenotype')
             if phenotype:
                 if phenotype in phenotype_counts:
                     phenotype_counts[phenotype] += 1
                 else:
                     phenotype_counts[phenotype] = 1
-
         for phenotype, count in phenotype_counts.items():
             egg_counts[phenotype] = count
-            
 
-        # Load elixirs into inventory slots from Firestore
-        elixirs_ref = db.collection('elixirs')
-        docs = elixirs_ref.stream()
-        for doc in docs:
+        # Load elixirs into inventory slots
+        for doc in batch_docs[2]:
             data = doc.to_dict()
             rgb = tuple(map(int, data.get('rgb', '0,0,0').strip('()').split(', ')))
             image_file = data.get('image_file')
             position = data.get('position', 0)
             if 0 < position <= len(inventory_slots):
                 inventory_slots[position - 1] = (rgb, image_file)
-            #print(f"Loaded elixir at position {position}: {rgb}, {image_file}")
-
+        
         logging.info("Inventory data loaded successfully")
 
     except Exception as e:
@@ -273,26 +296,21 @@ def draw_back_to_hub_button():
 
 def save_inventory_data():
     try:
-        # Update fruits inventory in Firestore
+        batch = db.batch()
         for fruit, count in inventory.items():
-            db.collection('inventory').document(fruit).set({'count': count})
-           
-        #print("Inventory data saved successfully")
+            doc_ref = db.collection('inventory').document(fruit)
+            batch.set(doc_ref, {'count': count})
+        batch.commit()
+        logging.info("Inventory data saved successfully")
     except Exception as e:
         logging.error(f"Error saving inventory data: {e}")
         print(f"Error saving inventory data: {e}")
 
-
-
 def save_elixir_data(elixir_data):
     try:
         elixirs_ref = db.collection('elixirs')
-        #print(f"Saving elixir data at position {elixir_data['position']}")
-
-        # Convert the RGB tuple to a string
         rgb_str = f"({elixir_data['rgb'][0]}, {elixir_data['rgb'][1]}, {elixir_data['rgb'][2]})"
-
-        elixirs_ref.document(str(elixir_data['position'])).set({
+        elixir_doc = {
             'rgb': rgb_str,
             'title': elixir_data['title'],
             'primary_trait': elixir_data['primary_trait'],
@@ -301,11 +319,13 @@ def save_elixir_data(elixir_data):
             'secondary_trait3': elixir_data['secondary_trait3'],
             'image_file': elixir_data['image_file'],
             'position': elixir_data['position']
-        })
-
-        #print("Elixir data saved successfully")
+        }
+        elixirs_ref.document(str(elixir_data['position'])).set(elixir_doc)
+        logging.info(f"Elixir data saved successfully at position {elixir_data['position']}")
     except Exception as e:
+        logging.error(f"Error saving elixir data: {e}")
         print(f"Error saving elixir data: {e}")
+
 
 def delete_elixir_data(position):
     try:
@@ -382,25 +402,6 @@ def create_egg(dragon1, dragon2, position):
         #print(f"Egg inventory updated successfully for phenotype: {egg_phenotype}")
     except Exception as e:
         print(f"Error updating egg inventory: {e}")
-
-    
-       
- #load images in the hatchery
-def load_and_resize_image(file_path, size):
-    base_path = os.path.join(os.path.dirname(__file__), 'assets', 'images')
-    # Ensure the correct path is used for all images
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(base_path, file_path)
-    elif not file_path.startswith(base_path):
-        file_path = os.path.join(base_path, file_path)
-    
-    try:
-        image = pygame.image.load(file_path).convert_alpha()
-        return pygame.transform.scale(image, size)
-    except pygame.error as e:
-        logging.error(f"Error loading image {file_path}: {e}")
-        print(f"Error loading image {file_path}: {e}")
-        return pygame.Surface(size)  # Return a blank surface as a placeholder
 
 
 # Function to check for overlapping rectangles

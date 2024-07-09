@@ -68,6 +68,9 @@ small_font = pygame.font.Font(None, 36)  # Smaller font for button text
 
 selected_dragon_for_upgrade = None  # Global variable to store the selected dragon
 
+loaded_images = {}
+
+selected_dragons = [None] * 5
 
 def load_quests(category):
     try:
@@ -113,7 +116,7 @@ def complete_daily_quest(quest_id):
             'reset': firestore.SERVER_TIMESTAMP  # Adjust this to match your reset logic
         })
 
-        logging.info(f"Successfully completed quest ID {quest_id}")
+       
 
     except Exception as e:
         print(f"Error completing daily quest: {e}")
@@ -142,8 +145,7 @@ def load_boss_dragon_image(dragon_filename, max_height):
         new_width = new_height * aspect_ratio
 
         new_size = (int(new_width), int(new_height))
-        logging.info(
-            f"Loaded and resized boss dragon image {dragon_image_path} to {new_size}")
+  
         return pygame.transform.scale(image, new_size)
     except pygame.error as e:
         logging.error(
@@ -174,10 +176,6 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     text_rect = text_surface.get_rect(center=rect.center)
     surface.blit(text_surface, text_rect)
 
-# def draw_back_to_hub_button():
-#     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 570, 150, 50)
-#     draw_beveled_button(screen, back_button_rect, RED, "Back to Hub", small_font)
-#     return back_button_rect
 
 def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
     screen.fill(GREY)
@@ -253,36 +251,58 @@ def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
 
     return fight_button_rect, back_button_rect  # Updated to return the new button rect
 
-
-
-def get_random_dragon():
+def get_all_dragon_ids():
     try:
         dragons_ref = db.collection('dragons')
+        dragon_ids = [doc.id for doc in dragons_ref.stream()]
+        return dragon_ids
+    except Exception as e:
+        print(f"Error retrieving dragon IDs: {e}")
+        return []
 
-        # Fetch all dragons
-        dragons_query = dragons_ref.stream()
-        dragons = [doc.to_dict()['filename'] for doc in dragons_query]
+# Fetch all dragon IDs once and store them
+all_dragon_ids = get_all_dragon_ids()
+
+def get_random_dragons(num_dragons=5):
+    try:
+        if len(all_dragon_ids) < num_dragons:
+            raise ValueError("Not enough dragons in the database")
+
+        # Pick random IDs from the stored list
+        random_ids = random.sample(all_dragon_ids, num_dragons)
+
+        dragons = []
+        for dragon_id in random_ids:
+            dragon_doc = db.collection('dragons').document(dragon_id).get()
+            if dragon_doc.exists:
+                dragons.append(dragon_doc.to_dict()['filename'])
+            else:
+                print(f"Dragon with ID {dragon_id} not found")
 
         if not dragons:
             raise ValueError("No dragons found in the database")
 
-        return random.choice(dragons)
+        return dragons
 
     except Exception as e:
-        print(f"Error getting random dragon: {e}")
-        return None
+        print(f"Error getting random dragons: {e}")
+        return []
 
-
-selected_dragons = [None] * 5
+# Use the function to get 5 random dragons
+selected_dragons = get_random_dragons()
 
 
 def initialize_dragons():
-    for i in range(len(selected_dragons)):
-        if selected_dragons[i] is None:
-            selected_dragons[i] = get_random_dragon()
+    global selected_dragons
+    if not any(selected_dragons):
+        selected_dragons = get_random_dragons()
+
+
 
 
 def load_and_resize_image_keeping_aspect(file_path, max_size):
+    if file_path in loaded_images:
+        return loaded_images[file_path]
     try:
         image = pygame.image.load(file_path).convert_alpha()
         width, height = image.get_size()
@@ -296,17 +316,20 @@ def load_and_resize_image_keeping_aspect(file_path, max_size):
                 new_width = new_height * aspect_ratio
         else:
             new_height = max_size[1]
-            new_width = new_height * aspect_ratio
+            new_width = new_height / aspect_ratio
             if new_width > max_size[0]:
                 new_width = max_size[0]
                 new_height = new_width / aspect_ratio
 
         new_size = (int(new_width), int(new_height))
-        return pygame.transform.scale(image, new_size)
+        resized_image = pygame.transform.scale(image, new_size)
+        loaded_images[file_path] = resized_image
+        return resized_image
     except pygame.error as e:
         logging.error(f"Error loading image {file_path}: {e}")
         print(f"Error loading image {file_path}: {e}")
         return pygame.Surface(max_size)
+
 
 def draw_mixolator_button():
     mixolator_button_rect = pygame.Rect(WIDTH // 2 - 375, HEIGHT - 500, 150, 50)
@@ -351,11 +374,10 @@ def draw_hub_gameboard():
     if selected_dragon_for_upgrade:
         display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
 
-    back_button_rect = draw_back_to_hub_button()  # Draw the "Back to Hub" button
+    back_button_rect = draw_back_to_hub_button()
 
     pygame.display.flip()
-    return upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect  # Updated to return the new button rect
-
+    return upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect
 
 
 def display_dragon_statistics(dragon, upgrade_dragon_rect):
