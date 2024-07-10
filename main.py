@@ -354,13 +354,19 @@ def draw_hub_gameboard():
     initialize_dragons()
 
     dragon_positions = [(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]
+    categories = ['daily', 'cleaning', 'dining', 'exercise', 'goals']  # Assuming these are your categories
+
     for i, pos in enumerate(dragon_positions):
         dragon_image_file = selected_dragons[i]
         dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
         dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
         image_rect = dragon_image.get_rect(center=pos)
         screen.blit(dragon_image, image_rect.topleft)
-        draw_text(screen, f"Dragon {i + 1}", small_font, WHITE, (pos[0] - 30, pos[1] + 60))
+        
+        # Draw category buttons beneath each dragon image
+        category = categories[i]
+        button_rect = pygame.Rect(pos[0] - 50, pos[1] + 100, 120, 50)
+        draw_beveled_button(screen, button_rect, CATEGORY_INFO[category]['color'], category.capitalize(), small_font)
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
 
