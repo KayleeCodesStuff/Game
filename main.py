@@ -9,7 +9,7 @@ import pygame
 from game import *
 from combat import *
 from firebase_config import db
-from Mixolator import main
+import Mixolator 
 import breeding
 import hatchery
 
@@ -1018,7 +1018,7 @@ def game_loop():
                             break  # Exit loop once dragon is handled
                     
                     if mixolator_button_rect.collidepoint(mouse_x, mouse_y):
-                        main()
+                        current_screen, _ = Mixolator.handle_mix_screen_interactions()  # Call the Mixolator interaction handler
                     if breedery_button_rect.collidepoint(mouse_x, mouse_y):
                         breeding.mainloop()
                     if hatchery_button_rect.collidepoint(mouse_x, mouse_y):
@@ -1027,6 +1027,8 @@ def game_loop():
                     current_screen, displayed_quests = handle_quest_screen_interactions(mouse_x, mouse_y, selected_category, displayed_quests)
                 elif current_screen == 'area':
                     current_screen, displayed_quests = handle_area_screen_interactions(mouse_x, mouse_y, selected_area, boss_dragon, player_dragons, displayed_quests)
+                elif current_screen == 'mixolator':
+                    current_screen, _ = Mixolator.handle_mix_screen_interactions()
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
                 handle_dragon_upgrade(event, selected_dragon_for_upgrade, upgrade_dragon_rect, display_error=True)
 
@@ -1041,10 +1043,14 @@ def game_loop():
                 category_buttons.append(button_rect)
                 dragon_rect = pygame.Rect(pos[0] - 75, pos[1] - 75, 150, 150)
                 dragon_buttons.append(dragon_rect)
+            # Print inventory to verify readback
+            print(f"Inventory when displaying hub: {inventory}")
         elif current_screen == 'quest' and selected_category is not None:
             draw_quest_gameboard(selected_category, displayed_quests)
         elif current_screen == 'area' and selected_area is not None:
             fight_button_rect, back_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+        elif current_screen == 'mixolator':
+            pass  # Mixolator screen is handled by the interaction function
 
         pygame.display.flip()
 
@@ -1056,4 +1062,3 @@ if __name__ == "__main__":
     load_inventory_data()
     game_loop()
     save_inventory_data()
-

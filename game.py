@@ -297,15 +297,18 @@ def draw_back_to_hub_button():
 
 def save_inventory_data():
     try:
+        print("Starting batch commit for inventory data")
         batch = db.batch()
         for fruit, count in inventory.items():
             doc_ref = db.collection('inventory').document(fruit)
             batch.set(doc_ref, {'count': count})
+            print(f"Prepared batch set for {fruit}: {count}")
         batch.commit()
-        logging.info("Inventory data saved successfully")
+        print("Batch commit successful, inventory data saved")
     except Exception as e:
-        logging.error(f"Error saving inventory data: {e}")
         print(f"Error saving inventory data: {e}")
+
+
 
 def save_elixir_data(elixir_data):
     try:
