@@ -877,8 +877,8 @@ def handle_area_screen_interactions(mouse_x, mouse_y, selected_area, boss_dragon
     
     return 'area', displayed_quests  # Stay in area screen
 
-def initialize_boss_and_quests(mouse_x, mouse_y):
-    global selected_dragon_for_upgrade, selected_area, boss_dragon_filename, boss_dragon_stats, displayed_quests, boss_dragon
+def initialize_boss_dragon(mouse_x, mouse_y):
+    global selected_dragon_for_upgrade, selected_area, boss_dragon_filename, boss_dragon_stats, boss_dragon
     for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
         dragon_image_file = selected_dragons[i]
         dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
@@ -894,10 +894,14 @@ def initialize_boss_and_quests(mouse_x, mouse_y):
                 'defense': boss_dragon.stats['defense'],
                 'dodge': boss_dragon.stats['dodge']
             }
-            all_quests = load_quests(selected_area)
-            displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
-            return 'area', boss_dragon, selected_area, displayed_quests  # Return displayed_quests as well
-    return 'hub', None, None, []  # Return an empty list for displayed_quests
+            return 'area', boss_dragon, selected_area
+    return 'hub', None, None
+
+def initialize_quests(selected_area):
+    global displayed_quests
+    all_quests = load_quests(selected_area)
+    displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
+    return displayed_quests
 
 
 def game_loop():
@@ -925,7 +929,9 @@ def game_loop():
                     upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect = draw_hub_gameboard()
                     if not handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrade):
                         selected_dragon_for_upgrade = handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
-                    current_screen, boss_dragon, selected_area, displayed_quests = initialize_boss_and_quests(mouse_x, mouse_y)
+                    current_screen, boss_dragon, selected_area = initialize_boss_dragon(mouse_x, mouse_y)
+                    if current_screen == 'area':
+                        displayed_quests = initialize_quests(selected_area)
                     if mixolator_button_rect.collidepoint(mouse_x, mouse_y):
                         main()
                     if breedery_button_rect.collidepoint(mouse_x, mouse_y):
@@ -954,3 +960,4 @@ if __name__ == "__main__":
     load_inventory_data()
     game_loop()
     save_inventory_data()
+
