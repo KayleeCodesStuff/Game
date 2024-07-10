@@ -834,6 +834,28 @@ def handle_back_to_hub_click(mouse_x, mouse_y):
     back_button_rect = pygame.Rect(WIDTH - 160, HEIGHT - 60, 150, 50)
     return back_button_rect.collidepoint(mouse_x, mouse_y)
 
+def handle_dragon_upgrade(event, selected_dragon_for_upgrade, upgrade_dragon_rect, display_error):
+    if event.key == pygame.K_1:
+        if spend_fruit_and_update_stats('gleamberry', selected_dragon_for_upgrade, display_error):
+            draw_hub_gameboard()
+            display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+    elif event.key == pygame.K_2:
+        if spend_fruit_and_update_stats('flamefruit', selected_dragon_for_upgrade, display_error):
+            draw_hub_gameboard()
+            display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+    elif event.key == pygame.K_3:
+        if spend_fruit_and_update_stats('shimmeringapple', selected_dragon_for_upgrade, display_error):
+            draw_hub_gameboard()
+            display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+    elif event.key == pygame.K_4:
+        if spend_fruit_and_update_stats('etherealpear', selected_dragon_for_upgrade, display_error):
+            draw_hub_gameboard()
+            display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+    elif event.key == pygame.K_5:
+        if spend_fruit_and_update_stats('moonbeammelon', selected_dragon_for_upgrade, display_error):
+            draw_hub_gameboard()
+            display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+
 
 def game_loop():
     running = True
@@ -903,26 +925,7 @@ def game_loop():
                         if quests_updated:
                             draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
-                if event.key == pygame.K_1:
-                    if spend_fruit_and_update_stats('gleamberry', selected_dragon_for_upgrade):
-                        draw_hub_gameboard()
-                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
-                elif event.key == pygame.K_2:
-                    if spend_fruit_and_update_stats('flamefruit', selected_dragon_for_upgrade):
-                        draw_hub_gameboard()
-                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
-                elif event.key == pygame.K_3:
-                    if spend_fruit_and_update_stats('shimmeringapple', selected_dragon_for_upgrade):
-                        draw_hub_gameboard()
-                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
-                elif event.key == pygame.K_4:
-                    if spend_fruit_and_update_stats('etherealpear', selected_dragon_for_upgrade):
-                        draw_hub_gameboard()
-                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
-                elif event.key == pygame.K_5:
-                    if spend_fruit_and_update_stats('moonbeammelon', selected_dragon_for_upgrade):
-                        draw_hub_gameboard()
-                        display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
+                handle_dragon_upgrade(event, selected_dragon_for_upgrade, upgrade_dragon_rect, display_error=True)
 
         if current_screen == 'hub':
             upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect = draw_hub_gameboard()
@@ -935,9 +938,6 @@ def game_loop():
 
     pygame.quit()
     print("Game loop ended")
-
-
-
 
 if __name__ == "__main__":
     initialize()
