@@ -856,6 +856,27 @@ def handle_dragon_upgrade(event, selected_dragon_for_upgrade, upgrade_dragon_rec
             draw_hub_gameboard()
             display_dragon_statistics(selected_dragon_for_upgrade, upgrade_dragon_rect)
 
+def handle_area_screen_interactions(mouse_x, mouse_y, selected_area, boss_dragon, player_dragons, displayed_quests):
+    global player_tokens
+
+    fight_button_rect, back_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+    if back_button_rect.collidepoint(mouse_x, mouse_y):
+        return 'hub', displayed_quests  # Switch to hub screen
+    elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
+        if player_tokens[selected_area] >= 10:
+            player_tokens[selected_area] -= 10
+            if any(dragon is not None for dragon in player_dragons):
+                start_combat(player_dragons, boss_dragon.stats, draw_area_gameboard, screen, selected_area, player_tokens, boss_dragon.filename)
+            else:
+                print("Error: At least one player dragon must be initialized.")
+    else:
+        displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y, displayed_quests)
+        handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
+        if quests_updated:
+            draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+    
+    return 'area', displayed_quests  # Stay in area screen
+
 
 def game_loop():
     running = True
@@ -865,6 +886,7 @@ def game_loop():
     player_dragons = initialize_player_dragons()
     displayed_quests = []
     global selected_dragon_for_upgrade
+    selected_dragon_for_upgrade = None
     boss_dragon_stats = None
 
     global inventory, egg_counts, inventory_slots
@@ -879,8 +901,7 @@ def game_loop():
                 if current_screen == 'hub':
                     upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect = draw_hub_gameboard()
                     if not handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrade):
-                        selected_dragon_for_upgrade = handle_upgrade_dragon_click(
-                            mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
+                        selected_dragon_for_upgrade = handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
                     for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
                         dragon_image_file = selected_dragons[i]
                         dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
@@ -903,27 +924,11 @@ def game_loop():
                     if mixolator_button_rect.collidepoint(mouse_x, mouse_y):
                         main()
                     if breedery_button_rect.collidepoint(mouse_x, mouse_y):
-                        breeding.main()
+                        breeding.mainloop()
                     if hatchery_button_rect.collidepoint(mouse_x, mouse_y):
-                        hatchery.main()
+                        hatchery.main_loop()
                 elif current_screen == 'area':
-                    fight_button_rect, back_button_rect = draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
-                    if back_button_rect.collidepoint(mouse_x, mouse_y):
-                        current_screen = 'hub'
-                    elif fight_button_rect and fight_button_rect.collidepoint(mouse_x, mouse_y):
-                        if player_tokens[selected_area] >= 10:
-                            player_tokens[selected_area] -= 10
-                            if any(dragon is not None for dragon in player_dragons):
-                                start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen,
-                                             selected_area, player_tokens, boss_dragon_filename)
-                            else:
-                                print("Error: At least one player dragon must be initialized.")
-                    else:
-                        displayed_quests, quests_updated = handle_quest_click(selected_area, mouse_x, mouse_y,
-                                                                              displayed_quests)
-                        handle_player_dragon_slot_click(mouse_x, mouse_y, player_dragons)
-                        if quests_updated:
-                            draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+                    current_screen, displayed_quests = handle_area_screen_interactions(mouse_x, mouse_y, selected_area, boss_dragon, player_dragons, displayed_quests)
             elif event.type == pygame.KEYDOWN and selected_dragon_for_upgrade:
                 handle_dragon_upgrade(event, selected_dragon_for_upgrade, upgrade_dragon_rect, display_error=True)
 
