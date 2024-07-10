@@ -877,6 +877,28 @@ def handle_area_screen_interactions(mouse_x, mouse_y, selected_area, boss_dragon
     
     return 'area', displayed_quests  # Stay in area screen
 
+def initialize_boss_and_quests(mouse_x, mouse_y):
+    global selected_dragon_for_upgrade, selected_area, boss_dragon_filename, boss_dragon_stats, displayed_quests, boss_dragon
+    for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
+        dragon_image_file = selected_dragons[i]
+        dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
+        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
+        image_rect = dragon_image.get_rect(center=pos)
+        if image_rect.collidepoint(mouse_x, mouse_y):
+            selected_area = list(CATEGORY_INFO.keys())[i]
+            boss_dragon_filename = dragon_image_file
+            boss_dragon = BossDragon(boss_dragon_filename, tier=1)
+            boss_dragon_stats = {
+                'health': boss_dragon.stats['health'],
+                'attack': boss_dragon.stats['attack'],
+                'defense': boss_dragon.stats['defense'],
+                'dodge': boss_dragon.stats['dodge']
+            }
+            all_quests = load_quests(selected_area)
+            displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
+            return 'area', boss_dragon, selected_area, displayed_quests  # Return displayed_quests as well
+    return 'hub', None, None, []  # Return an empty list for displayed_quests
+
 
 def game_loop():
     running = True
@@ -888,6 +910,7 @@ def game_loop():
     global selected_dragon_for_upgrade
     selected_dragon_for_upgrade = None
     boss_dragon_stats = None
+    boss_dragon = None
 
     global inventory, egg_counts, inventory_slots
     inventory, egg_counts, inventory_slots = load_inventory_data()
@@ -902,25 +925,7 @@ def game_loop():
                     upgrade_dragon_rect, mixolator_button_rect, breedery_button_rect, hatchery_button_rect, back_button_rect = draw_hub_gameboard()
                     if not handle_fruit_click_in_inventory(mouse_x, mouse_y, selected_dragon_for_upgrade):
                         selected_dragon_for_upgrade = handle_upgrade_dragon_click(mouse_x, mouse_y, upgrade_dragon_rect, player_dragons)
-                    for i, pos in enumerate([(100, 200), (300, 200), (500, 200), (700, 200), (900, 200)]):
-                        dragon_image_file = selected_dragons[i]
-                        dragon_image_path = os.path.join(os.path.dirname(__file__), 'assets', 'images', 'dragons', dragon_image_file)
-                        dragon_image = load_and_resize_image_keeping_aspect(dragon_image_path, (150, 150))
-                        image_rect = dragon_image.get_rect(center=pos)
-                        if image_rect.collidepoint(mouse_x, mouse_y):
-                            selected_area = list(CATEGORY_INFO.keys())[i]
-                            boss_dragon_filename = dragon_image_file
-                            boss_dragon = BossDragon(boss_dragon_filename, tier=1)
-                            boss_dragon_stats = {
-                                'health': boss_dragon.stats['health'],
-                                'attack': boss_dragon.stats['attack'],
-                                'defense': boss_dragon.stats['defense'],
-                                'dodge': boss_dragon.stats['dodge']
-                            }
-                            all_quests = load_quests(selected_area)
-                            displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
-                            current_screen = 'area'
-                            break
+                    current_screen, boss_dragon, selected_area, displayed_quests = initialize_boss_and_quests(mouse_x, mouse_y)
                     if mixolator_button_rect.collidepoint(mouse_x, mouse_y):
                         main()
                     if breedery_button_rect.collidepoint(mouse_x, mouse_y):
