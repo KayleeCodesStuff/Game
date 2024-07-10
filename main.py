@@ -177,7 +177,7 @@ def draw_beveled_button_gradient(surface, rect, text, font, gradient_colors):
     surface.blit(text_surface, text_rect)
 
 
-def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
+def draw_area_gameboard(category, boss_dragon, player_dragons, quests=None):
     screen.fill(GREY)
     screen.blit(background, (0, 0))
 
@@ -227,17 +227,18 @@ def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
     grid_width = total_grid_width // grid_cols
     start_y = (HEIGHT - 100) * 0.45
 
-    for i, quest in enumerate(quests):
-        text_surface = small_font.render(quest[2], True, WHITE)
-        button_width = text_surface.get_width() + 20
-        x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
-        y = start_y + (i // grid_cols) * grid_height + \
-            (grid_height - button_height) // 2
-        color = CATEGORY_INFO.get(quest[1], {}).get('color', BLUE)
-        if quest[5]:
-            color = GREY
-        rect = pygame.Rect(x, y, button_width, button_height)
-        draw_beveled_button(screen, rect, color, quest[2], small_font)
+    if quests:
+        for i, quest in enumerate(quests):
+            text_surface = small_font.render(quest[2], True, WHITE)
+            button_width = text_surface.get_width() + 20
+            x = (i % grid_cols) * grid_width + (grid_width - button_width) // 2
+            y = start_y + (i // grid_cols) * grid_height + \
+                (grid_height - button_height) // 2
+            color = CATEGORY_INFO.get(quest[1], {}).get('color', BLUE)
+            if quest[5]:
+                color = GREY
+            rect = pygame.Rect(x, y, button_width, button_height)
+            draw_beveled_button(screen, rect, color, quest[2], small_font)
 
     draw_inventory(screen, inventory, egg_counts, inventory_slots)
     back_button_rect = draw_back_to_hub_button()  # Updated to use the new function
@@ -250,6 +251,7 @@ def draw_area_gameboard(category, boss_dragon, player_dragons, quests):
     pygame.display.flip()
 
     return fight_button_rect, back_button_rect  # Updated to return the new button rect
+
 
 def get_all_dragon_ids():
     try:
@@ -296,8 +298,6 @@ def initialize_dragons():
     global selected_dragons
     if not any(selected_dragons):
         selected_dragons = get_random_dragons()
-
-
 
 
 def load_and_resize_image_keeping_aspect(file_path, max_size):
@@ -862,8 +862,12 @@ def game_loop():
                             selected_area = list(CATEGORY_INFO.keys())[i]
                             boss_dragon_filename = dragon_image_file
                             boss_dragon = BossDragon(boss_dragon_filename, tier=1)
-                            boss_dragon_stats = (boss_dragon.stats['health'], boss_dragon.stats['attack'],
-                                                 boss_dragon.stats['defense'], boss_dragon.stats['dodge'])
+                            boss_dragon_stats = {
+                                'health': boss_dragon.stats['health'],
+                                'attack': boss_dragon.stats['attack'],
+                                'defense': boss_dragon.stats['defense'],
+                                'dodge': boss_dragon.stats['dodge']
+                            }
                             all_quests = load_quests(selected_area)
                             displayed_quests = random.sample(all_quests, min(12, len(all_quests)))
                             current_screen = 'area'
@@ -883,7 +887,7 @@ def game_loop():
                             player_tokens[selected_area] -= 10
                             if any(dragon is not None for dragon in player_dragons):
                                 start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen,
-                                             selected_area, player_tokens, displayed_quests, boss_dragon_filename)
+                                             selected_area, player_tokens, boss_dragon_filename)
                             else:
                                 print("Error: At least one player dragon must be initialized.")
                     else:
@@ -925,6 +929,7 @@ def game_loop():
 
     pygame.quit()
     print("Game loop ended")
+
 
 
 

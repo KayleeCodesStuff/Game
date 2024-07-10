@@ -684,7 +684,7 @@ def delete_hatched_dragon(doc_id):
 
 
 # Main game loop with interactivity
-def main():
+def mainloop():
     
     initialize_dragons()
 
@@ -753,4 +753,4 @@ def main():
     pygame.quit()
 
 if __name__ == "__main__":
-    main()
+    mainloop()

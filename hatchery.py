@@ -108,7 +108,7 @@ def fetch_dragons_from_firestore():
             if dragon_doc.exists:
                 dragon_data = dragon_doc.to_dict()
                 dragon_data['id'] = dragon_doc.id  # Add the document ID to the dragon data
-                print(f"Dragon data fetched: {dragon_data}")
+               
                 dragons.append(dragon_data)
 
         print(f"Number of dragons fetched: {len(dragons)}")
@@ -824,7 +824,7 @@ def save_all_ddragon_instances(ddragon_save_list):
         print(f"Error saving ddragon instances to Firestore: {e}")
 
 
-def main():
+def main_loop():
     global elixir_color, eggs, dragons  # Declare dragons as global
     elixir_color = None
     running = True
@@ -976,6 +976,6 @@ def main():
     sys.exit()
 
 if __name__ == "__main__":
-    main()
+    main_loop()
 
 

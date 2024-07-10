@@ -44,7 +44,9 @@ initialize()
 # Screen dimensions
 WIDTH, HEIGHT = 1200, 900
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Dragon Game")
+#pygame.display.set_caption("Dragon Game")
+
+#background = load_image(os.path.join('background.png'), (WIDTH, HEIGHT))
 
 # Colors
 WHITE = (255, 255, 255)
@@ -96,7 +98,6 @@ def load_and_resize_image(file_path, size):
 
 
 
-background = load_image(os.path.join('background.png'), (WIDTH, HEIGHT))
 
 fruit_images_dict = {
 "gleamberry": load_image(os.path.join('gleamberry.png'), (50, 50)),

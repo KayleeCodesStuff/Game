@@ -425,14 +425,12 @@ def save_player_dragon_hitpoints(dragon):
     except Exception as e:
         print(f"Error saving player dragon hitpoints: {e}")
 
-def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests, boss_dragon_filename):
+def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen, selected_area, player_tokens, boss_dragon_filename):
     boss_dragon = BossDragon(filename=boss_dragon_filename)
-    boss_dragon.stats = {
-        'health': boss_dragon_stats[0],
-        'attack': boss_dragon_stats[1],
-        'defense': boss_dragon_stats[2],
-        'dodge': boss_dragon_stats[3]
-    }
+    if isinstance(boss_dragon_stats, dict):
+        boss_dragon.stats.update(boss_dragon_stats)
+    else:
+        raise ValueError("boss_dragon_stats must be a dictionary")
     boss_dragon.calculate_hitpoints_and_damage()
     boss_dragon.current_hitpoints = boss_dragon.maximum_hitpoints  # Set initial current_hitpoints to maximum_hitpoints
     print(f"Boss Dragon - HP: {boss_dragon.current_hitpoints}, Attack: {boss_dragon.stats['attack']}, Defense: {boss_dragon.stats['defense']}, Dodge: {boss_dragon.stats['dodge']}")
@@ -450,9 +448,10 @@ def start_combat(player_dragons, boss_dragon_stats, draw_area_gameboard, screen,
         print("Error: At least one player dragon must be initialized for combat.")
         return
 
-    combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests)
+    combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens)
 
-def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens, displayed_quests):
+
+def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_area, player_tokens):
     while boss_dragon.current_hitpoints > 0 and any(dragon is not None and dragon.current_hitpoints > 0 for dragon in player_dragons):
         for dragon in player_dragons:
             if dragon and dragon.current_hitpoints > 0:
@@ -463,7 +462,7 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
                     damage_to_boss = round(player_attack_boss(dragon, boss_dragon))
                 boss_dragon.current_hitpoints = max(0, round(boss_dragon.current_hitpoints - damage_to_boss, 2))
                 print(f"{dragon.name} attacks boss for {damage_to_boss} damage. Boss HP: {round(boss_dragon.current_hitpoints)}")
-                draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+                draw_area_gameboard(selected_area, boss_dragon, player_dragons)  # No quests argument
                 pygame.display.flip()
                 time.sleep(0.5)
                 if boss_dragon.current_hitpoints <= 0:
@@ -477,7 +476,7 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
                     damage_to_dragon = round(boss_attack_player(boss_dragon, dragon))
                 dragon.current_hitpoints = max(0, round(dragon.current_hitpoints - damage_to_dragon, 2))
                 print(f"Boss attacks {dragon.name} for {damage_to_dragon} damage. {dragon.name} HP: {round(dragon.current_hitpoints)}")
-                draw_area_gameboard(selected_area, boss_dragon, player_dragons, displayed_quests)
+                draw_area_gameboard(selected_area, boss_dragon, player_dragons)  # No quests argument
                 pygame.display.flip()
                 time.sleep(0.5)
                 if dragon.current_hitpoints <= 0:
@@ -487,6 +486,9 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
         print("Boss wins!")
     else:
         print("Players win!")
+        
+        
+    boss_dragon.save_current_hitpoints()
 
     # After combat ends, ensure all dragons have at least 1 HP if they reached 0 and save hitpoints
     for dragon in player_dragons:
@@ -499,3 +501,5 @@ def combat(player_dragons, boss_dragon, draw_area_gameboard, screen, selected_ar
     for dragon in player_dragons:
         if dragon:
             print(f"Final {dragon.name} HP: {dragon.current_hitpoints}")
+
+
