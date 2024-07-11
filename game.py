@@ -295,8 +295,10 @@ def draw_back_to_hub_button():
     return back_button_rect
 
 
-def save_inventory_data():
+def save_inventory_data(inventory=None):
     try:
+        if inventory is None:
+            inventory = globals().get('inventory', {})
         print("Starting batch commit for inventory data")
         batch = db.batch()
         for fruit, count in inventory.items():
