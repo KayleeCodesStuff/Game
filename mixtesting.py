@@ -481,13 +481,12 @@ def update_button_rects():
     bottle_button_rect = draw_bottle_button()  # Draw the "Bottle" button
     return back_button_rect, delete_button_rect, bottle_button_rect
 
-
-
-def main():
+def handle_mix_screen_interactions(inventory):
     global elixir_color, elixir_personality, elixir_color_name, elixir_title, selected_inventory_slot
     running = True
     selected_box = 0  # Start with the primary trait selection box selected
     selected_inventory_slot = None
+    elixir_data = None  # Initialize elixir_data
 
     # Declare button rects at the beginning
     back_button_rect = None
@@ -495,37 +494,118 @@ def main():
     bottle_button_rect = None
 
     while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-                
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = event.pos
+        running, selected_box, selected_inventory_slot, elixir_data, elixir_color, inventory = handle_events_mix(
+            running, selected_box, selected_inventory_slot, selections, mixalate_button, elixir_color, elixir_data, inventory_slots, back_button_rect, delete_button_rect, bottle_button_rect, inventory
+        )
 
-                selected_box = handle_selection_clicks(x, y, selections, selected_box)
+        # Draw the screen
+        draw_screen(selected_box, selected_inventory_slot, inventory)
 
-                if mixalate_button.collidepoint(x, y) and None not in selections:
-                    elixir_data, elixir_color, elixir_personality, elixir_color_name, elixir_title = create_elixir(selections)
+        # Update button rects
+        back_button_rect, delete_button_rect, bottle_button_rect = update_button_rects()
 
-                if elixir_color and bottle_button_rect.collidepoint(x, y):
-                    handle_bottle_button_click(elixir_data, elixir_color, inventory_slots)
+        # Update the display
+        pygame.display.flip()
 
-                # Handle elixir slot click
-                x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
-                y_offset = HEIGHT - 90
-                for i in range(len(inventory_slots)):
-                    if pygame.Rect(x_offset + i * 60, y_offset, 50, 50).collidepoint(x, y):
-                        selected_inventory_slot = i
+    return 'hub', inventory
 
-                # Handle delete button press
-                if delete_button_rect.collidepoint(x, y) and selected_inventory_slot is not None:
-                    delete_elixir_data(selected_inventory_slot + 1)
-                    inventory_slots[selected_inventory_slot] = None
-                    selected_inventory_slot = None
+def handle_events_mix(running, selected_box, selected_inventory_slot, selections, mixalate_button, elixir_color, elixir_data, inventory_slots, back_button_rect, delete_button_rect, bottle_button_rect, inventory):
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            print("Quitting the program. Saving inventory data...")
+            save_inventory_data(inventory)
+            running = False
+            return running, selected_box, selected_inventory_slot, elixir_data, elixir_color, inventory
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = event.pos
+            selected_box = handle_selection_clicks(x, y, selections, selected_box)
 
-                # Handle "Back to Hub" button press
-                if back_button_rect.collidepoint(x, y):
-                    running = False  # Exit the current loop to return to the hub
+            if mixalate_button.collidepoint(x, y) and None not in selections:
+                elixir_data, elixir_color, elixir_personality, elixir_color_name, elixir_title = create_elixir(selections)
+                for i in range(1, 4):
+                    fruit_name = fruit_names[selections[i]]
+                    inventory[fruit_name] -= 1
+                    print(f"Reduced {fruit_name} count to {inventory[fruit_name]}")
+                save_inventory_data(inventory)
+                print(f"Inventory after update: {inventory}")
+
+            if elixir_color and bottle_button_rect.collidepoint(x, y):
+                handle_bottle_button_click(elixir_data, elixir_color, inventory_slots)
+
+            # Handle elixir slot click
+            x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
+            y_offset = HEIGHT - 90
+            for i in range(len(inventory_slots)):
+                if pygame.Rect(x_offset + i * 60, y_offset, 50, 50).collidepoint(x, y):
+                    selected_inventory_slot = i
+
+            # Handle delete button press
+            if delete_button_rect.collidepoint(x, y) and selected_inventory_slot is not None:
+                delete_elixir_data(selected_inventory_slot + 1)
+                inventory_slots[selected_inventory_slot] = None
+                save_inventory_data(inventory)
+                selected_inventory_slot = None
+
+            # Handle "Back to Hub" button press
+            if back_button_rect.collidepoint(x, y):
+                print("Returning to hub. Saving inventory data...")
+                save_inventory_data(inventory)
+                running = False  # Exit the current loop to return to the hub
+
+    return running, selected_box, selected_inventory_slot, elixir_data, elixir_color, inventory
+
+def handle_events(running, selected_box, selected_inventory_slot, selections, mixalate_button, elixir_color, elixir_data, inventory_slots, back_button_rect, delete_button_rect, bottle_button_rect):
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = event.pos
+
+            selected_box = handle_selection_clicks(x, y, selections, selected_box)
+
+            if mixalate_button.collidepoint(x, y) and None not in selections:
+                elixir_data, elixir_color, elixir_personality, elixir_color_name, elixir_title = create_elixir(selections)
+
+            if elixir_color and bottle_button_rect.collidepoint(x, y):
+                handle_bottle_button_click(elixir_data, elixir_color, inventory_slots)
+
+            # Handle elixir slot click
+            x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
+            y_offset = HEIGHT - 90
+            for i in range(len(inventory_slots)):
+                if pygame.Rect(x_offset + i * 60, y_offset, 50, 50).collidepoint(x, y):
+                    selected_inventory_slot = i
+
+            # Handle delete button press
+            if delete_button_rect.collidepoint(x, y) and selected_inventory_slot is not None:
+                delete_elixir_data(selected_inventory_slot + 1)
+                inventory_slots[selected_inventory_slot] = None
+                selected_inventory_slot = None
+
+            # Handle "Back to Hub" button press
+            if back_button_rect.collidepoint(x, y):
+                running = False  # Exit the current loop to return to the hub
+
+    return running, selected_box, selected_inventory_slot, elixir_data, elixir_color
+
+
+def main():
+    global elixir_color, elixir_personality, elixir_color_name, elixir_title, selected_inventory_slot
+    running = True
+    selected_box = 0  # Start with the primary trait selection box selected
+    selected_inventory_slot = None
+    elixir_data = None  # Initialize elixir_data
+
+    # Declare button rects at the beginning
+    back_button_rect = None
+    delete_button_rect = None
+    bottle_button_rect = None
+
+    while running:
+        running, selected_box, selected_inventory_slot, elixir_data, elixir_color = handle_events(
+            running, selected_box, selected_inventory_slot, selections, mixalate_button, elixir_color, elixir_data, inventory_slots, back_button_rect, delete_button_rect, bottle_button_rect
+        )
 
         # Draw the screen
         draw_screen(selected_box, selected_inventory_slot, inventory)
@@ -538,7 +618,6 @@ def main():
 
     pygame.quit()
     sys.exit()
-
 
 if __name__ == "__main__":
     main()
