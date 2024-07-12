@@ -400,6 +400,20 @@ def handle_fruit_selection(x, y, selected_box, selections):
         x_offset += 60
     return selected_box
 
+def handle_selection_clicks(x, y, selections, selected_box):
+    # Handle selection box clicks
+    for i, box in enumerate(selection_boxes):
+        if box.collidepoint(x, y):
+            selected_box = i
+
+    # Handle primary trait selection
+    selected_box = handle_primary_trait_selection(x, y, selected_box, selections)
+
+    # Handle fruit selection
+    selected_box = handle_fruit_selection(x, y, selected_box, selections)
+
+    return selected_box
+
 
 def create_elixir(selections):
     # Create dragon elixir
@@ -422,8 +436,7 @@ def create_elixir(selections):
 
     # Save the updated inventory
     save_inventory_data()
-    print("Inventory data saved successfully")
-
+    
     # Assign primary trait and secondary traits separately
     primary_trait = personality_keywords[selections[0]]
     secondary_traits = elixir_personality[1:]  # Exclude the primary trait
@@ -442,6 +455,32 @@ def create_elixir(selections):
     
     return elixir_data, elixir_color, elixir_personality, elixir_color_name, elixir_title
 
+def handle_bottle_button_click(elixir_data, elixir_color, inventory_slots):
+    try:
+        # Save the elixir data when the "Bottle" button is clicked
+        elixir_data['position'] = next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
+        save_elixir_data(elixir_data)
+        
+        # Draw color swatch behind the background
+        pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
+
+        # Add the elixir to the inventory
+        for i in range(len(inventory_slots)):
+            if inventory_slots[i] is None:
+                image_file = elixir_data['image_file']
+                inventory_slots[i] = (elixir_color, image_file)
+                break
+
+    except StopIteration:
+        print("Inventory is full! Cannot save more elixirs.")
+        # Handle full inventory case, e.g., display a message to the user or take other actions
+
+def update_button_rects():
+    back_button_rect = draw_back_to_hub_button()  # Draw the "Back to Hub" button
+    delete_button_rect = draw_delete_button()  # Draw the "Delete" button
+    bottle_button_rect = draw_bottle_button()  # Draw the "Bottle" button
+    return back_button_rect, delete_button_rect, bottle_button_rect
+
 
 
 def main():
@@ -459,43 +498,17 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                save_inventory_data()
+                
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = event.pos
-                # Handle selection box clicks
-                for i, box in enumerate(selection_boxes):
-                    if box.collidepoint(x, y):
-                        selected_box = i
 
-                # Handle primary trait selection
-                selected_box = handle_primary_trait_selection(x, y, selected_box, selections)
-
-                # Handle fruit selection
-                selected_box = handle_fruit_selection(x, y, selected_box, selections)
+                selected_box = handle_selection_clicks(x, y, selections, selected_box)
 
                 if mixalate_button.collidepoint(x, y) and None not in selections:
                     elixir_data, elixir_color, elixir_personality, elixir_color_name, elixir_title = create_elixir(selections)
 
                 if elixir_color and bottle_button_rect.collidepoint(x, y):
-                    try:
-                        # Save the elixir data when the "Bottle" button is clicked
-                        elixir_data['position'] = next(i for i, slot in enumerate(inventory_slots) if slot is None) + 1  # Find the next available slot
-                        save_elixir_data(elixir_data)
-                        save_inventory_data()
-                        # Draw color swatch behind the background
-                        pygame.draw.rect(screen, elixir_color, (0, 0, WIDTH, HEIGHT))
-
-                        # Add the elixir to the inventory
-                        for i in range(len(inventory_slots)):
-                            if inventory_slots[i] is None:
-                                image_file = elixir_data['image_file']
-                                inventory_slots[i] = (elixir_color, image_file)
-                                save_inventory_data()
-                                break
-
-                    except StopIteration:
-                        print("Inventory is full! Cannot save more elixirs.")
-                        # Handle full inventory case, e.g., display a message to the user or take other actions
+                    handle_bottle_button_click(elixir_data, elixir_color, inventory_slots)
 
                 # Handle elixir slot click
                 x_offset = WIDTH - 60 * len(inventory_slots)  # Start from the rightmost part of the screen
@@ -508,27 +521,24 @@ def main():
                 if delete_button_rect.collidepoint(x, y) and selected_inventory_slot is not None:
                     delete_elixir_data(selected_inventory_slot + 1)
                     inventory_slots[selected_inventory_slot] = None
-                    save_inventory_data()
                     selected_inventory_slot = None
 
                 # Handle "Back to Hub" button press
                 if back_button_rect.collidepoint(x, y):
                     running = False  # Exit the current loop to return to the hub
-                   
 
         # Draw the screen
         draw_screen(selected_box, selected_inventory_slot, inventory)
 
         # Update button rects
-        back_button_rect = draw_back_to_hub_button()  # Draw the "Back to Hub" button
-        delete_button_rect = draw_delete_button()  # Draw the "Delete" button
-        bottle_button_rect = draw_bottle_button()  # Draw the "Bottle" button
+        back_button_rect, delete_button_rect, bottle_button_rect = update_button_rects()
 
         # Update the display
         pygame.display.flip()
 
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()
